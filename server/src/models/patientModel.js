@@ -1,0 +1,170 @@
+import pool from '../config/db.js'
+
+// Whitelisted 'to, hindi galing sa user input — sarili nating sinulat na
+// ORDER BY clause lang naman palagi yung `sort`, kaya walang injection
+// surface kahit direktang na-iinterpolate 'to sa query string sa baba.
+// Yung "(x IS NULL) ASC" trick, tinutulak nito sa ilalim yung mga patient
+// na wala pang treatment kahit anong direction, dahil wala namang NULLS
+// LAST keyword si MySQL.
+const PATIENT_SORTS = {
+  name: 'p.last_name ASC, p.first_name ASC',
+  name_desc: 'p.last_name DESC, p.first_name DESC',
+  date_added: 'p.created_at DESC',
+  date_added_asc: 'p.created_at ASC',
+  last_visit: '(lt.last_treatment_date IS NULL) ASC, lt.last_treatment_date DESC',
+}
+
+function buildPatientListQuery({ search }) {
+  const searchTerm = search ? `%${search}%` : null
+  const where = searchTerm
+    ? 'WHERE p.deleted_at IS NULL AND (CONCAT(p.first_name, " ", p.last_name) LIKE :search OR p.id = :searchId)'
+    : 'WHERE p.deleted_at IS NULL'
+  return {
+    where,
+    params: { search: searchTerm, searchId: search ? Number(search) || 0 : null },
+  }
+}
+
+export async function listPatients({ search, sort, limit, offset }) {
+  const { where, params } = buildPatientListQuery({ search })
+  const orderBy = PATIENT_SORTS[sort] || PATIENT_SORTS.name
+
+  const [rows] = await pool.execute(
+    `SELECT p.id, p.first_name, p.last_name, p.sex, p.date_of_birth, p.contact_number, p.email,
+            p.is_legacy_migrated, p.created_at, lt.last_treatment_date
+     FROM patients p
+     LEFT JOIN (
+       SELECT patient_id, MAX(treatment_date) AS last_treatment_date
+       FROM treatments
+       GROUP BY patient_id
+     ) lt ON lt.patient_id = p.id
+     ${where}
+     ORDER BY ${orderBy}
+     LIMIT :limit OFFSET :offset`,
+    { ...params, limit, offset },
+  )
+
+  const [[{ total }]] = await pool.execute(
+    `SELECT COUNT(*) AS total FROM patients p ${where}`,
+    params,
+  )
+
+  return { rows, total }
+}
+
+// Full, unpaginated column set 'to para sa CSV export — dentist-only
+// (tignan route). Ginagamit ulit yung parehong search filter ng list
+// view, kaya kapag "Export CSV" pagkatapos mag-search, filtered results
+// lang ang lalabas, hindi lahat ng patient.
+export async function listPatientsForExport({ search }) {
+  const { where, params } = buildPatientListQuery({ search })
+  const [rows] = await pool.execute(
+    `SELECT p.* FROM patients p ${where} ORDER BY p.last_name, p.first_name`,
+    params,
+  )
+  return rows
+}
+
+// Sa point of view ng app, yung mga soft-deleted patients, parang wala
+// nang existing (404, kagaya ng invalid id) — kept pa rin naman yung row
+// mismo para sa compliance/retention, pero wala nang lalabas dito sa API.
+export async function findPatientById(id) {
+  const [rows] = await pool.execute(
+    'SELECT * FROM patients WHERE id = :id AND deleted_at IS NULL',
+    { id },
+  )
+  return rows[0] || null
+}
+
+// Ginagamit 'to ng Mailgun inbound webhook para itugma yung emailed X-ray
+// sa isang patient, base sa address ng sender. Hindi tutugma yung email ng
+// deleted patient — walang balikan sa record na itinuturing na naman ng
+// app na wala na.
+export async function findPatientByEmail(email) {
+  const [rows] = await pool.execute(
+    'SELECT * FROM patients WHERE LOWER(email) = LOWER(:email) AND deleted_at IS NULL LIMIT 1',
+    { email },
+  )
+  return rows[0] || null
+}
+
+// Ginagamit 'to ng legacy import para ma-detect yung duplicate profiles.
+// Name + DOB, same de-dup key din naman na gagamitin ng front-desk clerk
+// kung titignan lang niya mismo sa paper folder. Hindi binibilang na
+// duplicate yung mga deleted patients — kapag ni-reimport ulit yung
+// parehong tao pagkatapos ma-delete ang record niya, dapat gumawa 'to ng
+// bago.
+export async function findPatientByNameAndDob(firstName, lastName, dateOfBirth) {
+  const [rows] = await pool.execute(
+    `SELECT id FROM patients
+     WHERE LOWER(first_name) = LOWER(:firstName)
+       AND LOWER(last_name) = LOWER(:lastName)
+       AND date_of_birth = :dateOfBirth
+       AND deleted_at IS NULL
+     LIMIT 1`,
+    { firstName, lastName, dateOfBirth },
+  )
+  return rows[0] || null
+}
+
+export async function createPatient(data) {
+  const [result] = await pool.execute(
+    `INSERT INTO patients
+      (first_name, last_name, sex, date_of_birth, contact_number, email, address, medical_history, allergies, emergency_contact_name, emergency_contact_phone, is_legacy_migrated)
+     VALUES
+      (:firstName, :lastName, :sex, :dateOfBirth, :contactNumber, :email, :address, :medicalHistory, :allergies, :emergencyContactName, :emergencyContactPhone, :isLegacyMigrated)`,
+    {
+      firstName: data.firstName,
+      lastName: data.lastName,
+      sex: data.sex,
+      dateOfBirth: data.dateOfBirth,
+      contactNumber: data.contactNumber ?? null,
+      email: data.email ?? null,
+      address: data.address ?? null,
+      medicalHistory: data.medicalHistory ?? null,
+      allergies: data.allergies ?? null,
+      emergencyContactName: data.emergencyContactName ?? null,
+      emergencyContactPhone: data.emergencyContactPhone ?? null,
+      isLegacyMigrated: data.isLegacyMigrated ? 1 : 0,
+    },
+  )
+  return findPatientById(result.insertId)
+}
+
+export async function updatePatient(id, data) {
+  const fieldMap = {
+    firstName: 'first_name',
+    lastName: 'last_name',
+    sex: 'sex',
+    dateOfBirth: 'date_of_birth',
+    contactNumber: 'contact_number',
+    email: 'email',
+    address: 'address',
+    medicalHistory: 'medical_history',
+    allergies: 'allergies',
+    emergencyContactName: 'emergency_contact_name',
+    emergencyContactPhone: 'emergency_contact_phone',
+  }
+
+  const setClauses = []
+  const params = { id }
+
+  for (const [key, column] of Object.entries(fieldMap)) {
+    if (data[key] !== undefined) {
+      setClauses.push(`${column} = :${key}`)
+      params[key] = data[key]
+    }
+  }
+
+  if (setClauses.length === 0) return findPatientById(id)
+
+  await pool.execute(
+    `UPDATE patients SET ${setClauses.join(', ')} WHERE id = :id`,
+    params,
+  )
+  return findPatientById(id)
+}
+
+export async function softDeletePatient(id) {
+  await pool.execute('UPDATE patients SET deleted_at = NOW() WHERE id = :id', { id })
+}

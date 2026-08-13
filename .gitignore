@@ -1,0 +1,11 @@
+node_modules/
+dist/
+build/
+.env
+!.env.example
+*.log
+uploads/xrays/*
+!uploads/xrays/.gitkeep
+server/uploads/xrays/*
+!server/uploads/xrays/.gitkeep
+.DS_Store
