@@ -2,16 +2,45 @@
 
 /*
  * Clinical design system notes:
- * The requested palette (Deep Navy #0F172A, Slate #475569, Soft Teal
- * #0EA5E9, light gray #F8FAFC) maps exactly onto Tailwind's built-in
- * `slate` and `sky` scales — slate-900/slate-600/slate-50 and sky-500 are
- * those literal hex values. Rather than duplicating them under new custom
- * names, the whole app uses `slate` for neutrals/text/surfaces and `sky`
- * as the single accent color (primary buttons, active nav, links, focus
- * rings). Only the font needs a genuine override, done below.
+ * Rebranded to match the clinic's actual signage (Teodosio-Rufin Dental
+ * Clinic tarpaulin: white background, purple wordmark/banner) and the
+ * approved combo palette (#6F2DBD / #A663CC / #171123 / #FBFBFB). Rather
+ * than touching every file that already uses `sky-*` (accent) and
+ * `slate-*` (neutrals) classes, both built-in Tailwind scales are
+ * redefined here with purple-derived values — same trick as the previous
+ * navy/teal mapping, just new hex. `sky-400`/`sky-600` land exactly on
+ * #A663CC/#6F2DBD (the two brand purples); `slate-50`/`slate-950` land
+ * exactly on #FBFBFB/#171123 (the brand's light/dark neutrals), with the
+ * scale interpolated around those anchors. Other semantic colors
+ * (emerald/amber/red for success/warning/danger) are untouched — those
+ * are status meaning, not brand identity.
  */
 @theme {
   --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+
+  --color-sky-50: #f7f0fe;
+  --color-sky-100: #efe3fd;
+  --color-sky-200: #e0c9f8;
+  --color-sky-300: #c8a5ee;
+  --color-sky-400: #a663cc;
+  --color-sky-500: #8a43d6;
+  --color-sky-600: #6f2dbd;
+  --color-sky-700: #5c239a;
+  --color-sky-800: #461b74;
+  --color-sky-900: #321551;
+  --color-sky-950: #1a0e26;
+
+  --color-slate-50: #fbfbfb;
+  --color-slate-100: #f4f2f7;
+  --color-slate-200: #e7e3ed;
+  --color-slate-300: #d4d0dd;
+  --color-slate-400: #a299b2;
+  --color-slate-500: #7a6c93;
+  --color-slate-600: #5d5170;
+  --color-slate-700: #443b54;
+  --color-slate-800: #2b2438;
+  --color-slate-900: #1f182a;
+  --color-slate-950: #171123;
 }
 
 body {

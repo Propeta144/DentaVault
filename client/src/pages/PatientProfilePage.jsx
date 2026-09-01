@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, lazy, Suspense } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   Printer,
@@ -11,10 +11,12 @@ import {
   Phone,
   Mail,
   MapPin,
-  ShieldAlert,
   Sparkles,
   KeyRound,
   RotateCcw,
+  Box,
+  LayoutGrid,
+  AlertTriangle,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { getPatient, listTreatments, addTreatment, getPortalAccount } from '../services/patients'
@@ -24,8 +26,12 @@ import EditPatientModal from '../components/patients/EditPatientModal'
 import DeletePatientModal from '../components/patients/DeletePatientModal'
 import CreatePortalAccountModal from '../components/patients/CreatePortalAccountModal'
 import ResetPortalPasswordModal from '../components/patients/ResetPortalPasswordModal'
+import Modal from '../components/common/Modal'
 import Odontogram2D from '../components/chart/Odontogram2D'
 import { ALL_TEETH } from '../constants/dental'
+import MedicalAlertBadge from '../components/common/MedicalAlertBadge'
+
+const Odontogram3D = lazy(() => import('../components/chart/Odontogram3D'))
 
 function InfoRow({ icon: Icon, label, value, capitalize }) {
   return (
@@ -50,6 +56,10 @@ export default function PatientProfilePage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [tab, setTab] = useState('history')
+  const [chartView, setChartView] = useState('2d')
+
+  const [has3DPendingDrawing, setHas3DPendingDrawing] = useState(false)
+  const [confirmLeave3D, setConfirmLeave3D] = useState(false)
   const [editing, setEditing] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [portalAccount, setPortalAccount] = useState(undefined)
@@ -67,10 +77,6 @@ export default function PatientProfilePage() {
       .finally(() => setLoading(false))
   }, [id])
 
-  // Dentist lang ang pwedeng gumawa/makakita ng portal-account status,
-  // dentist-only din naman yung endpoint sa server side — kaya laktawan
-  // na lang buong call kapag patient mismo ang nag-vi-view ng sarili
-  // niyang profile.
   useEffect(() => {
     if (user.role !== 'dentist') return
     getPortalAccount(id)
@@ -99,7 +105,9 @@ export default function PatientProfilePage() {
     }`
 
   return (
-    <div className="max-w-3xl space-y-6">
+    <div className="w-full space-y-6">
+      
+      {/* 1. TOP HEADER SECTION */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-slate-900">
@@ -108,50 +116,6 @@ export default function PatientProfilePage() {
           <p className="text-base text-slate-500">Patient ID #{patient.id}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {user.role === 'dentist' && (
-            <>
-              <button
-                type="button"
-                onClick={() => setEditing(true)}
-                className="flex min-h-11 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 text-base font-medium text-slate-700 transition-colors hover:bg-slate-50"
-              >
-                <Pencil className="h-4 w-4" />
-                Edit Information
-              </button>
-              <button
-                type="button"
-                onClick={() => setDeleting(true)}
-                className="flex min-h-11 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 text-base font-medium text-slate-700 transition-colors hover:bg-red-50 hover:text-red-700"
-              >
-                <Trash2 className="h-4 w-4" />
-                Delete
-              </button>
-              {portalAccount === null && (
-                <button
-                  type="button"
-                  onClick={() => setCreatingAccount(true)}
-                  className="flex min-h-11 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 text-base font-medium text-slate-700 transition-colors hover:bg-sky-50 hover:text-sky-700"
-                >
-                  <KeyRound className="h-4 w-4" />
-                  Create Portal Account
-                </button>
-              )}
-              {portalAccount && (
-                <span className="flex min-h-11 items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 py-2 pl-3 pr-1.5 text-sm font-medium text-emerald-700">
-                  <KeyRound className="h-4 w-4" />
-                  Portal: {portalAccount.email}
-                  <button
-                    type="button"
-                    onClick={() => setResettingPassword(true)}
-                    title="Reset portal password"
-                    className="flex h-8 w-8 items-center justify-center rounded text-emerald-700 transition-colors hover:bg-emerald-100"
-                  >
-                    <RotateCcw className="h-4 w-4" />
-                  </button>
-                </span>
-              )}
-            </>
-          )}
           <Link
             to={`/patients/${id}/summary`}
             target="_blank"
@@ -163,95 +127,251 @@ export default function PatientProfilePage() {
         </div>
       </div>
 
-      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
-          <InfoRow icon={Cake} label="Date of Birth" value={patient.date_of_birth} />
-          <InfoRow icon={Sparkles} label="Gender" value={patient.sex} capitalize />
-          <InfoRow icon={Phone} label="Contact" value={patient.contact_number} />
-          <InfoRow icon={Mail} label="Email" value={patient.email} />
-          <InfoRow icon={MapPin} label="Address" value={patient.address} />
-          <InfoRow icon={ShieldAlert} label="Allergies" value={patient.allergies} />
-          <InfoRow
-            icon={Phone}
-            label="Emergency Contact"
-            value={
-              patient.emergency_contact_name
-                ? `${patient.emergency_contact_name}${patient.emergency_contact_phone ? ` — ${patient.emergency_contact_phone}` : ''}`
-                : null
-            }
-          />
-        </div>
-        <div className="mt-4 border-t border-slate-100 pt-4">
-          <InfoRow icon={ClipboardList} label="Medical History" value={patient.medical_history} />
-        </div>
-      </div>
+      {/* 2. MAIN 2-COLUMN GRID LAYOUT */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 items-start">
+        
+        {/* ================= KALIWANG COLUMN: PATIENT INFO & ACTIONS (4 COLS) ================= */}
+        <div className="space-y-6 lg:col-span-4">
+          
+          {/* Patient Details Card */}
+<div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+  <h2 className="mb-4 border-b border-slate-100 pb-2 text-lg font-semibold text-slate-800">
+    Patient Details
+  </h2>
+  <div className="space-y-4">
+    <InfoRow icon={Cake} label="Date of Birth" value={patient.date_of_birth} />
+    <InfoRow icon={Sparkles} label="Gender" value={patient.sex} capitalize />
+    <InfoRow icon={Phone} label="Contact" value={patient.contact_number} />
+    <InfoRow icon={Mail} label="Email" value={patient.email} />
+    <InfoRow icon={MapPin} label="Address" value={patient.address} />
+    <InfoRow
+      icon={Phone}
+      label="Emergency Contact"
+      value={
+        patient.emergency_contact_name
+          ? `${patient.emergency_contact_name}${patient.emergency_contact_phone ? ` — ${patient.emergency_contact_phone}` : ''}`
+          : null
+      }
+    />
 
-      <div className="flex gap-4 overflow-x-auto border-b border-slate-200 sm:gap-6">
-        <button type="button" className={tabClass('history')} onClick={() => setTab('history')}>
-          <ClipboardList className="h-4 w-4" />
-          Treatment History
-        </button>
-        <button type="button" className={tabClass('chart')} onClick={() => setTab('chart')}>
-          <Grid3x3 className="h-4 w-4" />
-          Dental Chart
-        </button>
-        <button type="button" className={tabClass('xrays')} onClick={() => setTab('xrays')}>
-          <ScanLine className="h-4 w-4" />
-          X-rays
-        </button>
-      </div>
+    {/* PARATING NAKALITAW NA BADGES PARA SA ALLERGIES AT MEDICAL HISTORY */}
+    <div className="border-t border-slate-100 pt-4 space-y-3">
+      <MedicalAlertBadge label="Allergies" value={patient.allergies} />
+      <MedicalAlertBadge label="Medical History" value={patient.medical_history} />
+    </div>
+  </div>
+</div>
 
-      {tab === 'history' && (
-        <div>
-          <div className="space-y-2">
-            {treatments.length === 0 && (
-              <p className="text-sm text-slate-400">No treatment entries yet.</p>
-            )}
-            {treatments.map((t) => (
-              <div
-                key={t.id}
-                className="rounded-lg border border-slate-200 bg-white p-3.5 text-base shadow-sm"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-medium text-slate-900">{t.procedure_name}</span>
-                  <span className="text-sm text-slate-400">{t.treatment_date}</span>
-                </div>
-                {t.tooth_number && (
-                  <span className="text-sm text-slate-500">
-                    {t.tooth_number === ALL_TEETH ? 'All Teeth / Full Mouth' : `Tooth #${t.tooth_number}`}
-                  </span>
-                )}
-                {t.notes && <p className="mt-1 text-slate-600">{t.notes}</p>}
-                <p className="mt-1 text-sm text-slate-400">by {t.dentist_name}</p>
-              </div>
-            ))}
-          </div>
-
+          {/* Quick Actions Card (Buttons) */}
           {user.role === 'dentist' && (
-            <div className="mt-4">
-              <AddTreatmentForm onSubmit={handleAddTreatment} />
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm space-y-3">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                Actions
+              </h3>
+              <div className="flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEditing(true)}
+                  className="flex min-h-11 w-full items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-4 text-base font-medium text-slate-700 transition-colors hover:bg-slate-50"
+                >
+                  <Pencil className="h-4 w-4" />
+                  Edit Information
+                </button>
+
+                {portalAccount === null && (
+                  <button
+                    type="button"
+                    onClick={() => setCreatingAccount(true)}
+                    className="flex min-h-11 w-full items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-4 text-base font-medium text-slate-700 transition-colors hover:bg-sky-50 hover:text-sky-700"
+                  >
+                    <KeyRound className="h-4 w-4" />
+                    Create Portal Account
+                  </button>
+                )}
+
+                {portalAccount && (
+                  <div className="flex min-h-11 items-center justify-between gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700">
+                    <span className="flex items-center gap-2 truncate">
+                      <KeyRound className="h-4 w-4 shrink-0" />
+                      <span className="truncate">Portal: {portalAccount.email}</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setResettingPassword(true)}
+                      title="Reset portal password"
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded text-emerald-700 transition-colors hover:bg-emerald-100"
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                    </button>
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => setDeleting(true)}
+                  className="flex min-h-11 w-full items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-4 text-base font-medium text-slate-700 transition-colors hover:bg-red-50 hover:text-red-700"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Delete Patient
+                </button>
+              </div>
             </div>
           )}
-        </div>
-      )}
 
-      {tab === 'chart' && (
-        <div>
-          <div className="mb-3 flex justify-end">
-            <Link
-              to={`/patients/${id}/chart/print`}
-              target="_blank"
-              className="flex min-h-11 items-center gap-1.5 text-base font-medium text-slate-500 transition-colors hover:text-sky-700"
-            >
-              <Printer className="h-4 w-4" />
-              Print Chart
-            </Link>
+        </div>
+
+        {/* ================= KANANG COLUMN: TABS & CONTENT WORKSPACE (8 COLS) ================= */}
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm lg:col-span-8 min-h-[500px]">
+          
+          {/* Tabs Nav */}
+          <div className="mb-6 flex gap-4 overflow-x-auto border-b border-slate-200 sm:gap-6">
+            <button type="button" className={tabClass('history')} onClick={() => setTab('history')}>
+              <ClipboardList className="h-4 w-4" />
+              Treatment History
+            </button>
+            <button type="button" className={tabClass('chart')} onClick={() => setTab('chart')}>
+              <Grid3x3 className="h-4 w-4" />
+              Dental Chart
+            </button>
+            <button type="button" className={tabClass('xrays')} onClick={() => setTab('xrays')}>
+              <ScanLine className="h-4 w-4" />
+              X-rays
+            </button>
           </div>
-          <Odontogram2D patientId={id} canEdit={user.role === 'dentist'} />
-        </div>
-      )}
 
-      {tab === 'xrays' && <PatientXraysSection patientId={id} />}
+          {/* Tab 1: Treatment History */}
+          {tab === 'history' && (
+            <div className="space-y-6">
+              <div className="space-y-2">
+                {treatments.length === 0 && (
+                  <p className="text-sm text-slate-400">No treatment entries yet.</p>
+                )}
+                {treatments.map((t) => (
+                  <div
+                    key={t.id}
+                    className="rounded-lg border border-slate-200 bg-white p-3.5 text-base shadow-sm"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium text-slate-900">{t.procedure_name}</span>
+                      <span className="text-sm text-slate-400">{t.treatment_date}</span>
+                    </div>
+                    {t.tooth_number && (
+                      <span className="text-sm text-slate-500">
+                        {t.tooth_number === ALL_TEETH ? 'All Teeth / Full Mouth' : `Tooth #${t.tooth_number}`}
+                      </span>
+                    )}
+                    {t.notes && <p className="mt-1 text-slate-600">{t.notes}</p>}
+                    <p className="mt-1 text-sm text-slate-400">by {t.dentist_name}</p>
+                  </div>
+                ))}
+              </div>
+
+              {user.role === 'dentist' && (
+                <div className="border-t border-slate-100 pt-4">
+                  <AddTreatmentForm onSubmit={handleAddTreatment} />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Tab 2: Dental Chart */}
+          {tab === 'chart' && (
+            <div>
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                <div className="flex gap-1.5 rounded-lg border border-slate-200 bg-slate-100 p-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (chartView === '3d' && has3DPendingDrawing) {
+                        setConfirmLeave3D(true)
+                        return
+                      }
+                      setChartView('2d')
+                    }}
+                    className={`flex min-h-9 items-center gap-1.5 rounded-md px-3 text-sm font-medium transition-colors ${
+                      chartView === '2d' ? 'bg-white text-sky-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                    }`}
+                  >
+                    <LayoutGrid className="h-4 w-4" />
+                    2D Chart
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setChartView('3d')}
+                    className={`flex min-h-9 items-center gap-1.5 rounded-md px-3 text-sm font-medium transition-colors ${
+                      chartView === '3d' ? 'bg-white text-sky-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                    }`}
+                  >
+                    <Box className="h-4 w-4" />
+                    3D Chart
+                  </button>
+                </div>
+                <Link
+                  to={`/patients/${id}/chart/print`}
+                  target="_blank"
+                  className="flex min-h-11 items-center gap-1.5 text-base font-medium text-slate-500 transition-colors hover:text-sky-700"
+                >
+                  <Printer className="h-4 w-4" />
+                  Print Chart
+                </Link>
+              </div>
+              
+              <div className="overflow-x-auto">
+                {chartView === '2d' ? (
+                  <Odontogram2D patientId={id} canEdit={user.role === 'dentist'} />
+                ) : (
+                  <Suspense fallback={<p className="text-sm text-slate-400">Loading 3D chart...</p>}>
+                    <Odontogram3D
+                      patientId={id}
+                      canEdit={user.role === 'dentist'}
+                      onPendingChange={setHas3DPendingDrawing}
+                    />
+                  </Suspense>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Tab 3: X-rays */}
+          {tab === 'xrays' && <PatientXraysSection patientId={id} />}
+
+        </div>
+
+      </div>
+
+      {/* MODALS */}
+      {confirmLeave3D && (
+        <Modal title="Discard unsaved 3D mark?" onClose={() => setConfirmLeave3D(false)}>
+          <div className="space-y-4">
+            <div className="flex items-start gap-3 rounded-md border border-amber-200 bg-amber-50 px-4 py-3">
+              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+              <p className="text-base text-amber-800">
+                You have an unsaved freehand mark on the 3D chart. Switching to the 2D chart now will discard it.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirmLeave3D(false)}
+                className="flex-1 rounded-md border border-slate-300 bg-white px-4 py-3 text-base font-medium text-slate-700 transition-colors hover:bg-slate-50"
+              >
+                Keep Drawing
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirmLeave3D(false)
+                  setHas3DPendingDrawing(false)
+                  setChartView('2d')
+                }}
+                className="flex-1 rounded-md bg-red-600 px-4 py-3 text-base font-semibold text-white transition-colors hover:bg-red-700"
+              >
+                Discard & Switch
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
 
       {editing && (
         <EditPatientModal

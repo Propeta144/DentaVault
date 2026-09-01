@@ -28,5 +28,6 @@ router.get('/xrays/unreviewed-count', requireRole('dentist'), xraysController.un
 // X-ray-scoped 'to: gumagana sa isang image, base sa sarili niyang id.
 router.get('/xrays/:id/file', xraysController.getFile)
 router.put('/xrays/:id/annotations', requireRole('dentist'), xraysController.updateAnnotations)
+router.delete('/xrays/:id', requireRole('dentist'), xraysController.remove)
 
 export default router

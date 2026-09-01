@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { AlertTriangle, Clock, History, Loader2 } from 'lucide-react'
 import Modal from '../common/Modal'
-import { CONDITIONS, SURFACES } from '../../constants/dental'
+import { CONDITIONS, SURFACES, conditionColor } from '../../constants/dental'
 import { getToothHistory } from '../../services/chart'
 import { useToast } from '../../context/ToastContext'
 
@@ -31,7 +31,7 @@ function SurfaceIndicator({ surface }) {
           <polygon
             key={position}
             points={points}
-            fill={highlighted ? '#0284c7' : '#ffffff'}
+            fill={highlighted ? '#6f2dbd' : '#ffffff'}
             fillOpacity={highlighted ? 0.9 : 1}
             stroke="#cbd5e1"
             strokeWidth={1}
@@ -63,6 +63,8 @@ export default function ChartEntryModal({
   toothNumber,
   surface,
   currentEntry,
+  defaultConditionCode,
+  strokes,
   onClose,
   onSubmit,
 }) {
@@ -84,11 +86,13 @@ export default function ChartEntryModal({
     ? CONDITIONS.filter((c) => c.code === 'healthy' || c.code === 'extracted')
     : CONDITIONS
 
-  const [conditionCode, setConditionCode] = useState(
-    availableConditions.some((c) => c.code === currentEntry?.condition_code)
-      ? currentEntry.condition_code
-      : 'healthy',
-  )
+  // Priority: what the dentist just painted with (3D pen), then the
+  // surface's existing condition (2D click-to-edit), then healthy.
+  const [conditionCode, setConditionCode] = useState(() => {
+    if (availableConditions.some((c) => c.code === defaultConditionCode)) return defaultConditionCode
+    if (availableConditions.some((c) => c.code === currentEntry?.condition_code)) return currentEntry.condition_code
+    return 'healthy'
+  })
   const [notes, setNotes] = useState(currentEntry?.notes || '')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
@@ -122,11 +126,20 @@ export default function ChartEntryModal({
     setError('')
     setSubmitting(true)
     try {
+      // Only a genuine single-surface 3D-pen save carries the actual drawn
+      // strokes — whole-tooth saves apply to all 5 surfaces at once, and one
+      // stroke drawn in one spot doesn't represent that; 2D-originated saves
+      // never have strokes to begin with (no freehand drawing there).
+      const strokeData =
+        strokes && !applyToWholeTooth
+          ? strokes.map((points) => ({ type: 'freehand', points, color: conditionColor(conditionCode) }))
+          : null
       await onSubmit({
         toothNumber,
         surface: applyToWholeTooth ? 'whole' : surface,
         conditionCode,
         notes,
+        strokeData,
       })
       showToast(
         applyToWholeTooth

@@ -29,6 +29,10 @@ export function saveAnnotations(xrayId, annotations) {
   return api.put(`/xrays/${xrayId}/annotations`, { annotations }).then((r) => r.data.xray)
 }
 
+export function deleteXray(xrayId) {
+  return api.delete(`/xrays/${xrayId}`)
+}
+
 // 'To yung nagpapagana sa sidebar "new X-ray from email" badge (dentist-only endpoint).
 export function getUnreviewedXrayCount() {
   return api.get('/xrays/unreviewed-count').then((r) => r.data.count)

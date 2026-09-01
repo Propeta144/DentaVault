@@ -19,15 +19,22 @@ export async function listXraysForPatient(patientId) {
     `SELECT id, patient_id, original_filename, mime_type, file_size_bytes, source,
             taken_date, notes, annotations, reviewed_at, created_at
      FROM xray_images
-     WHERE patient_id = :patientId
+     WHERE patient_id = :patientId AND deleted_at IS NULL
      ORDER BY COALESCE(taken_date, created_at) DESC, id DESC`,
     { patientId },
   )
   return rows.map(parseAnnotations)
 }
 
+// Soft-deleted rows are treated as gone from the app's point of view (404,
+// same as a bad id) — same pattern as patientModel.findPatientById, and for
+// the same reason: the row (and the file it points to) stays in place for
+// retention, but nothing in the API surfaces it anymore.
 export async function findXrayById(id) {
-  const [rows] = await pool.execute('SELECT * FROM xray_images WHERE id = :id', { id })
+  const [rows] = await pool.execute(
+    'SELECT * FROM xray_images WHERE id = :id AND deleted_at IS NULL',
+    { id },
+  )
   return parseAnnotations(rows[0]) || null
 }
 
@@ -101,7 +108,11 @@ export async function markXrayReviewed(id) {
 export async function countUnreviewedEmailXrays() {
   const [[{ count }]] = await pool.execute(
     `SELECT COUNT(*) AS count FROM xray_images
-     WHERE source = 'email_inbound' AND reviewed_at IS NULL`,
+     WHERE source = 'email_inbound' AND reviewed_at IS NULL AND deleted_at IS NULL`,
   )
   return count
+}
+
+export async function softDeleteXray(id) {
+  await pool.execute('UPDATE xray_images SET deleted_at = NOW() WHERE id = :id', { id })
 }

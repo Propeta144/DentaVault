@@ -1,5 +1,17 @@
 import pool from '../config/db.js'
 
+// mysql2 returns JSON columns as raw text, not a parsed value — same gotcha
+// as xray_images.annotations (see xrayModel.js), same fix: parse on every
+// read path so callers get a real array/null, not a string that silently
+// misbehaves if spread or truthy-checked as one.
+function parseStrokeData(row) {
+  if (!row) return row
+  if (typeof row.stroke_data === 'string') {
+    row.stroke_data = JSON.parse(row.stroke_data)
+  }
+  return row
+}
+
 // Yung CURRENT state ang ipinapakita ng odontogram: yung latest entry per
 // (tooth_number, surface). Kapag walang entry para sa isang tooth/surface,
 // ibig sabihin "unmarked" — dini-draw 'to ng frontend bilang default
@@ -7,7 +19,7 @@ import pool from '../config/db.js'
 // 32 teeth.
 export async function getCurrentChart(patientId) {
   const [rows] = await pool.execute(
-    `SELECT ce.id, ce.tooth_number, ce.surface, ce.condition_code, ce.notes, ce.recorded_at, u.full_name AS dentist_name
+    `SELECT ce.id, ce.tooth_number, ce.surface, ce.condition_code, ce.notes, ce.stroke_data, ce.recorded_at, u.full_name AS dentist_name
      FROM (
        SELECT *, ROW_NUMBER() OVER (
          PARTITION BY tooth_number, surface ORDER BY recorded_at DESC, id DESC
@@ -19,7 +31,7 @@ export async function getCurrentChart(patientId) {
      WHERE ce.rn = 1`,
     { patientId },
   )
-  return rows
+  return rows.map(parseStrokeData)
 }
 
 export async function getToothHistory(patientId, toothNumber) {
@@ -31,19 +43,20 @@ export async function getToothHistory(patientId, toothNumber) {
      ORDER BY ce.recorded_at DESC, ce.id DESC`,
     { patientId, toothNumber },
   )
-  return rows
+  return rows.map(parseStrokeData)
 }
 
-export async function createChartEntry({ patientId, toothNumber, surface, conditionCode, notes, recordedBy }) {
+export async function createChartEntry({ patientId, toothNumber, surface, conditionCode, notes, strokeData, recordedBy }) {
   const [result] = await pool.execute(
-    `INSERT INTO chart_entries (patient_id, tooth_number, surface, condition_code, notes, recorded_by)
-     VALUES (:patientId, :toothNumber, :surface, :conditionCode, :notes, :recordedBy)`,
+    `INSERT INTO chart_entries (patient_id, tooth_number, surface, condition_code, notes, stroke_data, recorded_by)
+     VALUES (:patientId, :toothNumber, :surface, :conditionCode, :notes, :strokeData, :recordedBy)`,
     {
       patientId,
       toothNumber,
       surface,
       conditionCode,
       notes: notes ?? null,
+      strokeData: strokeData ? JSON.stringify(strokeData) : null,
       recordedBy,
     },
   )
@@ -52,7 +65,7 @@ export async function createChartEntry({ patientId, toothNumber, surface, condit
      JOIN users u ON u.id = ce.recorded_by WHERE ce.id = :id`,
     { id: result.insertId },
   )
-  return rows[0]
+  return parseStrokeData(rows[0])
 }
 
 const ALL_SURFACES = ['whole', 'mesial', 'distal', 'occlusal', 'facial', 'lingual']
@@ -92,7 +105,7 @@ export async function createWholeToothEntry({ patientId, toothNumber, conditionC
        JOIN users u ON u.id = ce.recorded_by WHERE ce.id = :id`,
       { id: wholeEntryId },
     )
-    return rows[0]
+    return parseStrokeData(rows[0])
   } catch (err) {
     await connection.rollback()
     throw err

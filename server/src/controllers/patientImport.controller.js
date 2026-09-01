@@ -19,6 +19,7 @@ export const importFile = asyncHandler(async (req, res) => {
       filename: req.file.originalname,
       totalRows: result.totalRows,
       createdCount: result.createdCount,
+      treatmentsAddedCount: result.treatmentsAddedCount,
       duplicateCount: result.duplicateCount,
       errorCount: result.errorCount,
     },
@@ -29,22 +30,52 @@ export const importFile = asyncHandler(async (req, res) => {
 })
 
 export const downloadTemplate = (req, res) => {
-  const exampleRow = [
-    'Juan',
-    'Dela Cruz',
-    'male',
-    '1985-03-14',
-    '09171234567',
-    'juan@example.com',
-    'Bacoor City, Cavite',
-    'None',
-    'Penicillin',
-    'Maria Dela Cruz',
-    '09179876543',
+  // Isang patient, dalawang rows: ganito ipinapakita kung paano isasama
+  // yung buong treatment history sa parehong file — ulitin lang yung
+  // first_name/last_name/sex/date_of_birth (kailangan magkatugma, dahil
+  // dito nakikilala kung parehong tao), tapos palitan na lang yung
+  // procedure_name/treatment_date/tooth_number bawat past visit. Yung
+  // demographic columns sa 2nd row, pwede nang iwan blangko maliban sa
+  // required 4 — hindi na basahin kung meron nang existing patient match.
+  const exampleRows = [
+    [
+      'Juan',
+      'Dela Cruz',
+      'male',
+      '1985-03-14',
+      '09171234567',
+      'juan@example.com',
+      'Bacoor City, Cavite',
+      'None',
+      'Penicillin',
+      'Maria Dela Cruz',
+      '09179876543',
+      'Oral Prophylaxis / Cleaning',
+      '2023-06-10',
+      'ALL',
+      'Routine cleaning, no issues noted',
+    ],
+    [
+      'Juan',
+      'Dela Cruz',
+      'male',
+      '1985-03-14',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      'Composite Restoration / Filling',
+      '2024-01-22',
+      '26',
+      'Small cavity, resin filling',
+    ],
   ]
   const csv = [
     IMPORT_TEMPLATE_HEADERS.map(csvField).join(','),
-    exampleRow.map(csvField).join(','),
+    ...exampleRows.map((row) => row.map(csvField).join(',')),
   ].join('\n')
 
   res.setHeader('Content-Type', 'text/csv')

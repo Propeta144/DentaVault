@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Stethoscope } from 'lucide-react'
+import ToothIcon from '../components/common/ToothIcon'
 import { useAuth } from '../context/AuthContext'
 
 export default function LoginPage() {
@@ -35,7 +35,7 @@ export default function LoginPage() {
       >
         <div className="mb-6 flex flex-col items-center text-center">
           <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-sky-50">
-            <Stethoscope className="h-6 w-6 text-sky-600" />
+            <ToothIcon className="h-6 w-6 text-sky-600" />
           </div>
           <h1 className="text-2xl font-semibold text-slate-900">DentaVault</h1>
           <p className="text-base text-slate-500">Teodosio-Rufin Dental Clinic</p>

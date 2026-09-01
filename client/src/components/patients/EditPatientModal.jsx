@@ -2,6 +2,7 @@ import Modal from '../common/Modal'
 import PatientForm from './PatientForm'
 import { updatePatient } from '../../services/patients'
 import { useToast } from '../../context/ToastContext'
+import QuickInputTextarea from '../common/QuickInputTextarea'
 
 // Snake_case yung DB rows; camelCase naman yung ginagamit ng PatientForm —
 // same shape na tinatanggap ng API — kaya kailangan i-map muna papuntang

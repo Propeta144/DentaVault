@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { User, Phone, ShieldAlert, ClipboardList } from 'lucide-react'
+import QuickInputTextarea from '../common/QuickInputTextarea'
 
 const EMPTY_FORM = {
   firstName: '',
@@ -202,22 +203,24 @@ export default function PatientForm({ initialValues, onSubmit, submitLabel = 'Sa
 
       <SectionHeading icon={ClipboardList}>Medical & Dental History</SectionHeading>
 
-      <Field label="Medical History">
-        <textarea
-          rows={3}
-          className={inputClass(false)}
-          value={form.medicalHistory}
-          onChange={(e) => update('medicalHistory', e.target.value)}
-        />
-      </Field>
+      <Field>
+        {/* Medical History */}
+<QuickInputTextarea
+  label="Medical History"
+  value={form.medicalHistory}
+  onChange={(val) => setForm({ ...form, medicalHistory: val })}
+  presets={['None', 'Hypertension', 'Diabetes', 'Asthma']}
+  placeholder="Enter medical history or select options above"
+/>
 
-      <Field label="Allergies">
-        <textarea
-          rows={2}
-          className={inputClass(false)}
-          value={form.allergies}
-          onChange={(e) => update('allergies', e.target.value)}
-        />
+{/* Allergies */}
+<QuickInputTextarea
+  label="Allergies"
+  value={form.allergies}
+  onChange={(val) => setForm({ ...form, allergies: val })}
+  presets={['None', 'Penicillin', 'Latex', 'Aspirin']}
+  placeholder="Enter known allergies or click None"
+/>
       </Field>
 
       <button

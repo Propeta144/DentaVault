@@ -113,6 +113,28 @@ export const getFile = asyncHandler(async (req, res) => {
   res.sendFile(localPath)
 })
 
+// Dentist-only (tignan route) — soft delete, gaya ng ginagawa sa patients:
+// hindi tinatanggal yung row o yung file mismo, minamarkahan lang na
+// deleted_at para itago sa app, pero manatiling buo sa DB para sa
+// retention/audit purposes.
+export const remove = asyncHandler(async (req, res) => {
+  const xray = await xrayModel.findXrayById(req.params.id)
+  if (!xray) throw new AppError('X-ray not found', 404)
+
+  await xrayModel.softDeleteXray(xray.id)
+
+  await recordAuditLog({
+    userId: req.user.userId,
+    action: 'DELETE_XRAY',
+    entityType: 'xray_image',
+    entityId: xray.id,
+    details: { patientId: xray.patient_id, filename: xray.original_filename },
+    ipAddress: req.ip,
+  })
+
+  res.status(204).send()
+})
+
 export const updateAnnotations = asyncHandler(async (req, res) => {
   const xray = await xrayModel.findXrayById(req.params.id)
   if (!xray) throw new AppError('X-ray not found', 404)

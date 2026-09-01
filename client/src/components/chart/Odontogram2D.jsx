@@ -4,6 +4,7 @@ import ChartEntryModal from './ChartEntryModal'
 import { ODONTOGRAM_ROWS, CONDITIONS } from '../../constants/dental'
 import { getCurrentChart, createChartEntry } from '../../services/chart'
 
+
 // Dapat tugma 'to sa SIZE constant ng Tooth.jsx — hiwalay lang sila sa
 // magkaibang files (isa ang gumagawa ng SVG geometry ng isang ngipin, yung
 // isa naman ang naglalayout sa buong grid) pero same physical cell size
@@ -122,7 +123,7 @@ export default function Odontogram2D({ patientId, canEdit }) {
         >
           <defs>
             <filter id="tooth-shadow" x="-30%" y="-30%" width="160%" height="160%">
-              <feDropShadow dx="0" dy="1" stdDeviation="1.1" floodColor="#0f172a" floodOpacity="0.18" />
+              <feDropShadow dx="0" dy="1" stdDeviation="1.1" floodColor="#171123" floodOpacity="0.18" />
             </filter>
           </defs>
 

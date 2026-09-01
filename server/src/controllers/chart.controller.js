@@ -34,11 +34,13 @@ export const createEntry = asyncHandler(async (req, res) => {
   }
 
   const patient = await assertPatientAccess(req, req.params.patientId)
-  const { toothNumber, surface, conditionCode, notes } = req.body
+  const { toothNumber, surface, conditionCode, notes, strokeData } = req.body
 
   // Yung "whole tooth" entry (extraction, restoration, o full-coverage fact
   // gaya ng crown), sabay na nag-a-apply sa lahat ng 5 surfaces — tignan
-  // yung comment ng createWholeToothEntry kung bakit.
+  // yung comment ng createWholeToothEntry kung bakit. Kaya rin hindi natin
+  // isinasama ang strokeData dito — isang lugar lang ginuhit yun, hindi
+  // naman kumakatawan sa lahat ng 5 surfaces kung i-replicate.
   const isWholeTooth = surface === 'whole'
   const entry = isWholeTooth
     ? await chartModel.createWholeToothEntry({
@@ -54,6 +56,7 @@ export const createEntry = asyncHandler(async (req, res) => {
         surface,
         conditionCode,
         notes,
+        strokeData,
         recordedBy: req.user.userId,
       })
 

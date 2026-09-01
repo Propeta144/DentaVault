@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { PenLine, Type, Undo2, Save, ZoomIn, ZoomOut, X, Printer } from 'lucide-react'
+import { PenLine, Type, Undo2, Save, ZoomIn, ZoomOut, X, Printer, Trash2 } from 'lucide-react'
 import { fetchXrayObjectUrl, saveAnnotations } from '../../services/xrays'
 import { useToast } from '../../context/ToastContext'
 import { drawShapes } from './drawAnnotations'
+import DeleteXrayModal from './DeleteXrayModal'
+import Modal from '../common/Modal'
 
 // --- Coordinate system -----------------------------------------------------
 // Bawat annotation point, naka-store bilang FRACTION (0..1) ng rendered
@@ -43,6 +45,15 @@ export default function XrayViewer({ xray, canAnnotate, onClose }) {
   const [shapes, setShapes] = useState(Array.isArray(xray.annotations) ? xray.annotations : [])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [deleting, setDeleting] = useState(false)
+  const [confirmingClose, setConfirmingClose] = useState(false)
+  // Baseline para sa "may unsaved changes ba?" check — yung last-saved (o
+  // initially-loaded) na shapes, bilang string para mabilis i-compare sa
+  // kasalukuyang `shapes` nang walang deep-equal. Naka-ref (hindi state) kasi
+  // hindi dapat mag-trigger ng re-render sa sarili niya, updater lang siya
+  // ng "saved" checkpoint pagkatapos ng successful save.
+  const savedShapesRef = useRef(JSON.stringify(shapes))
+  const hasUnsavedChanges = JSON.stringify(shapes) !== savedShapesRef.current
   // In-progress text annotation: inline input na naka-anchor sa tap point,
   // kapalit ng window.prompt() para hindi na umaalis yung annotation flow
   // sa sarili nating styled UI papunta sa native OS dialog. Null kapag
@@ -113,6 +124,19 @@ export default function XrayViewer({ xray, canAnnotate, onClose }) {
   function handlePointerDown(e) {
     if (!canAnnotate || textInput) return
 
+    // Kailangan 'to lalo na para sa Text tool: pagkatapos ng mga listener
+    // (kasama na tayo), gagawin pa rin ng browser yung sarili niyang default
+    // action para sa mousedown — ilipat yung focus base sa kung ano ang
+    // "focusable" sa ilalim ng pointer. Yung canvas mismo, hindi naman
+    // focusable, kaya kung real mouse click 'to (hindi touch, hindi
+    // synthetic), aagawin ng browser yung focus palayo sa bagong
+    // <input autoFocus> na kaka-mount lang natin sa ibaba — mag-bblur agad
+    // ito bago pa man makapag-type yung user, tapos i-ccommit (at itatapon,
+    // kasi wala pang laman) ni onBlur nang tahimik. preventDefault() dito
+    // ang pumipigil sa browser sa ganitong default focus-stealing, para
+    // manatili yung autoFocus natin.
+    e.preventDefault()
+
     if (tool === 'text') {
       const [xFrac, yFrac] = pointerToFraction(e, canvasRef.current)
       setTextInput({ xFrac, yFrac, value: '' })
@@ -177,6 +201,7 @@ export default function XrayViewer({ xray, canAnnotate, onClose }) {
     setError('')
     try {
       await saveAnnotations(xray.id, shapes)
+      savedShapesRef.current = JSON.stringify(shapes)
       showToast('Annotations saved.', { type: 'success' })
     } catch (err) {
       const message = err.response?.data?.error || 'Failed to save annotations'
@@ -240,6 +265,15 @@ export default function XrayViewer({ xray, canAnnotate, onClose }) {
                 <Save className="h-4 w-4" />
                 {saving ? 'Saving...' : 'Save Annotations'}
               </button>
+              <button
+                type="button"
+                title="Delete X-ray"
+                onClick={() => setDeleting(true)}
+                className="flex min-h-11 items-center gap-1.5 rounded bg-red-600 px-3 text-sm font-medium transition-colors hover:bg-red-500"
+              >
+                <Trash2 className="h-4 w-4" />
+                Delete
+              </button>
               <span className="mx-1 hidden h-6 w-px bg-slate-700 sm:block" />
             </>
           )}
@@ -273,7 +307,7 @@ export default function XrayViewer({ xray, canAnnotate, onClose }) {
           <button
             type="button"
             title="Close"
-            onClick={onClose}
+            onClick={() => (hasUnsavedChanges ? setConfirmingClose(true) : onClose())}
             className="ml-2 flex min-h-11 items-center gap-1.5 rounded bg-red-600 px-3 text-sm font-medium transition-colors hover:bg-red-500"
           >
             <X className="h-4 w-4" />
@@ -333,6 +367,36 @@ export default function XrayViewer({ xray, canAnnotate, onClose }) {
           )}
         </div>
       </div>
+
+      {deleting && (
+        <DeleteXrayModal xray={xray} onClose={() => setDeleting(false)} onDeleted={onClose} />
+      )}
+
+      {confirmingClose && (
+        <Modal title="Discard unsaved annotations?" onClose={() => setConfirmingClose(false)}>
+          <div className="space-y-4">
+            <p className="text-base text-slate-700">
+              You have annotations that haven't been saved yet. Closing now will discard them.
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirmingClose(false)}
+                className="flex-1 rounded-md border border-slate-300 bg-white px-4 py-3 text-base font-medium text-slate-700 transition-colors hover:bg-slate-50"
+              >
+                Keep Editing
+              </button>
+              <button
+                type="button"
+                onClick={onClose}
+                className="flex-1 rounded-md bg-red-600 px-4 py-3 text-base font-semibold text-white transition-colors hover:bg-red-700"
+              >
+                Discard & Close
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   )
 }

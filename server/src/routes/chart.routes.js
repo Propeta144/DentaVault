@@ -21,6 +21,7 @@ router.post(
     body('toothNumber').trim().notEmpty().withMessage('Tooth number is required'),
     body('surface').isIn(SURFACES).withMessage('Invalid surface'),
     body('conditionCode').isIn(CONDITIONS).withMessage('Invalid condition'),
+    body('strokeData').optional({ nullable: true }).isArray().withMessage('strokeData must be an array'),
   ],
   chartController.createEntry,
 )

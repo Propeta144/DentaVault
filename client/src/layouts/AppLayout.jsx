@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
-import { Stethoscope, Users, LogOut, Menu, X, ScrollText, LayoutDashboard } from 'lucide-react'
+import { Users, LogOut, Menu, X, ScrollText, LayoutDashboard } from 'lucide-react'
+import ToothIcon from '../components/common/ToothIcon'
 import { useAuth } from '../context/AuthContext'
 import { getUnreviewedXrayCount } from '../services/xrays'
 
@@ -47,7 +48,7 @@ export default function AppLayout() {
       {/* Mobile top bar: hamburger + title lang ang nandito, below md lang 'to lalabas */}
       <header className="flex items-center justify-between border-b border-slate-200 bg-slate-900 px-4 py-3 text-slate-100 md:hidden">
         <Link to="/" className="flex items-center gap-2">
-          <Stethoscope className="h-5 w-5 text-sky-400" />
+          <ToothIcon className="h-5 w-5 text-sky-400" />
           <span className="font-semibold tracking-tight">DentaVault</span>
         </Link>
         <button
@@ -87,7 +88,7 @@ export default function AppLayout() {
             to="/"
             className="flex items-center gap-2 transition-colors hover:text-sky-300"
           >
-            <Stethoscope className="h-6 w-6 text-sky-400" />
+            <ToothIcon className="h-6 w-6 text-sky-400" />
             <span className="text-lg font-semibold tracking-tight">DentaVault</span>
           </Link>
           <button
