@@ -1,4 +1,5 @@
 import pool from '../config/db.js'
+import { limitOffset } from '../utils/sqlLimit.js'
 import { generatePatientCode, normalizePatientCode } from '../utils/patientCode.js'
 
 // Whitelisted 'to, hindi galing sa user input — sarili nating sinulat na
@@ -18,7 +19,9 @@ const PATIENT_SORTS = {
 function buildPatientListQuery({ search }) {
   const searchTerm = search ? `%${search}%` : null
   const where = searchTerm
-    ? 'WHERE p.deleted_at IS NULL AND (CONCAT(p.first_name, " ", p.last_name) LIKE :search)'
+    ? // Single quotes sa ' ', hindi " ": naka-ANSI_QUOTES ang Aiven, kaya
+      // column name ang tingin nito sa "..." (hindi text).
+      `WHERE p.deleted_at IS NULL AND (CONCAT(p.first_name, ' ', p.last_name) LIKE :search)`
     : 'WHERE p.deleted_at IS NULL'
   return {
     where,
@@ -41,8 +44,8 @@ export async function listPatients({ search, sort, limit, offset }) {
      ) lt ON lt.patient_id = p.id
      ${where}
      ORDER BY ${orderBy}
-     LIMIT :limit OFFSET :offset`,
-    { ...params, limit, offset },
+     ${limitOffset(limit, offset)}`,
+    params,
   )
 
   const [[{ total }]] = await pool.execute(

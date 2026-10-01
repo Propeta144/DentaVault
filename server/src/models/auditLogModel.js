@@ -1,4 +1,5 @@
 import pool from '../config/db.js'
+import { limitOffset } from '../utils/sqlLimit.js'
 
 // Dapat tawagin 'to sa bawat write action, at bawat pag-view ng sensitive
 // data (patient records, x-rays). Tignan yung RA 10173 requirement sa
@@ -77,8 +78,8 @@ export async function listAuditLogs({ limit, offset, search, action, dateFrom, d
      LEFT JOIN users u ON u.id = al.user_id
      ${where}
      ORDER BY al.created_at DESC, al.id DESC
-     LIMIT :limit OFFSET :offset`,
-    { ...params, limit, offset },
+     ${limitOffset(limit, offset)}`,
+    params,
   )
   const [[{ total }]] = await pool.execute(
     `SELECT COUNT(*) AS total FROM audit_logs al LEFT JOIN users u ON u.id = al.user_id ${where}`,
