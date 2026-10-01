@@ -11,11 +11,11 @@ router.use(authenticate)
 const SURFACES = ['mesial', 'distal', 'occlusal', 'facial', 'lingual', 'whole']
 const CONDITIONS = ['healthy', 'caries', 'filling', 'root_canal', 'crown', 'extracted']
 
-router.get('/patients/:patientId/chart', chartController.getCurrentChart)
-router.get('/patients/:patientId/chart/:toothNumber/history', chartController.getToothHistory)
+router.get('/patients/:patientCode/chart', chartController.getCurrentChart)
+router.get('/patients/:patientCode/chart/:toothNumber/history', chartController.getToothHistory)
 
 router.post(
-  '/patients/:patientId/chart',
+  '/patients/:patientCode/chart',
   requireRole('dentist'),
   [
     body('toothNumber').trim().notEmpty().withMessage('Tooth number is required'),

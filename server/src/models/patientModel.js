@@ -1,4 +1,5 @@
 import pool from '../config/db.js'
+import { generatePatientCode, normalizePatientCode } from '../utils/patientCode.js'
 
 // Whitelisted 'to, hindi galing sa user input — sarili nating sinulat na
 // ORDER BY clause lang naman palagi yung `sort`, kaya walang injection
@@ -17,11 +18,11 @@ const PATIENT_SORTS = {
 function buildPatientListQuery({ search }) {
   const searchTerm = search ? `%${search}%` : null
   const where = searchTerm
-    ? 'WHERE p.deleted_at IS NULL AND (CONCAT(p.first_name, " ", p.last_name) LIKE :search OR p.id = :searchId)'
+    ? 'WHERE p.deleted_at IS NULL AND (CONCAT(p.first_name, " ", p.last_name) LIKE :search)'
     : 'WHERE p.deleted_at IS NULL'
   return {
     where,
-    params: { search: searchTerm, searchId: search ? Number(search) || 0 : null },
+    params: { search: searchTerm },
   }
 }
 
@@ -30,7 +31,7 @@ export async function listPatients({ search, sort, limit, offset }) {
   const orderBy = PATIENT_SORTS[sort] || PATIENT_SORTS.name
 
   const [rows] = await pool.execute(
-    `SELECT p.id, p.first_name, p.last_name, p.sex, p.date_of_birth, p.contact_number, p.email,
+    `SELECT p.id, p.patient_code, p.first_name, p.last_name, p.sex, p.date_of_birth, p.contact_number, p.email,
             p.is_legacy_migrated, p.created_at, lt.last_treatment_date
      FROM patients p
      LEFT JOIN (
@@ -76,6 +77,19 @@ export async function findPatientById(id) {
   return rows[0] || null
 }
 
+// Ito yung ginagamit ng lahat ng route na may patient sa URL
+// (/patients/:code/...) — Patient Code na ang laman ng URL, hindi na yung
+// numeric id. Kapag mali ang format, diretsong null (404) na.
+export async function findPatientByCode(value) {
+  const code = normalizePatientCode(value)
+  if (!code) return null
+  const [rows] = await pool.execute(
+    'SELECT * FROM patients WHERE patient_code = :code AND deleted_at IS NULL',
+    { code },
+  )
+  return rows[0] || null
+}
+
 // Ginagamit 'to ng Mailgun inbound webhook para itugma yung emailed X-ray
 // sa isang patient, base sa address ng sender. Hindi tutugma yung email ng
 // deleted patient — walang balikan sa record na itinuturing na naman ng
@@ -96,7 +110,7 @@ export async function findPatientByEmail(email) {
 // bago.
 export async function findPatientByNameAndDob(firstName, lastName, dateOfBirth) {
   const [rows] = await pool.execute(
-    `SELECT id FROM patients
+    `SELECT id, patient_code FROM patients
      WHERE LOWER(first_name) = LOWER(:firstName)
        AND LOWER(last_name) = LOWER(:lastName)
        AND date_of_birth = :dateOfBirth
@@ -107,13 +121,27 @@ export async function findPatientByNameAndDob(firstName, lastName, dateOfBirth) 
   return rows[0] || null
 }
 
+// Hanggang 5 subok kapag nagkataong may kaparehong code na (UNIQUE index
+// ang magrereject) — halos imposible sa 1 trilyong kombinasyon, pero mas
+// mabuti nang may sagot kaysa mag-crash yung pag-register.
 export async function createPatient(data) {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await insertPatient(data, generatePatientCode())
+    } catch (err) {
+      if (err.code !== 'ER_DUP_ENTRY' || !err.message.includes('patient_code') || attempt >= 5) throw err
+    }
+  }
+}
+
+async function insertPatient(data, patientCode) {
   const [result] = await pool.execute(
     `INSERT INTO patients
-      (first_name, last_name, sex, date_of_birth, contact_number, email, address, medical_history, allergies, emergency_contact_name, emergency_contact_phone, is_legacy_migrated)
+      (patient_code, first_name, last_name, sex, date_of_birth, contact_number, email, address, medical_history, allergies, emergency_contact_name, emergency_contact_phone, is_legacy_migrated)
      VALUES
-      (:firstName, :lastName, :sex, :dateOfBirth, :contactNumber, :email, :address, :medicalHistory, :allergies, :emergencyContactName, :emergencyContactPhone, :isLegacyMigrated)`,
+      (:patientCode, :firstName, :lastName, :sex, :dateOfBirth, :contactNumber, :email, :address, :medicalHistory, :allergies, :emergencyContactName, :emergencyContactPhone, :isLegacyMigrated)`,
     {
+      patientCode,
       firstName: data.firstName,
       lastName: data.lastName,
       sex: data.sex,

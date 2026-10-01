@@ -50,10 +50,19 @@ function validate(form) {
   return errors
 }
 
-function Field({ label, error, children }) {
+// `required`: pulang asterisk — dati "Contact Number *" lang ang may marka,
+// kahit required din ang pangalan at birthday (tignan validate() sa taas).
+function Field({ label, error, required, children }) {
   return (
     <div>
-      <label className="mb-1 block text-base font-medium text-slate-700">{label}</label>
+      <label className="mb-1 block text-base font-medium text-slate-700">
+        {label}
+        {required && (
+          <span className="ml-0.5 text-red-600" aria-hidden="true">
+            *
+          </span>
+        )}
+      </label>
       {children}
       {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
     </div>
@@ -69,7 +78,7 @@ function SectionHeading({ icon: Icon, children }) {
   )
 }
 
-export default function PatientForm({ initialValues, onSubmit, submitLabel = 'Save' }) {
+export default function PatientForm({ initialValues, onSubmit, submitLabel = 'Save', onCancel }) {
   const [form, setForm] = useState({ ...EMPTY_FORM, ...initialValues })
   const [fieldErrors, setFieldErrors] = useState({})
   const [formError, setFormError] = useState('')
@@ -116,14 +125,14 @@ export default function PatientForm({ initialValues, onSubmit, submitLabel = 'Sa
       <SectionHeading icon={User}>Personal Information</SectionHeading>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="First Name" error={fieldErrors.firstName}>
+        <Field label="First Name" required error={fieldErrors.firstName}>
           <input
             className={inputClass(fieldErrors.firstName)}
             value={form.firstName}
             onChange={(e) => update('firstName', e.target.value)}
           />
         </Field>
-        <Field label="Last Name" error={fieldErrors.lastName}>
+        <Field label="Last Name" required error={fieldErrors.lastName}>
           <input
             className={inputClass(fieldErrors.lastName)}
             value={form.lastName}
@@ -143,7 +152,7 @@ export default function PatientForm({ initialValues, onSubmit, submitLabel = 'Sa
             <option value="female">Female</option>
           </select>
         </Field>
-        <Field label="Date of Birth" error={fieldErrors.dateOfBirth}>
+        <Field label="Date of Birth" required error={fieldErrors.dateOfBirth}>
           <input
             type="date"
             className={inputClass(fieldErrors.dateOfBirth)}
@@ -156,7 +165,7 @@ export default function PatientForm({ initialValues, onSubmit, submitLabel = 'Sa
       <SectionHeading icon={Phone}>Contact Details</SectionHeading>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="Contact Number *" error={fieldErrors.contactNumber}>
+        <Field label="Contact Number" required error={fieldErrors.contactNumber}>
           <input
             placeholder="09XXXXXXXXX"
             className={inputClass(fieldErrors.contactNumber)}
@@ -223,13 +232,24 @@ export default function PatientForm({ initialValues, onSubmit, submitLabel = 'Sa
 />
       </Field>
 
-      <button
-        type="submit"
-        disabled={submitting}
-        className="w-full rounded-md bg-sky-600 px-5 py-3 text-base font-semibold text-white transition-colors hover:bg-sky-700 disabled:opacity-50 sm:w-auto"
-      >
-        {submitting ? 'Saving...' : submitLabel}
-      </button>
+      <div className="flex flex-col-reverse gap-2 border-t border-slate-100 pt-5 sm:flex-row sm:justify-end">
+        {onCancel && (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="flex min-h-11 items-center justify-center rounded-md border border-slate-300 bg-white px-5 text-base font-medium text-slate-700 transition-colors hover:bg-slate-50"
+          >
+            Cancel
+          </button>
+        )}
+        <button
+          type="submit"
+          disabled={submitting}
+          className="flex min-h-11 items-center justify-center rounded-md bg-sky-600 px-5 text-base font-semibold text-white transition-colors hover:bg-sky-700 disabled:opacity-50"
+        >
+          {submitting ? 'Saving...' : submitLabel}
+        </button>
+      </div>
     </form>
   )
 }

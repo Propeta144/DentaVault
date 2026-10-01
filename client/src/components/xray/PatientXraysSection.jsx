@@ -44,6 +44,7 @@ export default function PatientXraysSection({ patientId }) {
       {viewing && (
         <XrayViewer
           xray={viewing}
+          patientCode={patientId}
           canAnnotate={user.role === 'dentist'}
           onClose={() => {
             setViewing(null)

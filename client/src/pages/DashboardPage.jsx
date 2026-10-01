@@ -6,8 +6,9 @@ import StatTile from '../components/dashboard/StatTile'
 import HorizontalBarChart from '../components/dashboard/HorizontalBarChart'
 import MonthlyTrendChart from '../components/dashboard/MonthlyTrendChart'
 import StatusBadge from '../components/common/StatusBadge'
+import PageLoader from '../components/common/PageLoader'
 import { actionVariant } from '../utils/auditAction'
-import { SEQUENTIAL_HUE, CONDITION_CHART_ORDER } from '../constants/dashboardColors'
+import { PROCEDURE_CHART_ORDER, PROCEDURE_OTHER, CONDITION_CHART_ORDER } from '../constants/dashboardColors'
 
 export default function DashboardPage() {
   const [data, setData] = useState(null)
@@ -20,17 +21,33 @@ export default function DashboardPage() {
   }, [])
 
   if (error) return <p className="text-sm text-red-600">{error}</p>
-  if (!data) return <p className="px-1 py-6 text-center text-sm text-slate-400">Loading...</p>
+  if (!data) return <PageLoader label="Loading dashboard..." />
 
   const { stats, procedureBreakdown, conditionBreakdown, monthlyTrend, recentActivity } = data
 
-  // Single-hue: count-per-nominal-category chart 'to, hindi distinct
-  // series, kaya parehong kulay lahat ng bar (tignan yung color-formula.md).
-  const procedureData = procedureBreakdown.map((p) => ({
-    label: p.procedure_name,
-    value: p.count,
-    color: SEQUENTIAL_HUE,
+  // Iba-ibang kulay bawat procedure, sa FIXED na pagkakasunod (hindi sorted
+  // by count) — tignan PROCEDURE_CHART_ORDER sa dashboardColors.js kung
+  // bakit. Laging kita lahat ng 7 standard procedures (kahit 0), para hindi
+  // gumagalaw ang pwesto/kulay nila. Ang mga hindi-standard na pangalan,
+  // pinagsasama sa "Other" (nasa tooltip kung ano-ano sila).
+  const procedureCounts = Object.fromEntries(procedureBreakdown.map((p) => [p.procedure_name, p.count]))
+  const procedureData = PROCEDURE_CHART_ORDER.map((p) => ({
+    label: p.label,
+    value: procedureCounts[p.value] || 0,
+    color: p.color,
+    tooltip: `${p.value}: ${procedureCounts[p.value] || 0}`,
   }))
+  const otherProcedures = procedureBreakdown.filter(
+    (p) => !PROCEDURE_CHART_ORDER.some((known) => known.value === p.procedure_name),
+  )
+  if (otherProcedures.length > 0) {
+    procedureData.push({
+      label: PROCEDURE_OTHER.label,
+      value: otherProcedures.reduce((sum, p) => sum + p.count, 0),
+      color: PROCEDURE_OTHER.color,
+      tooltip: `Other: ${otherProcedures.map((p) => `${p.procedure_name} (${p.count})`).join(', ')}`,
+    })
+  }
 
   // Fixed display order (hindi sorted by count) para manatili sa loob ng
   // validated adjacency yung categorical color assignment — tignan yung
@@ -66,7 +83,7 @@ export default function DashboardPage() {
 
       <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <h2 className="mb-3 text-base font-semibold text-slate-900">Most Common Procedures</h2>
+          <h2 className="mb-3 text-base font-semibold text-slate-900">Procedures Performed</h2>
           <HorizontalBarChart data={procedureData} />
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">

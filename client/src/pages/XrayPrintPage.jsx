@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { usePrintState } from '../utils/selectedPatient'
 import { getPatient } from '../services/patients'
 import { listXrays, fetchXrayObjectUrl } from '../services/xrays'
 import { drawShapes } from '../components/xray/drawAnnotations'
+import PageLoader from '../components/common/PageLoader'
 
 export default function XrayPrintPage() {
-  const { patientId, xrayId } = useParams()
+  const printState = usePrintState()
+  const patientId = printState?.patientCode
+  const xrayId = printState?.xrayId
   const [patient, setPatient] = useState(null)
   const [xray, setXray] = useState(null)
   const [imageUrl, setImageUrl] = useState(null)
@@ -14,6 +17,7 @@ export default function XrayPrintPage() {
   const imgRef = useRef(null)
 
   useEffect(() => {
+    if (!patientId || !xrayId) return
     let objectUrl
     Promise.all([getPatient(patientId), listXrays(patientId), fetchXrayObjectUrl(xrayId)])
       .then(([p, xrays, url]) => {
@@ -41,8 +45,9 @@ export default function XrayPrintPage() {
     drawShapes(canvas.getContext('2d'), xray?.annotations || [], canvas.width, canvas.height)
   }
 
+  if (!patientId || !xrayId) return <p className="p-6 text-slate-500">Open this page from the X-ray viewer's Print button.</p>
   if (error) return <p className="p-6 text-red-600">{error}</p>
-  if (!patient || !xray || !imageUrl) return <p className="p-6 text-slate-500">Loading...</p>
+  if (!patient || !xray || !imageUrl) return <PageLoader fullScreen />
 
   return (
     <div className="mx-auto max-w-3xl bg-white p-8 text-slate-900">
@@ -63,9 +68,6 @@ export default function XrayPrintPage() {
       <div className="mb-6 grid grid-cols-2 gap-2 border-b border-slate-200 pb-4 text-sm">
         <div>
           <strong>Name:</strong> {patient.last_name}, {patient.first_name}
-        </div>
-        <div>
-          <strong>Patient ID:</strong> #{patient.id}
         </div>
         <div>
           <strong>Taken:</strong> {xray.taken_date || xray.created_at.slice(0, 10)}

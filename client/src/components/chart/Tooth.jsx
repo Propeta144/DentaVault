@@ -133,7 +133,9 @@ export default function Tooth({
         x={SIZE / 2}
         y={labelPosition === 'above' ? -8 : SIZE + 20}
         textAnchor="middle"
-        fontSize="12"
+        // 16 (hindi 12): lumiliit na ang buong chart para magkasya sa
+        // laptop (~60%), kaya ~10px pa rin ang numero doon imbes na ~7px.
+        fontSize="16"
         fontWeight="600"
         fill="#334155"
         onClick={() => canEdit && onWholeClick(toothNumber)}

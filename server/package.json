@@ -4,12 +4,16 @@
   "description": "DentaVault backend API",
   "main": "server.js",
   "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "node --watch-path=src --watch-path=server.js --watch-path=.env server.js",
     "start": "node server.js",
     "migrate": "node db/migrate.js",
     "seed": "node db/seed.js",
-    "seed:patient": "node db/seedPatientUser.js"
+    "seed:patient": "node db/seedPatientUser.js",
+    "audit:prune": "node db/pruneAuditLogs.js"
   },
   "keywords": [],
   "author": "",

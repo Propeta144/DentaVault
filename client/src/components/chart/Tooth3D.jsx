@@ -321,7 +321,14 @@ export default function Tooth3D({
 
   const layouts = surfaceLayouts(mesialOnPositiveX, TOOTH_EXTENTS[positionDigit])
   const surfaces = ['facial', 'lingual', 'mesial', 'distal', 'occlusal']
-  const historyMarks = surfaces.flatMap((surface) => chartState[surface]?.stroke_data || [])
+  // Ang kulay ay kinukuha sa condition_code NGAYON, hindi sa hex na
+  // naka-save sa stroke_data noong iginuhit — kaya kapag nagbago ang
+  // palette (hal. ginawang color-blind safe), sumusunod din ang mga lumang
+  // drawing at tugma pa rin sa legend.
+  const historyMarks = surfaces.flatMap((surface) => {
+    const entry = chartState[surface]
+    return (entry?.stroke_data || []).map((mark) => ({ ...mark, color: conditionColor(entry.condition_code) }))
+  })
 
   return (
     <group position={position} rotation={[0, rotationY, 0]} scale={highlighted ? 1.15 : 1}>

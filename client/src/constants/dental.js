@@ -49,17 +49,30 @@ export const SURFACES = [
   { code: 'whole', label: 'Whole Tooth' },
 ]
 
-// Tugma 'to sa color coding na nakasaad sa proposal, plus yung `crown`
-// para sa Crown/Bridge procedure. Lalabas lang yung `healthy` kapag talagang
-// na-record 'to ng dentist mismo — neutral lang ang itsura ng unmarked
-// na ngipin, hindi green, para hindi mag-imply yung chart ng exam na hindi
-// naman talaga nangyari.
+// Color coding ng mga kondisyon — IISANG pinagmumulan para sa buong app
+// (2D/3D odontogram, legend, chart entry modal, at dashboard "Tooth
+// Condition Breakdown" chart sa constants/dashboardColors.js).
+//
+// Color-blind safe na (dataviz skill, validate_palette.js --pairs all, kasi
+// sa odontogram kahit anong dalawang kondisyon pwedeng magkatabi): worst
+// CVD ΔE 13 (target ≥ 8), normal-vision ΔE 16.3 (floor 15). Ang dating
+// Tailwind hues ay FAIL — Root Canal (blue) at Crown (purple) ay ΔE 0.9
+// lang para sa deuteranopia, halos magkapareho talaga.
+//
+// Sinadyang malapit pa rin sa color coding ng proposal: green = Healthy,
+// yellow = Filling, blue = Root Canal, purple/violet = Crown, gray =
+// Extracted. Ang Caries lang ang lumipat mula red papuntang magenta
+// (pinkish-red), kasi ang red ay hindi pumapasa kasabay ng green.
+//
+// Lalabas lang yung `healthy` kapag talagang na-record 'to ng dentist
+// mismo — neutral lang ang itsura ng unmarked na ngipin, hindi green, para
+// hindi mag-imply yung chart ng exam na hindi naman talaga nangyari.
 export const CONDITIONS = [
-  { code: 'healthy', label: 'Healthy', color: '#22c55e' },
-  { code: 'caries', label: 'Caries', color: '#ef4444' },
-  { code: 'filling', label: 'Filling / Restored', color: '#eab308' },
-  { code: 'root_canal', label: 'Root Canal', color: '#3b82f6' },
-  { code: 'crown', label: 'Crown / Bridge', color: '#a855f7' },
+  { code: 'healthy', label: 'Healthy', color: '#008300' },
+  { code: 'caries', label: 'Caries', color: '#e87ba4' },
+  { code: 'filling', label: 'Filling / Restored', color: '#eda100' },
+  { code: 'root_canal', label: 'Root Canal', color: '#2a78d6' },
+  { code: 'crown', label: 'Crown / Bridge', color: '#4a3aa7' },
   { code: 'extracted', label: 'Extracted / Missing', color: '#6b7280' },
 ]
 

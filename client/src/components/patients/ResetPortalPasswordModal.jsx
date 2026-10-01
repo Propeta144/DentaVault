@@ -19,7 +19,7 @@ export default function ResetPortalPasswordModal({ patient, email, onClose }) {
     setError('')
     setSubmitting(true)
     try {
-      await resetPortalAccountPassword(patient.id, { password })
+      await resetPortalAccountPassword(patient.patient_code, { password })
       setDone(true)
       showToast('Portal password reset.', { type: 'success' })
     } catch (err) {

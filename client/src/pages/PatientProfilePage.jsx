@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, lazy, Suspense } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Navigate, useNavigate } from 'react-router-dom'
 import {
   Printer,
   Pencil,
@@ -30,6 +30,8 @@ import Modal from '../components/common/Modal'
 import Odontogram2D from '../components/chart/Odontogram2D'
 import { ALL_TEETH } from '../constants/dental'
 import MedicalAlertBadge from '../components/common/MedicalAlertBadge'
+import PageLoader from '../components/common/PageLoader'
+import { useSelectedPatientCode, openPrintTab, profileState, PROFILE_PATH } from '../utils/selectedPatient'
 
 const Odontogram3D = lazy(() => import('../components/chart/Odontogram3D'))
 
@@ -48,7 +50,8 @@ function InfoRow({ icon: Icon, label, value, capitalize }) {
 }
 
 export default function PatientProfilePage() {
-  const { id } = useParams()
+  // Patient Code galing sa history state, hindi sa URL (tignan utils/selectedPatient.js)
+  const id = useSelectedPatientCode()
   const navigate = useNavigate()
   const { user } = useAuth()
   const [patient, setPatient] = useState(null)
@@ -67,6 +70,7 @@ export default function PatientProfilePage() {
   const [resettingPassword, setResettingPassword] = useState(false)
 
   const load = useCallback(() => {
+    if (!id) return
     setLoading(true)
     Promise.all([getPatient(id), listTreatments(id)])
       .then(([p, t]) => {
@@ -78,7 +82,7 @@ export default function PatientProfilePage() {
   }, [id])
 
   useEffect(() => {
-    if (user.role !== 'dentist') return
+    if (user.role !== 'dentist' || !id) return
     getPortalAccount(id)
       .then(setPortalAccount)
       .catch(() => setPortalAccount(null))
@@ -93,12 +97,15 @@ export default function PatientProfilePage() {
     load()
   }
 
-  if (loading) return <p className="text-slate-500">Loading...</p>
+  // Kinopya/tinype lang yung URL, o nag-expire yung history state — walang
+  // patient na alam, kaya balik sa listahan.
+  if (!id) return <Navigate to="/patients" replace />
+  if (loading) return <PageLoader label="Loading patient record..." />
   if (error) return <p className="text-red-600">{error}</p>
   if (!patient) return null
 
   const tabClass = (name) =>
-    `flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap border-b-2 px-1 pb-2 text-base font-medium transition-colors ${
+    `flex min-h-11 flex-1 items-center justify-center gap-1.5 whitespace-nowrap border-b-2 px-1 pb-2 text-base font-medium transition-colors sm:flex-none ${
       tab === name
         ? 'border-sky-600 text-sky-700'
         : 'border-transparent text-slate-500 hover:text-slate-700'
@@ -108,23 +115,20 @@ export default function PatientProfilePage() {
     <div className="w-full space-y-6">
       
       {/* 1. TOP HEADER SECTION */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-slate-900">
-            {patient.last_name}, {patient.first_name}
-          </h1>
-          <p className="text-base text-slate-500">Patient ID #{patient.id}</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Link
-            to={`/patients/${id}/summary`}
-            target="_blank"
-            className="flex min-h-11 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 text-base font-medium text-slate-700 transition-colors hover:bg-slate-50"
-          >
-            <Printer className="h-4 w-4" />
-            Print Summary
-          </Link>
-        </div>
+      {/* Walang print button dito sa header — nasa loob na ng bawat tab ang
+          sariling print (Print Summary sa Treatment History, Print Chart sa
+          Dental Chart), para malinaw kung ano ang ipi-print. */}
+      <h1 className="text-2xl font-semibold text-slate-900">
+        {patient.last_name}, {patient.first_name}
+      </h1>
+
+      {/* Mobile lang: Allergies at Medical History sa pinakaitaas — kritikal
+          na impormasyon ito bago gumawa ng kahit anong treatment, kaya hindi
+          dapat nasa ilalim ng mahabang scroll. Sa desktop, nasa Patient
+          Details card pa rin sila (lg:hidden dito, hidden lg:block doon). */}
+      <div className="space-y-2 lg:hidden">
+        <MedicalAlertBadge label="Allergies" value={patient.allergies} />
+        <MedicalAlertBadge label="Medical History" value={patient.medical_history} />
       </div>
 
       {/* 2. MAIN 2-COLUMN GRID LAYOUT */}
@@ -154,8 +158,10 @@ export default function PatientProfilePage() {
       }
     />
 
-    {/* PARATING NAKALITAW NA BADGES PARA SA ALLERGIES AT MEDICAL HISTORY */}
-    <div className="border-t border-slate-100 pt-4 space-y-3">
+    {/* PARATING NAKALITAW NA BADGES PARA SA ALLERGIES AT MEDICAL HISTORY.
+        Desktop lang dito — sa mobile, nasa pinakaitaas na sila (tignan sa
+        ilalim ng h1) para hindi matabunan ng tabs. */}
+    <div className="hidden space-y-3 border-t border-slate-100 pt-4 lg:block">
       <MedicalAlertBadge label="Allergies" value={patient.allergies} />
       <MedicalAlertBadge label="Medical History" value={patient.medical_history} />
     </div>
@@ -221,17 +227,24 @@ export default function PatientProfilePage() {
         </div>
 
         {/* ================= KANANG COLUMN: TABS & CONTENT WORKSPACE (8 COLS) ================= */}
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm lg:col-span-8 min-h-[500px]">
+        {/* order-first sa mobile: tabs (History / Chart / X-rays) ang
+            kasunod agad ng alerts, bago ang Patient Details at Actions — ito
+            ang madalas gamitin ng dentist. Sa desktop (lg), balik sa normal
+            na 2-column na ayos. */}
+        <div className="order-first min-h-[500px] rounded-xl border border-slate-200 bg-white p-5 shadow-sm lg:order-none lg:col-span-8">
           
           {/* Tabs Nav */}
           <div className="mb-6 flex gap-4 overflow-x-auto border-b border-slate-200 sm:gap-6">
             <button type="button" className={tabClass('history')} onClick={() => setTab('history')}>
               <ClipboardList className="h-4 w-4" />
-              Treatment History
+              {/* Maikling label sa phone para kasya ang 3 tab — dati natatago ang X-rays */}
+              <span className="sm:hidden">History</span>
+              <span className="hidden sm:inline">Treatment History</span>
             </button>
             <button type="button" className={tabClass('chart')} onClick={() => setTab('chart')}>
               <Grid3x3 className="h-4 w-4" />
-              Dental Chart
+              <span className="sm:hidden">Chart</span>
+              <span className="hidden sm:inline">Dental Chart</span>
             </button>
             <button type="button" className={tabClass('xrays')} onClick={() => setTab('xrays')}>
               <ScanLine className="h-4 w-4" />
@@ -242,6 +255,19 @@ export default function PatientProfilePage() {
           {/* Tab 1: Treatment History */}
           {tab === 'history' && (
             <div className="space-y-6">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm text-slate-500">
+                  {treatments.length} treatment{treatments.length === 1 ? '' : 's'} on record
+                </p>
+                <button
+                  type="button"
+                  onClick={() => openPrintTab(`${PROFILE_PATH}/summary`, profileState(id))}
+                  className="flex min-h-11 items-center gap-1.5 text-base font-medium text-slate-500 transition-colors hover:text-sky-700"
+                >
+                  <Printer className="h-4 w-4" />
+                  Print Summary
+                </button>
+              </div>
               <div className="space-y-2">
                 {treatments.length === 0 && (
                   <p className="text-sm text-slate-400">No treatment entries yet.</p>
@@ -306,21 +332,21 @@ export default function PatientProfilePage() {
                     3D Chart
                   </button>
                 </div>
-                <Link
-                  to={`/patients/${id}/chart/print`}
-                  target="_blank"
+                <button
+                  type="button"
+                  onClick={() => openPrintTab(`${PROFILE_PATH}/chart/print`, profileState(id))}
                   className="flex min-h-11 items-center gap-1.5 text-base font-medium text-slate-500 transition-colors hover:text-sky-700"
                 >
                   <Printer className="h-4 w-4" />
                   Print Chart
-                </Link>
+                </button>
               </div>
               
               <div className="overflow-x-auto">
                 {chartView === '2d' ? (
                   <Odontogram2D patientId={id} canEdit={user.role === 'dentist'} />
                 ) : (
-                  <Suspense fallback={<p className="text-sm text-slate-400">Loading 3D chart...</p>}>
+                  <Suspense fallback={<PageLoader label="Loading 3D chart..." />}>
                     <Odontogram3D
                       patientId={id}
                       canEdit={user.role === 'dentist'}

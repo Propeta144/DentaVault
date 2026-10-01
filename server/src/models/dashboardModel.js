@@ -27,17 +27,17 @@ export async function getXraysThisMonthCount() {
   return count
 }
 
-// Ranked, hindi fixed-order — single-metric breakdown lang naman 'to
-// (count per procedure name), hindi distinct series, kaya same chart
-// color lang lahat ng bar sa frontend, hindi isa-isang hue per procedure.
+// Count per procedure name — LAHAT ng pangalan (walang LIMIT), kasi ang
+// frontend na ang nag-aayos: fixed order para sa 7 standard procedures
+// (may sariling kulay bawat isa), at pinagsasama sa "Other" ang iba —
+// kailangang kumpleto dito para tama ang bilang ng "Other".
 export async function getProcedureBreakdown() {
   const [rows] = await pool.execute(
     `SELECT t.procedure_name, COUNT(*) AS count
      FROM treatments t
      JOIN patients p ON p.id = t.patient_id AND p.deleted_at IS NULL
      GROUP BY t.procedure_name
-     ORDER BY count DESC
-     LIMIT 8`,
+     ORDER BY count DESC`,
   )
   return rows
 }

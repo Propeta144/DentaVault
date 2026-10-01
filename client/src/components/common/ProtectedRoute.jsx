@@ -1,11 +1,12 @@
 import { Navigate, Outlet } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
+import PageLoader from './PageLoader'
 
 export default function ProtectedRoute({ allowedRoles }) {
   const { user, loading } = useAuth()
 
   if (loading) {
-    return <div className="p-6 text-slate-500">Loading...</div>
+    return <PageLoader fullScreen />
   }
 
   if (!user) {

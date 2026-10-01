@@ -1,6 +1,7 @@
 import * as auditLogModel from '../models/auditLogModel.js'
 import { recordAuditLog } from '../models/auditLogModel.js'
 import asyncHandler from '../utils/asyncHandler.js'
+import { getRetentionConfig } from '../services/auditRetentionService.js'
 
 export const list = asyncHandler(async (req, res) => {
   const page = Math.max(1, Number(req.query.page) || 1)
@@ -25,7 +26,17 @@ export const list = asyncHandler(async (req, res) => {
     ipAddress: req.ip,
   })
 
-  res.json({ logs: rows, page, limit, total, totalPages: Math.ceil(total / limit) })
+  // Retention info para maipakita sa page kung gaano katagal nananatili ang
+  // entries dito bago ilipat sa archive (araw lang — hindi kasama ang path).
+  const { enabled, viewDays, changeDays } = getRetentionConfig()
+  res.json({
+    logs: rows,
+    page,
+    limit,
+    total,
+    totalPages: Math.ceil(total / limit),
+    retention: { enabled, viewDays, changeDays },
+  })
 })
 
 // Ito yung nasa likod ng "Action" filter dropdown. Hindi ito naka-log

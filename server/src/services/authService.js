@@ -54,6 +54,7 @@ export async function login({ email, password, ipAddress }) {
       id: user.id,
       role: user.role,
       patientId: user.patient_id,
+      patientCode: user.patient_code,
       email: user.email,
       fullName: user.full_name,
     },

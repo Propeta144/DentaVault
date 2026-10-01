@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { Users, LogOut, Menu, X, ScrollText, LayoutDashboard } from 'lucide-react'
 import ToothIcon from '../components/common/ToothIcon'
+import PageLoader from '../components/common/PageLoader'
 import { useAuth } from '../context/AuthContext'
 import { getUnreviewedXrayCount } from '../services/xrays'
 
@@ -137,7 +138,12 @@ export default function AppLayout() {
         </div>
       </aside>
       <main className="p-4 sm:p-6 md:pl-[16.5rem]">
-        <Outlet />
+        {/* Suspense DITO (sa loob ng main, hindi sa labas ng buong layout) para
+            habang dina-download ang page na pinindot, nakikita pa rin ang
+            sidebar at loading indicator lang ang nasa content area. */}
+        <Suspense fallback={<PageLoader />}>
+          <Outlet />
+        </Suspense>
       </main>
     </div>
   )

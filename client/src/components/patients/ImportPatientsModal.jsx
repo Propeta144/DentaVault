@@ -127,7 +127,7 @@ export default function ImportPatientsModal({ onClose, onImported }) {
                 <ul className="space-y-1 text-sm text-slate-600">
                   {result.treatmentsAdded.map((t) => (
                     <li key={t.row}>
-                      Row {t.row}: {t.procedureName} for {t.name} (patient #{t.patientId})
+                      Row {t.row}: {t.procedureName} for {t.name}
                     </li>
                   ))}
                 </ul>
@@ -143,7 +143,7 @@ export default function ImportPatientsModal({ onClose, onImported }) {
                 <ul className="space-y-1 text-sm text-slate-600">
                   {result.duplicates.map((d) => (
                     <li key={d.row}>
-                      Row {d.row}: {d.name} — already exists as patient #{d.existingPatientId}
+                      Row {d.row}: {d.name} — already exists
                     </li>
                   ))}
                 </ul>
@@ -175,7 +175,7 @@ export default function ImportPatientsModal({ onClose, onImported }) {
                 <ul className="space-y-1 text-sm text-slate-600">
                   {result.created.map((c) => (
                     <li key={c.row}>
-                      Row {c.row}: {c.name} (patient #{c.id})
+                      Row {c.row}: {c.name}
                     </li>
                   ))}
                 </ul>

@@ -14,8 +14,8 @@ function assertValid(req) {
   }
 }
 
-async function assertPatientAccess(req, patientId) {
-  const patient = await patientModel.findPatientById(patientId)
+async function assertPatientAccess(req, patientCode) {
+  const patient = await patientModel.findPatientByCode(patientCode)
   if (!patient) throw new AppError('Patient not found', 404)
   if (!canAccessPatientRecord(req.user, patient.id)) {
     throw new AppError('You do not have permission to access this record', 403)
@@ -24,8 +24,8 @@ async function assertPatientAccess(req, patientId) {
 }
 
 export const list = asyncHandler(async (req, res) => {
-  await assertPatientAccess(req, req.params.patientId)
-  const xrays = await xrayModel.listXraysForPatient(req.params.patientId)
+  const patient = await assertPatientAccess(req, req.params.patientCode)
+  const xrays = await xrayModel.listXraysForPatient(patient.id)
   res.json({ xrays })
 })
 
@@ -38,7 +38,7 @@ export const unreviewedCount = asyncHandler(async (req, res) => {
 })
 
 export const upload = asyncHandler(async (req, res) => {
-  const patient = await assertPatientAccess(req, req.params.patientId)
+  const patient = await assertPatientAccess(req, req.params.patientCode)
 
   if (!req.file) {
     throw new AppError('An X-ray file is required', 422)

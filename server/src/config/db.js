@@ -1,4 +1,5 @@
 import mysql from 'mysql2/promise'
+import { dbSslOptions } from './dbSsl.js'
 
 // Pool, hindi single connection: sabay-sabay kasing hinahandle ni Express
 // yung mga requests, kaya bawat isa, huhulugan lang ng connection habang
@@ -10,6 +11,7 @@ const pool = mysql.createPool({
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
+  ssl: dbSslOptions(),
   waitForConnections: true,
   connectionLimit: 10,
   namedPlaceholders: true,

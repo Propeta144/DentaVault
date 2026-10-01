@@ -41,7 +41,7 @@ function ArchLabel({ x, y, children }) {
       x={x}
       y={y}
       textAnchor="middle"
-      fontSize="8.5"
+      fontSize="13" // ~8px pa rin kapag pinaliit ang chart sa laptop
       fontWeight="600"
       letterSpacing="0.5"
       fill="#94a3b8"
@@ -97,29 +97,25 @@ export default function Odontogram2D({ patientId, canEdit }) {
       {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
 
       {/*
-        Sinadya na HINDI siya naka-scale para bumagay sa viewport width
-        (walang w-full/max-w-* sa svg). Kasi sa phone, kapag pinaliit yung
-        16-tooth row papuntang ~350px, magiging sobrang liit na ng bawat isa
-        sa 5 surface regions para pa i-touch nang maayos. Kaya fixed at
-        laging-readable na pixel size na lang ang ginagamit ng chart, tapos
-        naka-horizontal scroll na lang yung container sa maliliit na screen
-        — same tradeoff din ginagawa ng totoong dental charting software.
+        Lumiliit ang chart para magkasya sa lalagyan (w-full, hanggang sa
+        natural na laki niya), pero hindi bababa sa 600px (min-w). Dati
+        naka-fixed ito sa buong laki (~1056px), kaya sa karaniwang laptop
+        (1366px, may sidebar at 2-column na profile) naputol ang kalahati ng
+        bibig (21-28, 31-38) at kailangan pang i-scroll. Ang 600px na sahig
+        ay para sa phone: kung papaliitin pa sa ~350px, sobrang liit na ng 5
+        surface regions para i-tap nang tama — kaya doon, horizontal scroll
+        pa rin (overflow-x-auto), same tradeoff ng dental charting software.
       */}
       {/*
-        print:overflow-visible + print:w-full sa svg sa baba: yung fixed-width
-        horizontal-scroll layout sa taas, okay para sa touch screens pero
-        di magagamit sa papel — kasi kahit ano lampas sa edge ng print
-        viewport, hindi na lalabas, tahimik na ma-tutruncate yung upper-right
-        at lower-right quadrants. Sa print media, sinasukat na lang ang SVG
-        para bumagay sa page width, gamit yung viewBox niya para manatiling
-        proportional.
+        print:overflow-visible: sa papel walang scroll — anumang lumampas sa
+        gilid ng page, tahimik na mapuputol. Dahil w-full + viewBox na ang
+        SVG, sumusukat na ito sa lapad ng print page nang proportional.
       */}
       <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6 print:overflow-visible print:border-0 print:p-0 print:shadow-none">
         <svg
           viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
-          width={CHART_WIDTH}
-          height={CHART_HEIGHT}
-          className="mx-auto block print:h-auto print:w-full"
+          className="mx-auto block h-auto w-full min-w-[600px]"
+          style={{ maxWidth: CHART_WIDTH }}
         >
           <defs>
             <filter id="tooth-shadow" x="-30%" y="-30%" width="160%" height="160%">

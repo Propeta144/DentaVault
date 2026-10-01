@@ -251,16 +251,15 @@ export async function importPatients(buffer, originalname, importedByUserId) {
     }
 
     if (isNewPatient) {
-      created.push({ row: rowNumber, id: patient.id, name, treatmentAdded: Boolean(treatment) })
+      created.push({ row: rowNumber, name, treatmentAdded: Boolean(treatment) })
     } else if (treatment) {
       treatmentsAdded.push({
         row: rowNumber,
-        patientId: patient.id,
         name,
         procedureName: treatment.procedure_name,
       })
     } else {
-      duplicates.push({ row: rowNumber, name, existingPatientId: patient.id })
+      duplicates.push({ row: rowNumber, name })
     }
   }
 

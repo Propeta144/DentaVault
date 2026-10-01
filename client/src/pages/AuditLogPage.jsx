@@ -2,12 +2,22 @@ import { useCallback, useEffect, useState } from 'react'
 import { ChevronLeft, ChevronRight, ScrollText, Search, X } from 'lucide-react'
 import { listAuditLogs, listAuditLogActions } from '../services/auditLogs'
 import StatusBadge from '../components/common/StatusBadge'
+import PageLoader from '../components/common/PageLoader'
 import { actionVariant, humanizeAction } from '../utils/auditAction'
 
 function formatDetails(details) {
   if (!details || typeof details !== 'object') return '—'
   const parts = Object.entries(details).map(([key, value]) => `${key}: ${value}`)
   return parts.length ? parts.join(', ') : '—'
+}
+
+// 365 → "1 year", 1825 → "5 years", 90 → "90 days" — mas madaling basahin.
+function formatDays(days) {
+  if (days % 365 === 0) {
+    const years = days / 365
+    return `${years} year${years === 1 ? '' : 's'}`
+  }
+  return `${days} days`
 }
 
 export default function AuditLogPage() {
@@ -77,6 +87,13 @@ export default function AuditLogPage() {
           Every sensitive read/write in DentaVault, as required under the Data Privacy Act
           (RA 10173) — who did what, on which record, and when.
         </p>
+        {data.retention?.enabled && (
+          <p className="mt-1 text-sm text-slate-400">
+            Views are kept here for {formatDays(data.retention.viewDays)}; changes, exports, and
+            logins for {formatDays(data.retention.changeDays)}. Older entries are moved to a secure
+            archive on the server, not lost.
+          </p>
+        )}
       </div>
 
       <div className="mb-4 flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:flex-wrap sm:items-center">
@@ -142,7 +159,7 @@ export default function AuditLogPage() {
       </div>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
-      {loading && <p className="px-1 py-6 text-center text-sm text-slate-400">Loading...</p>}
+      {loading && <PageLoader label="Loading audit log..." />}
 
       {!loading && data.logs.length === 0 && (
         <p className="rounded-xl border border-slate-200 bg-white px-4 py-6 text-center text-sm text-slate-400 shadow-sm">

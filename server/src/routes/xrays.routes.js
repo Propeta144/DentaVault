@@ -10,9 +10,9 @@ const router = Router()
 router.use(authenticate)
 
 // Patient-scoped 'to: listahan/pag-upload ng X-rays para sa isang partikular na patient.
-router.get('/patients/:patientId/xrays', xraysController.list)
+router.get('/patients/:patientCode/xrays', xraysController.list)
 router.post(
-  '/patients/:patientId/xrays',
+  '/patients/:patientCode/xrays',
   requireRole('dentist'),
   uploadXray.single('file'),
   [body('takenDate').optional({ values: 'falsy' }).isISO8601()],

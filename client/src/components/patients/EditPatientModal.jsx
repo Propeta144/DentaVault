@@ -28,7 +28,7 @@ export default function EditPatientModal({ patient, onClose, onSaved }) {
 
   async function handleSubmit(form) {
     try {
-      const updated = await updatePatient(patient.id, form)
+      const updated = await updatePatient(patient.patient_code, form)
       showToast('Patient information updated successfully.', { type: 'success' })
       onSaved(updated)
       onClose()
@@ -40,7 +40,12 @@ export default function EditPatientModal({ patient, onClose, onSaved }) {
 
   return (
     <Modal title={`Edit ${patient.first_name} ${patient.last_name}`} onClose={onClose} maxWidth="max-w-2xl">
-      <PatientForm initialValues={toFormValues(patient)} onSubmit={handleSubmit} submitLabel="Save Changes" />
+      <PatientForm
+        initialValues={toFormValues(patient)}
+        onSubmit={handleSubmit}
+        submitLabel="Save Changes"
+        onCancel={onClose}
+      />
     </Modal>
   )
 }

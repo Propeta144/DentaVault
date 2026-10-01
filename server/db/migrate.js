@@ -1,8 +1,9 @@
 import 'dotenv/config'
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import mysql from 'mysql2/promise'
+import { dbSslOptions } from '../src/config/dbSsl.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const MIGRATIONS_DIR = path.join(__dirname, 'migrations')
@@ -14,6 +15,7 @@ async function run() {
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,
+    ssl: dbSslOptions(),
     multipleStatements: true, // only needed here, never on the app's query pool
     namedPlaceholders: true,
   })
@@ -31,15 +33,23 @@ async function run() {
   const applied = new Set(appliedRows.map((r) => r.filename))
 
   const files = (await fs.readdir(MIGRATIONS_DIR))
-    .filter((f) => f.endsWith('.sql'))
+    .filter((f) => f.endsWith('.sql') || f.endsWith('.js'))
     .sort()
 
   let ranCount = 0
   for (const file of files) {
     if (applied.has(file)) continue
-    const sql = await fs.readFile(path.join(MIGRATIONS_DIR, file), 'utf8')
     console.log(`Running migration: ${file}`)
-    await connection.query(sql)
+    if (file.endsWith('.js')) {
+      // JS migration 'to — para sa mga kailangan ng Node mismo (hal.
+      // crypto-random na values sa backfill), na hindi kaya ng plain SQL.
+      // Dapat mag-export ng `up(connection)`.
+      const { up } = await import(pathToFileURL(path.join(MIGRATIONS_DIR, file)).href)
+      await up(connection)
+    } else {
+      const sql = await fs.readFile(path.join(MIGRATIONS_DIR, file), 'utf8')
+      await connection.query(sql)
+    }
     await connection.execute('INSERT INTO schema_migrations (filename) VALUES (:file)', { file })
     ranCount++
   }

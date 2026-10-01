@@ -6,8 +6,8 @@ import { canAccessPatientRecord } from '../middleware/rbac.js'
 import asyncHandler from '../utils/asyncHandler.js'
 import AppError from '../utils/AppError.js'
 
-async function assertPatientAccess(req, patientId) {
-  const patient = await patientModel.findPatientById(patientId)
+async function assertPatientAccess(req, patientCode) {
+  const patient = await patientModel.findPatientByCode(patientCode)
   if (!patient) throw new AppError('Patient not found', 404)
   if (!canAccessPatientRecord(req.user, patient.id)) {
     throw new AppError('You do not have permission to access this record', 403)
@@ -16,13 +16,13 @@ async function assertPatientAccess(req, patientId) {
 }
 
 export const getCurrentChart = asyncHandler(async (req, res) => {
-  const patient = await assertPatientAccess(req, req.params.patientId)
+  const patient = await assertPatientAccess(req, req.params.patientCode)
   const entries = await chartModel.getCurrentChart(patient.id)
   res.json({ entries })
 })
 
 export const getToothHistory = asyncHandler(async (req, res) => {
-  const patient = await assertPatientAccess(req, req.params.patientId)
+  const patient = await assertPatientAccess(req, req.params.patientCode)
   const history = await chartModel.getToothHistory(patient.id, req.params.toothNumber)
   res.json({ history })
 })
@@ -33,7 +33,7 @@ export const createEntry = asyncHandler(async (req, res) => {
     throw new AppError(errors.array()[0].msg, 422)
   }
 
-  const patient = await assertPatientAccess(req, req.params.patientId)
+  const patient = await assertPatientAccess(req, req.params.patientCode)
   const { toothNumber, surface, conditionCode, notes, strokeData } = req.body
 
   // Yung "whole tooth" entry (extraction, restoration, o full-coverage fact

@@ -20,7 +20,7 @@ export default function CreatePortalAccountModal({ patient, onClose, onCreated }
     setError('')
     setSubmitting(true)
     try {
-      const created = await createPortalAccount(patient.id, { email, password })
+      const created = await createPortalAccount(patient.patient_code, { email, password })
       setAccount(created)
       onCreated(created)
       showToast('Portal account created.', { type: 'success' })

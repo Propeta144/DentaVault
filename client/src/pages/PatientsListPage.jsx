@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { PROFILE_PATH, profileState } from '../utils/selectedPatient'
 import { Search, UserPlus, Pencil, Trash2, FileCheck2, FileUp, Download } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { listPatients, getPatient, exportPatientsCsv } from '../services/patients'
@@ -7,6 +8,7 @@ import EditPatientModal from '../components/patients/EditPatientModal'
 import DeletePatientModal from '../components/patients/DeletePatientModal'
 import ImportPatientsModal from '../components/patients/ImportPatientsModal'
 import StatusBadge from '../components/common/StatusBadge'
+import PageLoader from '../components/common/PageLoader'
 import { useToast } from '../context/ToastContext'
 
 const SORT_OPTIONS = [
@@ -43,11 +45,11 @@ function RowActions({ patient, loadingEditId, onEdit, onDelete, className = '' }
       <button
         type="button"
         onClick={() => onEdit(patient)}
-        disabled={loadingEditId === patient.id}
+        disabled={loadingEditId === patient.patient_code}
         className="inline-flex min-h-11 items-center gap-1.5 rounded-md px-3 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-sky-700 disabled:opacity-50"
       >
         <Pencil className="h-4 w-4" />
-        {loadingEditId === patient.id ? 'Loading...' : 'Edit'}
+        {loadingEditId === patient.patient_code ? 'Loading...' : 'Edit'}
       </button>
       <button
         type="button"
@@ -89,9 +91,9 @@ export default function PatientsListPage() {
   }, [reload])
 
   async function handleEditClick(row) {
-    setLoadingEditId(row.id)
+    setLoadingEditId(row.patient_code)
     try {
-      const full = await getPatient(row.id)
+      const full = await getPatient(row.patient_code)
       setEditingPatient(full)
     } catch (err) {
       showToast(err.response?.data?.error || 'Failed to load patient details.', { type: 'error' })
@@ -103,14 +105,14 @@ export default function PatientsListPage() {
   function handleSaved(updated) {
     setData((prev) => ({
       ...prev,
-      patients: prev.patients.map((p) => (p.id === updated.id ? { ...p, ...updated } : p)),
+      patients: prev.patients.map((p) => (p.patient_code === updated.patient_code ? { ...p, ...updated } : p)),
     }))
   }
 
-  function handleDeleted(deletedId) {
+  function handleDeleted(deletedCode) {
     setData((prev) => ({
       ...prev,
-      patients: prev.patients.filter((p) => p.id !== deletedId),
+      patients: prev.patients.filter((p) => p.patient_code !== deletedCode),
       total: prev.total - 1,
     }))
   }
@@ -134,7 +136,9 @@ export default function PatientsListPage() {
           <p className="text-base text-slate-500">Search, register, and manage patient records</p>
         </div>
         {user.role === 'dentist' && (
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          // Sa phone: Export at Import magkatabi (2 columns), Register sa ilalim
+          // na buong lapad — dati tatlong full-width na button ang nakasalansan.
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-row sm:items-center">
             <button
               type="button"
               onClick={handleExport}
@@ -150,11 +154,12 @@ export default function PatientsListPage() {
               className="flex min-h-11 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-4 text-base font-medium text-slate-700 transition-colors hover:bg-slate-50"
             >
               <FileUp className="h-4 w-4" />
-              Import Legacy Records
+              <span className="sm:hidden">Import</span>
+              <span className="hidden sm:inline">Import Legacy Records</span>
             </button>
             <Link
               to="/patients/new"
-              className="flex min-h-11 items-center justify-center gap-2 rounded-md bg-sky-600 px-4 text-base font-semibold text-white transition-colors hover:bg-sky-700"
+              className="col-span-2 flex min-h-11 items-center justify-center gap-2 rounded-md bg-sky-600 px-4 text-base font-semibold text-white transition-colors hover:bg-sky-700"
             >
               <UserPlus className="h-4 w-4" />
               Register Patient
@@ -168,7 +173,7 @@ export default function PatientsListPage() {
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
-            placeholder="Search by name or patient ID..."
+            placeholder="Search by name..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full rounded-md border border-slate-300 py-2.5 pl-9 pr-3 text-base focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-100"
@@ -189,7 +194,7 @@ export default function PatientsListPage() {
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 
-      {loading && <p className="px-1 py-6 text-center text-sm text-slate-400">Loading...</p>}
+      {loading && <PageLoader label="Loading patients..." />}
 
       {!loading && data.patients.length === 0 && (
         <p className="rounded-xl border border-slate-200 bg-white px-4 py-6 text-center text-sm text-slate-400 shadow-sm">
@@ -202,14 +207,17 @@ export default function PatientsListPage() {
           {/* Card list: small screens only */}
           <div className="space-y-3 md:hidden">
             {data.patients.map((p) => (
-              <div key={p.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div key={p.patient_code} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                 <div className="flex items-start justify-between gap-2">
-                  <Link
-                    to={`/patients/${p.id}`}
-                    className="font-medium text-slate-900 hover:text-sky-700 hover:underline"
-                  >
-                    {p.last_name}, {p.first_name}
-                  </Link>
+                  <div>
+                    <Link
+                      to={PROFILE_PATH}
+                      state={profileState(p.patient_code)}
+                      className="font-medium text-slate-900 hover:text-sky-700 hover:underline"
+                    >
+                      {p.last_name}, {p.first_name}
+                    </Link>
+                  </div>
                   <PatientStatusBadge patient={p} />
                 </div>
                 <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-sm text-slate-500">
@@ -263,10 +271,11 @@ export default function PatientsListPage() {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {data.patients.map((p) => (
-                  <tr key={p.id} className="hover:bg-slate-50">
+                  <tr key={p.patient_code} className="hover:bg-slate-50">
                     <td className="px-4 py-3">
                       <Link
-                        to={`/patients/${p.id}`}
+                        to={PROFILE_PATH}
+                      state={profileState(p.patient_code)}
                         className="font-medium text-slate-900 hover:text-sky-700 hover:underline"
                       >
                         {p.last_name}, {p.first_name}

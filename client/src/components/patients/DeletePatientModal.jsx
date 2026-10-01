@@ -17,9 +17,9 @@ export default function DeletePatientModal({ patient, onClose, onDeleted }) {
     setError('')
     setSubmitting(true)
     try {
-      await deletePatient(patient.id)
+      await deletePatient(patient.patient_code)
       showToast(`${fullName}'s record has been deleted.`, { type: 'success' })
-      onDeleted(patient.id)
+      onDeleted(patient.patient_code)
       onClose()
     } catch (err) {
       const message = err.response?.data?.error || 'Failed to delete patient'

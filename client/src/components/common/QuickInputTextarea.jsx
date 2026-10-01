@@ -25,7 +25,7 @@ export default function QuickInputTextarea({
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between">
-        <label className="text-sm font-medium text-slate-700">{label}</label>
+        <label className="text-base font-medium text-slate-700">{label}</label>
         
         {/* Quick Action Badges */}
         <div className="flex flex-wrap gap-1.5">

@@ -1,21 +1,24 @@
 import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { usePrintState } from '../utils/selectedPatient'
 import { getPatient } from '../services/patients'
 import Odontogram2D from '../components/chart/Odontogram2D'
+import PageLoader from '../components/common/PageLoader'
 
 export default function ChartPrintPage() {
-  const { id } = useParams()
+  const id = usePrintState()?.patientCode
   const [patient, setPatient] = useState(null)
   const [error, setError] = useState('')
 
   useEffect(() => {
+    if (!id) return
     getPatient(id)
       .then(setPatient)
       .catch((err) => setError(err.response?.data?.error || 'Failed to load patient'))
   }, [id])
 
+  if (!id) return <p className="p-6 text-slate-500">Open this page from the patient profile's Print button.</p>
   if (error) return <p className="p-6 text-red-600">{error}</p>
-  if (!patient) return <p className="p-6 text-slate-500">Loading...</p>
+  if (!patient) return <PageLoader fullScreen />
 
   return (
     <div className="mx-auto max-w-3xl bg-white p-8 text-slate-900">
@@ -36,9 +39,6 @@ export default function ChartPrintPage() {
       <div className="mb-6 grid grid-cols-2 gap-2 border-b border-slate-200 pb-4 text-sm">
         <div>
           <strong>Name:</strong> {patient.last_name}, {patient.first_name}
-        </div>
-        <div>
-          <strong>Patient ID:</strong> #{patient.id}
         </div>
         <div>
           <strong>Sex:</strong> <span className="capitalize">{patient.sex}</span>

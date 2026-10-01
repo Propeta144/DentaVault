@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { PenLine, Type, Undo2, Save, ZoomIn, ZoomOut, X, Printer, Trash2 } from 'lucide-react'
 import { fetchXrayObjectUrl, saveAnnotations } from '../../services/xrays'
 import { useToast } from '../../context/ToastContext'
+import { openPrintTab, PROFILE_PATH } from '../../utils/selectedPatient'
 import { drawShapes } from './drawAnnotations'
 import DeleteXrayModal from './DeleteXrayModal'
 import Modal from '../common/Modal'
@@ -31,7 +32,7 @@ function pointerToFraction(e, canvas) {
   return [(e.clientX - rect.left) / rect.width, (e.clientY - rect.top) / rect.height]
 }
 
-export default function XrayViewer({ xray, canAnnotate, onClose }) {
+export default function XrayViewer({ xray, patientCode, canAnnotate, onClose }) {
   const { showToast } = useToast()
   const [imageUrl, setImageUrl] = useState(null)
   const [naturalSize, setNaturalSize] = useState(null) // { width, height } in real pixels
@@ -280,7 +281,7 @@ export default function XrayViewer({ xray, canAnnotate, onClose }) {
           <button
             type="button"
             title="Print"
-            onClick={() => window.open(`/patients/${xray.patient_id}/xrays/${xray.id}/print`, '_blank')}
+            onClick={() => openPrintTab(`${PROFILE_PATH}/xray/print`, { patientCode, xrayId: xray.id })}
             className="flex min-h-11 items-center gap-1.5 rounded bg-slate-800 px-3 text-sm font-medium transition-colors hover:bg-slate-700"
           >
             <Printer className="h-4 w-4" />

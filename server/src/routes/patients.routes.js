@@ -46,8 +46,8 @@ const treatmentValidation = [
 router.get('/', requireRole('dentist'), patientsController.list)
 router.post('/', requireRole('dentist'), patientValidation, patientsController.create)
 
-// DAPAT maregister ang mga 'to bago yung '/:id' sa baba — kung hindi,
-// ipapares ni Express yung "/import" o "/export" bilang :id =
+// DAPAT maregister ang mga 'to bago yung '/:code' sa baba — kung hindi,
+// ipapares ni Express yung "/import" o "/export" bilang :code =
 // "import"/"export" tapos hindi na kailanman tatakbo itong mga route na
 // 'to.
 router.get('/import/template', requireRole('dentist'), patientImportController.downloadTemplate)
@@ -59,23 +59,23 @@ router.post(
 )
 router.get('/export', requireRole('dentist'), patientsController.exportCsv)
 
-router.get('/:id', patientsController.getOne)
-router.put('/:id', requireRole('dentist'), patientValidation, patientsController.update)
-router.delete('/:id', requireRole('dentist'), patientsController.remove)
+router.get('/:code', patientsController.getOne)
+router.put('/:code', requireRole('dentist'), patientValidation, patientsController.update)
+router.delete('/:code', requireRole('dentist'), patientsController.remove)
 
-router.get('/:id/treatments', patientsController.listTreatments)
+router.get('/:code/treatments', patientsController.listTreatments)
 router.post(
-  '/:id/treatments',
+  '/:code/treatments',
   requireRole('dentist'),
   treatmentValidation,
   patientsController.addTreatment,
 )
 
-router.get('/:id/summary', patientsController.summary)
+router.get('/:code/summary', patientsController.summary)
 
-router.get('/:id/portal-account', requireRole('dentist'), patientsController.getPortalAccount)
+router.get('/:code/portal-account', requireRole('dentist'), patientsController.getPortalAccount)
 router.post(
-  '/:id/portal-account',
+  '/:code/portal-account',
   requireRole('dentist'),
   [
     body('email').isEmail().withMessage('A valid email is required'),
@@ -84,7 +84,7 @@ router.post(
   patientsController.createPortalAccount,
 )
 router.put(
-  '/:id/portal-account/password',
+  '/:code/portal-account/password',
   requireRole('dentist'),
   [body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters')],
   patientsController.resetPortalAccountPassword,

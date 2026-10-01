@@ -1,21 +1,24 @@
 import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { usePrintState } from '../utils/selectedPatient'
 import { getSummary } from '../services/patients'
 import { ALL_TEETH } from '../constants/dental'
+import PageLoader from '../components/common/PageLoader'
 
 export default function PatientSummaryPrintPage() {
-  const { id } = useParams()
+  const id = usePrintState()?.patientCode
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
 
   useEffect(() => {
+    if (!id) return
     getSummary(id)
       .then(setData)
       .catch((err) => setError(err.response?.data?.error || 'Failed to load summary'))
   }, [id])
 
+  if (!id) return <p className="p-6 text-slate-500">Open this page from the patient profile's Print button.</p>
   if (error) return <p className="p-6 text-red-600">{error}</p>
-  if (!data) return <p className="p-6 text-slate-500">Loading...</p>
+  if (!data) return <PageLoader fullScreen />
 
   const { patient, treatments } = data
 
@@ -38,9 +41,6 @@ export default function PatientSummaryPrintPage() {
       <div className="mb-6 grid grid-cols-2 gap-2 border-b border-slate-200 pb-4 text-sm">
         <div>
           <strong>Name:</strong> {patient.last_name}, {patient.first_name}
-        </div>
-        <div>
-          <strong>Patient ID:</strong> #{patient.id}
         </div>
         <div>
           <strong>Sex:</strong> <span className="capitalize">{patient.sex}</span>

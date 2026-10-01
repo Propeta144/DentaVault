@@ -35,12 +35,12 @@ export const exportCsv = asyncHandler(async (req, res) => {
   const patients = await patientModel.listPatientsForExport({ search: req.query.search?.trim() })
 
   const headers = [
-    'ID', 'Last Name', 'First Name', 'Sex', 'Date of Birth', 'Contact Number', 'Email',
+    'Last Name', 'First Name', 'Sex', 'Date of Birth', 'Contact Number', 'Email',
     'Address', 'Medical History', 'Allergies', 'Emergency Contact Name',
     'Emergency Contact Phone', 'Legacy Record', 'Registered On',
   ]
   const rows = patients.map((p) => [
-    p.id, p.last_name, p.first_name, p.sex, p.date_of_birth, p.contact_number, p.email,
+    p.last_name, p.first_name, p.sex, p.date_of_birth, p.contact_number, p.email,
     p.address, p.medical_history, p.allergies, p.emergency_contact_name,
     p.emergency_contact_phone, p.is_legacy_migrated ? 'Yes' : 'No',
     // Bumabalik yung created_at bilang JS Date (DATE columns lang ang
@@ -84,7 +84,7 @@ export const create = asyncHandler(async (req, res) => {
 })
 
 export const getOne = asyncHandler(async (req, res) => {
-  const patient = await patientModel.findPatientById(req.params.id)
+  const patient = await patientModel.findPatientByCode(req.params.code)
   if (!patient) throw new AppError('Patient not found', 404)
 
   if (!canAccessPatientRecord(req.user, patient.id)) {
@@ -104,10 +104,10 @@ export const getOne = asyncHandler(async (req, res) => {
 
 export const update = asyncHandler(async (req, res) => {
   assertValid(req)
-  const existing = await patientModel.findPatientById(req.params.id)
+  const existing = await patientModel.findPatientByCode(req.params.code)
   if (!existing) throw new AppError('Patient not found', 404)
 
-  const patient = await patientModel.updatePatient(req.params.id, req.body)
+  const patient = await patientModel.updatePatient(existing.id, req.body)
 
   await recordAuditLog({
     userId: req.user.userId,
@@ -121,7 +121,7 @@ export const update = asyncHandler(async (req, res) => {
 })
 
 export const remove = asyncHandler(async (req, res) => {
-  const patient = await patientModel.findPatientById(req.params.id)
+  const patient = await patientModel.findPatientByCode(req.params.code)
   if (!patient) throw new AppError('Patient not found', 404)
 
   await patientModel.softDeletePatient(patient.id)
@@ -139,7 +139,7 @@ export const remove = asyncHandler(async (req, res) => {
 })
 
 export const listTreatments = asyncHandler(async (req, res) => {
-  const patient = await patientModel.findPatientById(req.params.id)
+  const patient = await patientModel.findPatientByCode(req.params.code)
   if (!patient) throw new AppError('Patient not found', 404)
 
   if (!canAccessPatientRecord(req.user, patient.id)) {
@@ -152,7 +152,7 @@ export const listTreatments = asyncHandler(async (req, res) => {
 
 export const addTreatment = asyncHandler(async (req, res) => {
   assertValid(req)
-  const patient = await patientModel.findPatientById(req.params.id)
+  const patient = await patientModel.findPatientByCode(req.params.code)
   if (!patient) throw new AppError('Patient not found', 404)
 
   const treatment = await treatmentModel.createTreatment({
@@ -177,7 +177,7 @@ export const addTreatment = asyncHandler(async (req, res) => {
 })
 
 export const getPortalAccount = asyncHandler(async (req, res) => {
-  const patient = await patientModel.findPatientById(req.params.id)
+  const patient = await patientModel.findPatientByCode(req.params.code)
   if (!patient) throw new AppError('Patient not found', 404)
 
   const account = await userModel.findUserByPatientId(patient.id)
@@ -186,7 +186,7 @@ export const getPortalAccount = asyncHandler(async (req, res) => {
 
 export const createPortalAccount = asyncHandler(async (req, res) => {
   assertValid(req)
-  const patient = await patientModel.findPatientById(req.params.id)
+  const patient = await patientModel.findPatientByCode(req.params.code)
   if (!patient) throw new AppError('Patient not found', 404)
 
   const existingAccount = await userModel.findUserByPatientId(patient.id)
@@ -218,7 +218,7 @@ export const createPortalAccount = asyncHandler(async (req, res) => {
 
 export const resetPortalAccountPassword = asyncHandler(async (req, res) => {
   assertValid(req)
-  const patient = await patientModel.findPatientById(req.params.id)
+  const patient = await patientModel.findPatientByCode(req.params.code)
   if (!patient) throw new AppError('Patient not found', 404)
 
   const account = await userModel.findUserByPatientId(patient.id)
@@ -240,7 +240,7 @@ export const resetPortalAccountPassword = asyncHandler(async (req, res) => {
 })
 
 export const summary = asyncHandler(async (req, res) => {
-  const patient = await patientModel.findPatientById(req.params.id)
+  const patient = await patientModel.findPatientByCode(req.params.code)
   if (!patient) throw new AppError('Patient not found', 404)
 
   if (!canAccessPatientRecord(req.user, patient.id)) {

@@ -40,31 +40,43 @@ export default function XrayGallery({ xrays, onOpen, onCompare }) {
             <button type="button" onClick={() => onOpen(xray)} className="h-full w-full">
               <XrayThumbnail xray={xray} />
             </button>
-            <label className="absolute left-1 top-1 flex min-h-9 items-center gap-1.5 rounded-md bg-white/95 px-2.5 py-1.5 text-sm shadow-sm">
+            {/* Dati: "compare" label sa kaliwa at Email/Manual badge sa kanan,
+                parehong nasa itaas — nagpapatong sila sa makitid na thumbnail.
+                Ngayon: checkbox lang (44px touch target, may aria-label) sa
+                itaas-kaliwa, "New" lang sa itaas-kanan (yun ang kailangang
+                pansinin), at ang source ay lumipat sa bottom bar kasama ng petsa. */}
+            <label
+              title="Select to compare"
+              className={`absolute left-1 top-1 flex h-11 w-11 cursor-pointer items-center justify-center rounded-md shadow-sm transition-colors ${
+                selected.includes(xray.id) ? 'bg-sky-600' : 'bg-white/95 hover:bg-white'
+              }`}
+            >
               <input
                 type="checkbox"
+                aria-label={`Select X-ray from ${xray.taken_date || xray.created_at.slice(0, 10)} to compare`}
                 checked={selected.includes(xray.id)}
                 onChange={() => toggleSelect(xray.id)}
-                className="h-4 w-4 accent-sky-600"
+                className="h-5 w-5 cursor-pointer accent-sky-600"
               />
-              compare
             </label>
-            <div className="absolute right-1 top-1 flex flex-col items-end gap-1">
-              {xray.source === 'email_inbound' && !xray.reviewed_at && (
+            {xray.source === 'email_inbound' && !xray.reviewed_at && (
+              <div className="absolute right-1 top-1">
                 <StatusBadge variant="amber">New</StatusBadge>
-              )}
-              {xray.source === 'email_inbound' ? (
-                <StatusBadge variant="sky" icon={Mail}>
-                  Email
-                </StatusBadge>
-              ) : (
-                <StatusBadge variant="slate" icon={UploadCloud}>
-                  Manual
-                </StatusBadge>
-              )}
-            </div>
-            <div className="absolute bottom-0 w-full truncate bg-slate-900/70 px-1.5 py-1 text-xs text-white">
-              {xray.taken_date || xray.created_at.slice(0, 10)}
+              </div>
+            )}
+            <div className="absolute bottom-0 flex w-full items-center justify-between gap-1 bg-slate-900/75 px-2 py-1 text-xs text-white">
+              <span className="truncate">{xray.taken_date || xray.created_at.slice(0, 10)}</span>
+              <span className="flex shrink-0 items-center gap-1 text-slate-200">
+                {xray.source === 'email_inbound' ? (
+                  <>
+                    <Mail className="h-3 w-3" /> Email
+                  </>
+                ) : (
+                  <>
+                    <UploadCloud className="h-3 w-3" /> Manual
+                  </>
+                )}
+              </span>
             </div>
           </div>
         ))}
