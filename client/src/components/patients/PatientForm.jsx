@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { cloneElement, isValidElement, useId, useState } from 'react'
 import { User, Phone, ShieldAlert, ClipboardList } from 'lucide-react'
 import QuickInputTextarea from '../common/QuickInputTextarea'
 
@@ -52,10 +52,27 @@ function validate(form) {
 
 // `required`: pulang asterisk — dati "Contact Number *" lang ang may marka,
 // kahit required din ang pangalan at birthday (tignan validate() sa taas).
+//
+// Naka-link na ang <label> sa input (htmlFor + id, galing useId), at ang
+// error message sa input (aria-describedby / aria-invalid). Dati hindi,
+// kaya hindi nababasa ng screen reader kung para saan ang bawat input, at
+// hindi rin napipindot ang label para i-focus ang input. Sa DOM element
+// lang (input/select) idinidikit ang id; ang ibang component, as is.
 function Field({ label, error, required, children }) {
+  const id = useId()
+  const errorId = `${id}-error`
+  const control =
+    isValidElement(children) && typeof children.type === 'string'
+      ? cloneElement(children, {
+          id,
+          'aria-invalid': error ? true : undefined,
+          'aria-describedby': error ? errorId : undefined,
+          'aria-required': required ? true : undefined,
+        })
+      : children
   return (
     <div>
-      <label className="mb-1 block text-base font-medium text-slate-700">
+      <label htmlFor={id} className="mb-1 block text-base font-medium text-slate-700">
         {label}
         {required && (
           <span className="ml-0.5 text-red-600" aria-hidden="true">
@@ -63,8 +80,12 @@ function Field({ label, error, required, children }) {
           </span>
         )}
       </label>
-      {children}
-      {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
+      {control}
+      {error && (
+        <p id={errorId} className="mt-1 text-sm text-red-600">
+          {error}
+        </p>
+      )}
     </div>
   )
 }
@@ -78,7 +99,7 @@ function SectionHeading({ icon: Icon, children }) {
   )
 }
 
-export default function PatientForm({ initialValues, onSubmit, submitLabel = 'Save', onCancel }) {
+export default function PatientForm({ initialValues, onSubmit, submitLabel = 'Save', onCancel, stickyFooter = false }) {
   const [form, setForm] = useState({ ...EMPTY_FORM, ...initialValues })
   const [fieldErrors, setFieldErrors] = useState({})
   const [formError, setFormError] = useState('')
@@ -232,12 +253,25 @@ export default function PatientForm({ initialValues, onSubmit, submitLabel = 'Sa
 />
       </Field>
 
-      <div className="flex flex-col-reverse gap-2 border-t border-slate-100 pt-5 sm:flex-row sm:justify-end">
+      {/* stickyFooter (Register page lang): laging kita ang Save/Cancel
+          habang nag-i-scroll sa mahabang form. Ang negative margins ay
+          tugma sa padding ng card sa PatientRegisterPage (p-4 sa phone,
+          p-6 sm pataas). Sa phone, nasa ibabaw ng bottom tab bar (4rem).
+          Hindi ito ginagamit sa Edit modal (may sariling scroll ang modal). */}
+      <div
+        // Magkatabi ang Cancel at Save kahit sa phone (dati nakasalansan,
+        // kaya ~120px ng screen ang kinakain ng sticky footer)
+        className={`flex gap-2 border-t border-slate-100 pt-5 sm:justify-end ${
+          stickyFooter
+            ? 'sticky bottom-[calc(4rem+env(safe-area-inset-bottom))] z-10 -mx-4 -mb-4 rounded-b-xl bg-white/95 px-4 pb-4 backdrop-blur sm:-mx-6 sm:-mb-6 sm:px-6 sm:pb-5 md:bottom-0'
+            : ''
+        }`}
+      >
         {onCancel && (
           <button
             type="button"
             onClick={onCancel}
-            className="flex min-h-11 items-center justify-center rounded-md border border-slate-300 bg-white px-5 text-base font-medium text-slate-700 transition-colors hover:bg-slate-50"
+            className="flex min-h-11 shrink-0 items-center justify-center whitespace-nowrap rounded-md border border-slate-300 bg-white px-4 text-base font-medium text-slate-700 transition-colors hover:bg-slate-50 sm:px-5"
           >
             Cancel
           </button>
@@ -245,7 +279,7 @@ export default function PatientForm({ initialValues, onSubmit, submitLabel = 'Sa
         <button
           type="submit"
           disabled={submitting}
-          className="flex min-h-11 items-center justify-center rounded-md bg-sky-600 px-5 text-base font-semibold text-white transition-colors hover:bg-sky-700 disabled:opacity-50"
+          className="flex min-h-11 flex-1 items-center justify-center whitespace-nowrap rounded-md bg-sky-600 px-4 text-base font-semibold text-white transition-colors hover:bg-sky-700 disabled:opacity-50 sm:flex-none sm:px-5"
         >
           {submitting ? 'Saving...' : submitLabel}
         </button>

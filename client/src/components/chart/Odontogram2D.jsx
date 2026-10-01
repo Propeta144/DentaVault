@@ -167,24 +167,27 @@ export default function Odontogram2D({ patientId, canEdit }) {
         </svg>
       </div>
 
-      <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm print:border-0 print:p-0 print:shadow-none">
-        <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-400">Legend</h3>
-        <div className="flex flex-wrap gap-x-4 gap-y-2">
+      {/* Legend: isang linya sa ilalim ng chart (dati hiwalay na malaking
+          card na may "LEGEND" na heading), kasama ang maikling tagubilin. */}
+      <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between print:mt-4">
+        <ul className="flex flex-wrap gap-x-4 gap-y-1.5" aria-label="Legend">
           {CONDITIONS.map((c) => (
-            <div key={c.code} className="flex items-center gap-1.5 text-base text-slate-600">
+            <li key={c.code} className="flex items-center gap-1.5 text-sm text-slate-600">
               <span
-                className="h-3.5 w-3.5 rounded-full border border-black/10"
+                className="h-3 w-3 rounded-full border border-black/10"
                 style={{ backgroundColor: c.color }}
+                aria-hidden="true"
               />
               {c.label}
-            </div>
+            </li>
           ))}
-        </div>
+        </ul>
+        <p className="text-sm text-slate-400 print:hidden">
+          {canEdit
+            ? 'Tap a tooth surface to record a condition, or a tooth number for the whole tooth.'
+            : 'Read-only view — only the dentist can update the chart.'}
+        </p>
       </div>
-
-      {!canEdit && (
-        <p className="mt-3 text-sm text-slate-400">Read-only view — only the dentist can update the chart.</p>
-      )}
 
       {selection && (
         <ChartEntryModal

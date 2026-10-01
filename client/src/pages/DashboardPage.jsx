@@ -1,16 +1,41 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Users, Stethoscope, ScanLine, MailWarning, LayoutDashboard } from 'lucide-react'
+import { format } from 'date-fns'
+import { Users, Stethoscope, ScanLine, MailWarning, UserPlus, ScrollText, ArrowRight } from 'lucide-react'
 import { getDashboard } from '../services/dashboard'
 import StatTile from '../components/dashboard/StatTile'
 import HorizontalBarChart from '../components/dashboard/HorizontalBarChart'
 import MonthlyTrendChart from '../components/dashboard/MonthlyTrendChart'
-import StatusBadge from '../components/common/StatusBadge'
 import PageLoader from '../components/common/PageLoader'
-import { actionVariant } from '../utils/auditAction'
+import { useAuth } from '../context/AuthContext'
+import { actionVariant, actionLabel, auditPatientName, groupAuditLogs } from '../utils/auditAction'
+import { formatActivityTime, greetingForNow } from '../utils/formatDate'
 import { PROCEDURE_CHART_ORDER, PROCEDURE_OTHER, CONDITION_CHART_ORDER } from '../constants/dashboardColors'
 
+// Kulay ng tuldok sa Recent Activity: parehong grupo ng actionVariant
+// (status colors). Hindi kulay lang ang nagdadala ng kahulugan: laging may
+// nakasulat na label sa tabi.
+const DOT = {
+  red: 'bg-red-500',
+  emerald: 'bg-emerald-500',
+  sky: 'bg-sky-500',
+  amber: 'bg-amber-500',
+  slate: 'bg-slate-300',
+}
+
+const RECENT_LIMIT = 8
+
+// "Dr. Nolita Reloj Teodosio-Rufin" → "Dr. Teodosio-Rufin" (huling salita =
+// apelyido; may gitling ang compound na apelyido, tignan migration 009).
+// Kung walang "Dr.", unang pangalan lang.
+function greetingName(fullName = '') {
+  const parts = fullName.trim().split(/\s+/)
+  if (/^dr\.?$/i.test(parts[0]) && parts.length > 1) return `Dr. ${parts[parts.length - 1]}`
+  return parts[0] || ''
+}
+
 export default function DashboardPage() {
+  const { user } = useAuth()
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
 
@@ -20,10 +45,17 @@ export default function DashboardPage() {
       .catch((err) => setError(err.response?.data?.error || 'Failed to load dashboard'))
   }, [])
 
-  if (error) return <p className="text-sm text-red-600">{error}</p>
+  const recent = useMemo(
+    () => (data ? groupAuditLogs(data.recentActivity).slice(0, RECENT_LIMIT) : []),
+    [data],
+  )
+
+  if (error) {
+    return <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-base text-red-700">{error}</div>
+  }
   if (!data) return <PageLoader label="Loading dashboard..." />
 
-  const { stats, procedureBreakdown, conditionBreakdown, monthlyTrend, recentActivity } = data
+  const { stats, procedureBreakdown, conditionBreakdown, monthlyTrend } = data
 
   // Iba-ibang kulay bawat procedure, sa FIXED na pagkakasunod (hindi sorted
   // by count) — tignan PROCEDURE_CHART_ORDER sa dashboardColors.js kung
@@ -61,76 +93,111 @@ export default function DashboardPage() {
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="flex items-center gap-2 text-2xl font-semibold text-slate-900">
-          <LayoutDashboard className="h-6 w-6 text-sky-600" />
-          Dashboard
-        </h1>
-        <p className="text-base text-slate-500">A snapshot of the clinic — patients, treatments, and X-rays.</p>
+      {/* Bati + petsa ngayon + quick actions. Dati: "Dashboard" lang, at
+          kailangan pang pumunta sa Patients para maghanap o mag-register. */}
+      <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <p className="text-sm font-medium text-slate-500">{format(new Date(), 'EEEE, MMMM d, yyyy')}</p>
+          <h1 className="text-2xl font-semibold text-slate-900">
+            {greetingForNow()}, {greetingName(user?.fullName)}
+          </h1>
+          <p className="text-base text-slate-500">Here's what's happening at the clinic.</p>
+        </div>
+        {/* "Find patient" nasa top bar na (laging kita sa lahat ng page),
+            kaya Register na lang dito. Buong lapad sa phone. */}
+        <Link
+          to="/patients/new"
+          className="flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-md bg-sky-600 px-4 text-base font-semibold text-white transition-colors hover:bg-sky-700 sm:self-start lg:self-auto"
+        >
+          <UserPlus className="h-4 w-4" />
+          Register patient
+        </Link>
       </div>
 
       <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatTile label="Active Patients" value={stats.activePatients} icon={Users} />
-        <StatTile label="Treatments This Month" value={stats.treatmentsThisMonth} icon={Stethoscope} />
-        <StatTile label="X-rays This Month" value={stats.xraysThisMonth} icon={ScanLine} />
+        <StatTile label="Active patients" value={stats.activePatients} icon={Users} hint="View all" to="/patients" />
+        <StatTile label="Treatments" value={stats.treatmentsThisMonth} icon={Stethoscope} hint="This month" />
+        <StatTile label="X-rays uploaded" value={stats.xraysThisMonth} icon={ScanLine} hint="This month" />
         <StatTile
-          label="Unreviewed X-rays"
+          // ‑ = non-breaking hyphen: hindi mahahati sa "X- / rays" sa phone
+          label={'Unreviewed X‑rays'}
           value={stats.unreviewedXrays}
           icon={MailWarning}
           accent={stats.unreviewedXrays > 0}
+          hint={stats.unreviewedXrays > 0 ? 'From email, not opened yet' : 'All caught up'}
         />
       </div>
 
       <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <h2 className="mb-3 text-base font-semibold text-slate-900">Procedures Performed</h2>
+        <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+          <h2 className="mb-1 text-base font-semibold text-slate-900">Procedures Performed</h2>
+          <p className="mb-4 text-sm text-slate-400">All treatments on record, by procedure.</p>
           <HorizontalBarChart data={procedureData} />
-        </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <h2 className="mb-3 text-base font-semibold text-slate-900">Tooth Condition Breakdown</h2>
-          <p className="mb-3 text-sm text-slate-400">
+        </section>
+        <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+          <h2 className="mb-1 text-base font-semibold text-slate-900">Tooth Condition Breakdown</h2>
+          <p className="mb-4 text-sm text-slate-400">
             Current state across all patients' dental charts (latest entry per tooth surface).
           </p>
           <HorizontalBarChart data={conditionData} showLegend />
-        </div>
+        </section>
       </div>
 
-      <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <h2 className="mb-3 text-base font-semibold text-slate-900">New Patients &amp; Treatments </h2>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+          <h2 className="mb-1 text-base font-semibold text-slate-900">New Patients &amp; Treatments</h2>
+          <p className="mb-4 text-sm text-slate-400">Last 6 months. Hover or tap a month for exact numbers.</p>
           <MonthlyTrendChart data={monthlyTrend} />
-        </div>
+        </section>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="mb-3 flex items-center justify-between">
+        <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+          <div className="mb-3 flex items-center justify-between gap-2">
             <h2 className="text-base font-semibold text-slate-900">Recent Activity</h2>
-            <Link to="/audit-log" className="text-sm font-medium text-sky-600 hover:text-sky-700">
-              View full audit log →
+            <Link
+              to="/audit-log"
+              className="flex min-h-11 items-center gap-1 rounded-md px-2 text-sm font-medium text-sky-700 transition-colors hover:bg-sky-50"
+            >
+              Full audit log
+              <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
-          {recentActivity.length === 0 ? (
-            <p className="text-sm text-slate-400">No activity yet.</p>
+          {recent.length === 0 ? (
+            <div className="flex flex-col items-center py-8 text-center">
+              <ScrollText className="mb-2 h-6 w-6 text-slate-300" />
+              <p className="text-sm text-slate-400">No activity on patient records yet.</p>
+            </div>
           ) : (
-            <ul className="space-y-2.5">
-              {recentActivity.map((log) => (
-                <li key={log.id} className="flex items-center justify-between gap-2 text-sm">
-                  <div className="flex items-center gap-2 overflow-hidden">
-                    <StatusBadge variant={actionVariant(log.action)}>{log.action}</StatusBadge>
-                    <span className="truncate text-slate-500">{log.user_name || 'system'}</span>
-                  </div>
-                  <span className="shrink-0 text-slate-400">
-                    {new Date(log.created_at).toLocaleString(undefined, {
-                      month: 'short',
-                      day: 'numeric',
-                      hour: 'numeric',
-                      minute: '2-digit',
-                    })}
-                  </span>
-                </li>
-              ))}
+            <ul className="divide-y divide-slate-100">
+              {recent.map((g) => {
+                // Hindi na uulitin ang pangalan kung ang patient mismo ang
+                // gumawa (hal. patient na nag-login sa portal)
+                const name = auditPatientName(g)
+                const patientName = name && name !== g.user_name ? name : null
+                return (
+                  <li key={g.id} className="flex items-start gap-3 py-2.5">
+                    <span
+                      className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${DOT[actionVariant(g.action)]}`}
+                      aria-hidden="true"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm text-slate-800">
+                        {actionLabel(g.action, g.count)}
+                        {patientName && (
+                          <>
+                            {' · '}
+                            <span className="font-medium">{patientName}</span>
+                          </>
+                        )}
+                      </p>
+                      <p className="truncate text-xs text-slate-400">{g.user_name || 'System'}</p>
+                    </div>
+                    <span className="shrink-0 text-xs text-slate-400">{formatActivityTime(g.created_at)}</span>
+                  </li>
+                )
+              })}
             </ul>
           )}
-        </div>
+        </section>
       </div>
     </div>
   )

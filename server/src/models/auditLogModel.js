@@ -30,23 +30,54 @@ function parseDetails(row) {
   return row
 }
 
-// Yung `search`, tumutugma sa kung sino ang gumawa (dentist name) at ano
-// yung ginawa niya (action code, record type, o yung eksaktong record
-// number kung numeric yung search term) — dalawang bagay na talagang
-// hinahanap ng dentist kapag ire-reconstruct niya kung "sino gumawa ng
-// ano". Yung `action` at date range naman, mas pinapaliit pa. Optional
-// lahat ng apat, tapos AND ang pagsasama nila.
-function buildAuditLogQuery({ search, action, dateFrom, dateTo }) {
+// Kung KANINONG patient ang isang log entry. Dati "patient #1" /
+// "xray_image #4" lang ang naipapakita sa Audit Log page (numeric internal
+// ID — salungat sa Feature #7 na walang patient ID sa screen). Ngayon,
+// hinahanap ang patient mula sa entity mismo:
+//   patient                              → entity_id na mismo ang patient
+//   treatment / xray_image / chart_entry → patient_id ng row na iyon
+//   user                                 → patient_id ng portal account (null kung dentist)
+//   kahit ano                            → details.patientId, kung meron
+// Kasama ang soft-deleted na patients (walang deleted_at filter), para may
+// pangalan pa rin ang mga lumang log ng nabura nang patient.
+// Single quotes lang sa SQL (naka-ANSI_QUOTES ang Aiven).
+const AUDIT_FROM = `
+  FROM audit_logs al
+  LEFT JOIN users u ON u.id = al.user_id
+  LEFT JOIN treatments rt ON al.entity_type = 'treatment' AND rt.id = al.entity_id
+  LEFT JOIN xray_images rx ON al.entity_type = 'xray_image' AND rx.id = al.entity_id
+  LEFT JOIN chart_entries rc ON al.entity_type = 'chart_entry' AND rc.id = al.entity_id
+  LEFT JOIN users ru ON al.entity_type = 'user' AND ru.id = al.entity_id
+  LEFT JOIN patients rp ON rp.id = COALESCE(
+    CASE WHEN al.entity_type = 'patient' THEN al.entity_id END,
+    rt.patient_id, rx.patient_id, rc.patient_id, ru.patient_id,
+    CAST(JSON_UNQUOTE(JSON_EXTRACT(al.details, '$.patientId')) AS UNSIGNED)
+  )`
+
+// Yung `search`, tumutugma sa kung sino ang gumawa (dentist name), kaninong
+// patient (pangalan), at ano yung ginawa niya (action code o record type).
+// Yung `action` at date range naman, mas pinapaliit pa. Optional lahat,
+// tapos AND ang pagsasama nila. `excludeActions`: galing lang sa sariling
+// code (hal. Dashboard), hindi sa user input, at placeholders pa rin ang
+// gamit.
+function buildAuditLogQuery({ search, action, dateFrom, dateTo, excludeActions = [] }) {
   const conditions = []
   const params = {}
 
   const trimmedSearch = search?.trim()
   if (trimmedSearch) {
     conditions.push(
-      '(u.full_name LIKE :search OR al.action LIKE :search OR al.entity_type LIKE :search OR al.entity_id = :searchId)',
+      `(u.full_name LIKE :search OR CONCAT(rp.first_name, ' ', rp.last_name) LIKE :search
+        OR al.action LIKE :search OR al.entity_type LIKE :search)`,
     )
     params.search = `%${trimmedSearch}%`
-    params.searchId = Number(trimmedSearch) || 0 // 0, hindi 'to matutugma ng tunay na id — safe na "walang numeric term" sentinel
+  }
+  if (excludeActions.length) {
+    const placeholders = excludeActions.map((actionCode, i) => {
+      params[`exclude${i}`] = actionCode
+      return `:exclude${i}`
+    })
+    conditions.push(`al.action NOT IN (${placeholders.join(', ')})`)
   }
   if (action) {
     conditions.push('al.action = :action')
@@ -68,21 +99,21 @@ function buildAuditLogQuery({ search, action, dateFrom, dateTo }) {
 // 'To yung nagpapagana sa audit log viewer page (dentist-only). Newest
 // first, kasi halos palagi naman, recent activity ang pinapansin ng
 // dentist kapag chinicheck niya kung "sino gumawa ng ano".
-export async function listAuditLogs({ limit, offset, search, action, dateFrom, dateTo }) {
-  const { where, params } = buildAuditLogQuery({ search, action, dateFrom, dateTo })
+export async function listAuditLogs({ limit, offset, search, action, dateFrom, dateTo, excludeActions }) {
+  const { where, params } = buildAuditLogQuery({ search, action, dateFrom, dateTo, excludeActions })
 
   const [rows] = await pool.execute(
     `SELECT al.id, al.user_id, u.full_name AS user_name, u.role AS user_role,
-            al.action, al.entity_type, al.entity_id, al.details, al.ip_address, al.created_at
-     FROM audit_logs al
-     LEFT JOIN users u ON u.id = al.user_id
+            al.action, al.entity_type, al.entity_id, al.details, al.ip_address, al.created_at,
+            CONCAT(rp.first_name, ' ', rp.last_name) AS patient_name
+     ${AUDIT_FROM}
      ${where}
      ORDER BY al.created_at DESC, al.id DESC
      ${limitOffset(limit, offset)}`,
     params,
   )
   const [[{ total }]] = await pool.execute(
-    `SELECT COUNT(*) AS total FROM audit_logs al LEFT JOIN users u ON u.id = al.user_id ${where}`,
+    `SELECT COUNT(*) AS total ${AUDIT_FROM} ${where}`,
     params,
   )
   return { rows: rows.map(parseDetails), total }

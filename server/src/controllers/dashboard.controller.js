@@ -26,7 +26,18 @@ export const get = asyncHandler(async (req, res) => {
     dashboardModel.getProcedureBreakdown(),
     dashboardModel.getConditionBreakdown(),
     dashboardModel.getMonthlyTrend(),
-    auditLogModel.listAuditLogs({ limit: 8, offset: 0 }),
+    // "Recent Activity" sa Dashboard: mga ginawa sa records lang. Hindi
+    // kasama ang pagbukas ng Dashboard/Audit Log mismo at ang matagumpay na
+    // login, kung hindi puro "Opened the dashboard" / "Signed in" ang laman.
+    // Nasa buong Audit Log page pa rin silang lahat. (Kasama pa rin ang
+    // LOGIN_FAILED: may kinalaman sa seguridad.) 20 ang kinukuha:
+    // pinagsasama pa sa client ang magkakasunod na VIEW_XRAY
+    // (groupAuditLogs), tapos 8 grupo lang ang ipinapakita.
+    auditLogModel.listAuditLogs({
+      limit: 20,
+      offset: 0,
+      excludeActions: ['VIEW_DASHBOARD', 'VIEW_AUDIT_LOG', 'LOGIN_SUCCESS'],
+    }),
   ])
 
   await recordAuditLog({

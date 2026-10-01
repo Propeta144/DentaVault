@@ -9,7 +9,9 @@ const VARIANTS = {
 export default function StatusBadge({ children, variant = 'slate', icon: Icon }) {
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${VARIANTS[variant]}`}
+      // whitespace-nowrap: hindi dapat mahati ang badge sa dalawa o tatlong
+      // linya sa makitid na column (nangyari sa Audit Log sa tablet)
+      className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium ${VARIANTS[variant]}`}
     >
       {Icon && <Icon className="h-3 w-3" />}
       {children}

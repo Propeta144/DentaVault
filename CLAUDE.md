@@ -368,3 +368,136 @@ Dati sa phone: Patient Details → Actions → (mahabang scroll) → tabs. Ngayo
 
 **Na-verify:** build pasado; screenshots ng 2D chart, 3D chart (lumang drawings sumusunod sa bagong kulay),
 dashboard; mobile vertical order: Allergies (154px) → Tabs (329px) → Patient Details (1143px).
+
+---
+
+## 13. Buong UI Redesign (Phase 1–3) + Official Logo
+
+Hiling: gawing **mas madaling gamitin** at **mas polished** ang buong app, puwedeng baguhin ang layout,
+at gamitin ang **official logo** ng clinic (galing sa `Desktop/LOGOS`). Pareho pa rin ang purple brand
+at ang mga validated chart colors. Walang bagong library.
+
+### Phase 1: Mabilis na ayos
+- **Audit Log:** pangalan ng patient na ang nakikita, hindi `patient #1` / `xray_image #4` (salungat iyon
+  sa #7). Hinahanap ng server ang patient mula sa entity (treatment, X-ray, chart entry, portal account,
+  o `details.patientId`). Puwede nang i-search ang pangalan ng patient.
+- **Readable na action labels:** "Viewed patient record", "Signed in", atbp. (nasa tooltip pa rin ang code).
+  Pinagsasama ang magkakasunod na `VIEW_XRAY` sa isang row ("Viewed 6 X-rays"); display lang ito, buo pa
+  rin ang bawat entry sa database.
+- **Iisang date format** sa buong app (`Oct 1, 2026`), pati print pages.
+- **Patient account:** "My Record" ang menu (dati "Patients") at may bating "Hi, Joselita!".
+- "Migrated Record" (amber) → **"Imported"** (neutral).
+
+### Phase 2: Layout
+- **Patient Profile:** header card na may avatar, pangalan, edad/kasarian/birthday, Allergies at Medical
+  History, contact details, at mga action (**Add Treatment**, Edit, at ⋯ menu para sa portal account at
+  Delete). Buong lapad na ang tabs, kaya mas malaki ang Dental Chart sa laptop. Sa phone: header + alerts →
+  tabs → contact details (tugma sa #12).
+- **Add Treatment = modal** (dati form sa pinakailalim ng Treatment History). Timeline na ang listahan.
+- **Patients list:** avatar, buong row clickable, Edit/Delete nasa ⋯ menu (iwas maling pindot ng Delete),
+  "Last visit: 2 days ago", at **pagination** (dati 20 lang ang lumalabas, walang Next).
+- **Dashboard:** bati + petsa, quick actions (Find patient, Register), trend chart na may y-axis, gridlines,
+  at tooltip (dumaan sa dataviz skill), at Recent Activity na readable at may pangalan ng patient (hindi na
+  kasama ang pagbukas ng dashboard, audit log, at matagumpay na login).
+- **Find patient (Ctrl+K):** mabilisang paghahanap ng patient mula sa kahit anong page (dentist lang).
+- **Login:** split layout, **official logo PNG** sa itaas ng form, show/hide password.
+
+### Phase 3: Polish
+- Empty states (icon + paliwanag + button), skeleton loaders sa mga listahan, compact na chart legend na
+  may tagubilin, sidebar na may official mark at avatar ng user, sticky na Save/Cancel sa Register form.
+- **Official logo** sa print headers (Summary, Chart, X-ray). **Bagong favicon at PWA app icons** mula sa
+  official mark.
+
+| Name | Type | Purpose |
+|---|---|---|
+| `client/src/assets/brand/teodosio-rufin-logo.png`, `teodosio-rufin-mark.svg` | **NEW** | Official logo (kopya mula LOGOS) at mark (tinanggal ang 8KB na metadata). |
+| `client/public/favicon.svg`, `icon-192.png`, `icon-512.png`, `icon-512-maskable.png` | MODIFIED | Official mark (puti sa purple ang PWA icons). |
+| `client/src/components/common/BrandMark.jsx` | **NEW** | Official mark bilang CSS mask (sumusunod sa `text-*` color). Pinalitan ang `ToothIcon.jsx` (**binura**). |
+| `client/src/components/common/{Avatar,DropdownMenu,EmptyState,Skeleton,PrintHeader,PatientSearchPalette}.jsx` | **NEW** | Shared UI pieces (tignan ang `dentavault-ui` skill). Lazy-loaded ang palette (Feature #9). |
+| `client/src/utils/formatDate.js`, `patientName.js` | **NEW** | Date format/edad (local parsing, walang UTC day shift), at pangalan. (Ang `patientSearch.js` na ginawa rito ay binura sa #14.) |
+| `client/src/utils/auditAction.js` | MODIFIED | `actionLabel`, `formatAuditDetails` (tago ang patientId), `auditPatientName`, `groupAuditLogs`. |
+| `server/src/models/auditLogModel.js` | MODIFIED | `AUDIT_FROM` (LEFT JOINs para sa `patient_name`), search sa pangalan ng patient, `excludeActions`. |
+| `server/src/controllers/dashboard.controller.js` | MODIFIED | Recent Activity: 20 entries, walang VIEW_DASHBOARD/VIEW_AUDIT_LOG/LOGIN_SUCCESS. |
+| `client/src/pages/{Login,Dashboard,PatientsList,PatientProfile,AuditLog,PatientRegister}Page.jsx` | MODIFIED | Tignan ang Phase 1–3 sa itaas. |
+| `client/src/pages/{PatientSummary,Chart,Xray}PrintPage.jsx` | MODIFIED | `PrintHeader` (logo) + iisang date format. |
+| `client/src/layouts/AppLayout.jsx` | MODIFIED | Official mark, Find patient + Ctrl+K, "My Record", avatar ng user. |
+| `client/src/components/dashboard/{MonthlyTrendChart,StatTile}.jsx` | MODIFIED | Axis/gridlines/tooltip/sr-only table; sentence-case tiles na puwedeng link. |
+| `client/src/components/patients/{AddTreatmentForm,PatientForm}.jsx` | MODIFIED | Modal footer (Cancel + Save Treatment); `stickyFooter` prop. |
+| `client/src/components/xray/{XrayGallery,PatientXraysSection,CompareView}.jsx`, `chart/{Odontogram2D,ChartEntryModal}.jsx` | MODIFIED | Empty state, date format, compact legend. |
+| `.claude/skills/dentavault-ui/SKILL.md` | MODIFIED | Bagong shared helpers at patterns. |
+| `.gitignore` | MODIFIED | `ui-review-login.txt` (local test login para sa screenshots, hindi kino-commit). |
+
+**Na-verify (local, Edge via Playwright):** 22/22 functional tests: login (mali/tamang password, show password),
+dashboard feed, register (sticky button), Add Treatment modal, empty states, Edit modal, Ctrl+K → Enter,
+"Viewed 6 X-rays" grouping, walang numeric ID sa Audit Log, search by patient name, row click, ⋯ menu → Delete,
+logo sa print, patient account (My Record lang, walang dentist actions). Walang console error (maliban sa
+inaasahang 401 ng maling password). Screenshots desktop (1366px) at phone (400/360px), **0px horizontal
+overflow**. Audit query nasubok sa MariaDB (local) at MySQL 8 (Aiven). Build pasado; main bundle 242.7 KB
+(dati 239 KB). Ang mga test patient ("E2ETest Burahin") ay na-delete pagkatapos.
+
+**Hindi pa nagagawa / paalala:**
+- **Hindi pa naka-push.** Kailangan munang i-check ng team bago i-deploy.
+- ~~Hindi naka-link ang mga label ng `PatientForm` sa input nito.~~ Naayos sa #14.
+- Ang `npm run dev` ng server ay nagre-restart nang kusa minsan dahil sa OneDrive sync. Gamitin ang
+  `npm start` kapag nagte-test nang matagal.
+
+---
+
+## 14. Responsive (Phone/Tablet), Top Navigation, at Pangalan ng Dentist
+
+Puna pagkatapos ng #13: maganda na, pero hindi responsive sa phone/tablet; "Dr. Rufin" ang bati (dapat
+**Teodosio-Rufin**, iisang apelyido); at parang bakante ang sidebar dahil tatlo lang ang menu.
+
+### A. Sidebar → Top bar + bottom tab bar
+- **Lahat ng screen:** puting top bar na may official mark, menu (Dashboard / Patients / Audit Log) sa
+  md pataas, Find patient (icon sa tablet, buong search box sa laptop), at **user menu** (avatar → pangalan,
+  role, Sign out). Wala nang sidebar, kaya **buong lapad** na ang content (hanggang 1600px).
+- **Phone:** **bottom tab bar** (parang mobile app): isang tap lang para lumipat ng page, abot ng hinlalaki.
+  Dati nakatago sa hamburger (dalawang tap). Wala ito sa patient account (iisa lang ang menu niya).
+- Tinanggal ang "Find patient" sa Dashboard (nasa top bar na sa bawat page) at ang `utils/patientSearch.js`.
+
+### B. Pangalan
+Naka-save ang pangalan bilang "Teodosio Rufin" (walang gitling), kaya huling salita lang ("Rufin") ang
+nakukuha ng bati. Inayos ang mismong data: **migration 009** → "Dr. Nolita Reloj Teodosio-Rufin" (at sa
+`seed.js`). Ngayon "Good evening, Dr. Teodosio-Rufin", at ganito na rin sa top bar, Audit Log, at "by ..." ng treatments.
+> ⚠️ **Kailangang patakbuhin din sa Aiven bago/kasabay ng push:** `$env:DOTENV_CONFIG_PATH=".env.aiven"; npm run migrate` (sa `server/`).
+
+### C. Mga responsive na ayos
+| Saan | Problema | Ayos |
+|---|---|---|
+| Top bar (768px) | "Audit Log" / "Find patient" nahahati sa 2 linya | `whitespace-nowrap`; icon lang ang search sa tablet |
+| Patients (768px) | "Export / CSV" at mga cell nahahati | Buttons sa sariling hanay hanggang lg; nowrap cells; "Registered" column lg pataas lang |
+| Audit Log (768–1023px) | 6 column, badges 3 linya | Cards hanggang lg (2 column sa tablet); 1 hanay ng filters sa laptop; role sa ilalim ng pangalan |
+| Lahat ng badge | nahahati sa makitid na column | `whitespace-nowrap` sa `StatusBadge` |
+| Profile (360px) | "Add Treatment" 2 linya | Icon lang ang Edit sa phone (may `aria-label`) |
+| Profile (1024px) | contact details 2 column, mataas | 3 column sa lg |
+| Dashboard (360px) | "Register patient" at KPI labels nahahati | Buong-lapad na button; KPI icon sm pataas lang; non-breaking hyphen sa "X‑rays" |
+| Register (phone) | 2 nakasalansang button sa sticky footer (~120px) | Magkatabi; nasa ibabaw ng bottom tab bar |
+| Toasts (phone) | 320px sa kanan-ibaba, matatakpan ng tab bar | Buong lapad, nasa ibabaw ng tab bar; X button may `aria-label` at 40px |
+| Medical History / Allergies presets | ~22px chips, siksik sa tabi ng label | 36px chips, nasa ilalim ng label sa phone |
+
+### D. Bugs (luma)
+- **Form labels hindi naka-link sa input** (`PatientForm` `Field`, `QuickInputTextarea`): may `htmlFor`/`id`
+  na (useId), pati `aria-invalid` / `aria-describedby` sa error. Napipindot na rin ang label para i-focus.
+
+| Name | Type | Purpose |
+|---|---|---|
+| `client/src/layouts/AppLayout.jsx` | MODIFIED | Isinulat ulit: top bar + bottom tab bar + user menu; walang sidebar. |
+| `client/src/components/common/DropdownMenu.jsx` | MODIFIED | Optional `trigger`, `triggerClassName`, `header` (para sa user menu); `max-w` sa phone. |
+| `client/src/context/ToastContext.jsx` | MODIFIED | Posisyon sa phone (ibabaw ng tab bar), dismiss button `aria-label` + touch target. |
+| `client/src/components/common/StatusBadge.jsx` | MODIFIED | `whitespace-nowrap`. |
+| `client/src/components/common/QuickInputTextarea.jsx` | MODIFIED | Label link, mas malaking presets, stacked sa phone, `text-base`. |
+| `client/src/components/patients/PatientForm.jsx` | MODIFIED | `Field` may useId/htmlFor/aria; footer magkatabi; sticky footer sa ibabaw ng tab bar. |
+| `client/src/components/dashboard/StatTile.jsx` | MODIFIED | Icon sm pataas lang. |
+| `client/src/pages/{Dashboard,PatientsList,AuditLog,PatientProfile,PatientRegister}Page.jsx` | MODIFIED | Tignan ang table C. |
+| `client/src/utils/patientSearch.js` | **BINURA** | Wala nang gumagamit (nasa top bar na ang search). |
+| `server/db/migrations/009_fix_dentist_surname.sql` | **NEW** | "Teodosio Rufin" → "Teodosio-Rufin" (eksaktong lumang pangalan lang ang tinatamaan). Napatakbo na sa local. |
+| `server/db/seed.js` | MODIFIED | Bagong pangalan para sa bagong install. |
+| `.claude/skills/dentavault-ui/SKILL.md` | MODIFIED | Navigation pattern, responsive checklist (360/768/1024/1366). |
+
+**Na-verify (local, Edge via Playwright):** responsive sweep sa **360, 400, 768, 1024, 1366px**: 12 screen bawat
+lapad (login, dashboard, patients, register, audit log, profile ×3 tabs, Add Treatment modal, account menu,
+search, patient view) = 60 screen, **0 horizontal overflow, 0 page errors**. Phone viewport checks (7/7): tab bar
+nasa ibaba at gumagana ang tap, huling card hindi natatakpan, sticky Register button at toast nasa ibabaw ng tab
+bar, account menu kasya sa screen. Functional e2e 22/22 pa rin. Build pasado (main bundle 245 KB).
+**Hindi pa naka-push.**

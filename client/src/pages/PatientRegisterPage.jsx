@@ -23,7 +23,7 @@ export default function PatientRegisterPage() {
   }
 
   return (
-    <div className="max-w-2xl">
+    <div className="mx-auto max-w-3xl">
       <div className="mb-6">
         <h1 className="flex items-center gap-2 text-2xl font-semibold text-slate-900">
           <UserPlus className="h-6 w-6 text-sky-600" />
@@ -33,8 +33,13 @@ export default function PatientRegisterPage() {
           Fields marked <span className="text-red-600">*</span> are required.
         </p>
       </div>
-      <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-        <PatientForm onSubmit={handleSubmit} submitLabel="Register Patient" onCancel={() => navigate('/patients')} />
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+        <PatientForm
+          onSubmit={handleSubmit}
+          submitLabel="Register Patient"
+          onCancel={() => navigate('/patients')}
+          stickyFooter
+        />
       </div>
     </div>
   )

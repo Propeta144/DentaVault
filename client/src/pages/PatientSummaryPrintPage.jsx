@@ -3,6 +3,8 @@ import { usePrintState } from '../utils/selectedPatient'
 import { getSummary } from '../services/patients'
 import { ALL_TEETH } from '../constants/dental'
 import PageLoader from '../components/common/PageLoader'
+import PrintHeader from '../components/common/PrintHeader'
+import { formatDate, formatDateTime } from '../utils/formatDate'
 
 export default function PatientSummaryPrintPage() {
   const id = usePrintState()?.patientCode
@@ -35,8 +37,7 @@ export default function PatientSummaryPrintPage() {
         </button>
       </div>
 
-      <h1 className="text-xl font-bold">Teodosio-Rufin Dental Clinic</h1>
-      <p className="mb-6 text-sm text-slate-500">Patient Treatment Summary</p>
+      <PrintHeader title="Patient Treatment Summary" />
 
       <div className="mb-6 grid grid-cols-2 gap-2 border-b border-slate-200 pb-4 text-sm">
         <div>
@@ -46,7 +47,7 @@ export default function PatientSummaryPrintPage() {
           <strong>Sex:</strong> <span className="capitalize">{patient.sex}</span>
         </div>
         <div>
-          <strong>Date of Birth:</strong> {patient.date_of_birth}
+          <strong>Date of Birth:</strong> {formatDate(patient.date_of_birth)}
         </div>
         <div>
           <strong>Contact:</strong> {patient.contact_number || '—'}
@@ -74,7 +75,7 @@ export default function PatientSummaryPrintPage() {
         <tbody>
           {treatments.map((t) => (
             <tr key={t.id} className="border-b border-slate-100">
-              <td className="py-1 pr-2 align-top">{t.treatment_date}</td>
+              <td className="whitespace-nowrap py-1 pr-2 align-top">{formatDate(t.treatment_date)}</td>
               <td className="py-1 pr-2 align-top">{t.procedure_name}</td>
               <td className="py-1 pr-2 align-top">
                 {t.tooth_number === ALL_TEETH ? 'All Teeth' : t.tooth_number || '—'}
@@ -86,7 +87,7 @@ export default function PatientSummaryPrintPage() {
       </table>
 
       <p className="mt-8 text-xs text-slate-400">
-        Generated {new Date().toLocaleString()} — DentaVault
+        Generated {formatDateTime(new Date())} — DentaVault
       </p>
     </div>
   )

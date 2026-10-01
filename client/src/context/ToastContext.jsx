@@ -24,7 +24,9 @@ export function ToastProvider({ children }) {
   return (
     <ToastContext.Provider value={{ showToast }}>
       {children}
-      <div className="fixed bottom-4 right-4 z-[100] flex w-80 flex-col gap-2">
+      {/* Phone: buong lapad (may 1rem na gilid) at nasa ibabaw ng bottom tab
+          bar (h-16). md pataas: kanan-ibaba, 320px. */}
+      <div className="fixed inset-x-4 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-[100] flex flex-col gap-2 md:inset-x-auto md:bottom-4 md:right-4 md:w-80">
         {toasts.map((t) => (
           <div
             key={t.id}
@@ -44,7 +46,8 @@ export function ToastProvider({ children }) {
             <button
               type="button"
               onClick={() => dismiss(t.id)}
-              className="text-slate-400 hover:text-slate-600"
+              aria-label="Dismiss notification"
+              className="-m-2.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-slate-400 hover:text-slate-600"
             >
               <X className="h-4 w-4" />
             </button>

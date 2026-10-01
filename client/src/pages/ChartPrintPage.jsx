@@ -3,6 +3,8 @@ import { usePrintState } from '../utils/selectedPatient'
 import { getPatient } from '../services/patients'
 import Odontogram2D from '../components/chart/Odontogram2D'
 import PageLoader from '../components/common/PageLoader'
+import PrintHeader from '../components/common/PrintHeader'
+import { formatDate, formatDateTime } from '../utils/formatDate'
 
 export default function ChartPrintPage() {
   const id = usePrintState()?.patientCode
@@ -33,8 +35,7 @@ export default function ChartPrintPage() {
         </button>
       </div>
 
-      <h1 className="text-xl font-bold">Teodosio-Rufin Dental Clinic</h1>
-      <p className="mb-6 text-sm text-slate-500">Dental Chart</p>
+      <PrintHeader title="Dental Chart" />
 
       <div className="mb-6 grid grid-cols-2 gap-2 border-b border-slate-200 pb-4 text-sm">
         <div>
@@ -44,14 +45,14 @@ export default function ChartPrintPage() {
           <strong>Sex:</strong> <span className="capitalize">{patient.sex}</span>
         </div>
         <div>
-          <strong>Date of Birth:</strong> {patient.date_of_birth}
+          <strong>Date of Birth:</strong> {formatDate(patient.date_of_birth)}
         </div>
       </div>
 
       <Odontogram2D patientId={id} canEdit={false} />
 
       <p className="mt-8 text-xs text-slate-400">
-        Generated {new Date().toLocaleString()} — DentaVault
+        Generated {formatDateTime(new Date())} — DentaVault
       </p>
     </div>
   )

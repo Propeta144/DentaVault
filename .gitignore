@@ -12,3 +12,4 @@ server/uploads/xrays/*
 server/archives/
 !server/uploads/xrays/.gitkeep
 .DS_Store
+ui-review-login.txt

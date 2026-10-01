@@ -4,6 +4,8 @@ import { getPatient } from '../services/patients'
 import { listXrays, fetchXrayObjectUrl } from '../services/xrays'
 import { drawShapes } from '../components/xray/drawAnnotations'
 import PageLoader from '../components/common/PageLoader'
+import PrintHeader from '../components/common/PrintHeader'
+import { formatDate, formatDateTime } from '../utils/formatDate'
 
 export default function XrayPrintPage() {
   const printState = usePrintState()
@@ -62,15 +64,14 @@ export default function XrayPrintPage() {
         </button>
       </div>
 
-      <h1 className="text-xl font-bold">Teodosio-Rufin Dental Clinic</h1>
-      <p className="mb-6 text-sm text-slate-500">X-ray Image</p>
+      <PrintHeader title="X-ray Image" />
 
       <div className="mb-6 grid grid-cols-2 gap-2 border-b border-slate-200 pb-4 text-sm">
         <div>
           <strong>Name:</strong> {patient.last_name}, {patient.first_name}
         </div>
         <div>
-          <strong>Taken:</strong> {xray.taken_date || xray.created_at.slice(0, 10)}
+          <strong>Taken:</strong> {formatDate(xray.taken_date || xray.created_at)}
         </div>
         <div>
           <strong>File:</strong> {xray.original_filename}
@@ -94,7 +95,7 @@ export default function XrayPrintPage() {
       </div>
 
       <p className="mt-8 text-xs text-slate-400">
-        Generated {new Date().toLocaleString()} — DentaVault
+        Generated {formatDateTime(new Date())} — DentaVault
       </p>
     </div>
   )

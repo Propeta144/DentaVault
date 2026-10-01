@@ -5,6 +5,7 @@ import UploadXrayForm from './UploadXrayForm'
 import XrayGallery from './XrayGallery'
 import XrayViewer from './XrayViewer'
 import CompareView from './CompareView'
+import PageLoader from '../common/PageLoader'
 
 export default function PatientXraysSection({ patientId }) {
   const { user } = useAuth()
@@ -31,13 +32,20 @@ export default function PatientXraysSection({ patientId }) {
     load()
   }
 
-  if (loading) return <p className="text-sm text-slate-400">Loading X-rays...</p>
+  if (loading) return <PageLoader label="Loading X-rays..." />
 
   return (
     <div className="space-y-4">
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && (
+        <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-base text-red-700">{error}</div>
+      )}
 
-      <XrayGallery xrays={xrays} onOpen={setViewing} onCompare={setComparing} />
+      <XrayGallery
+        xrays={xrays}
+        onOpen={setViewing}
+        onCompare={setComparing}
+        canUpload={user.role === 'dentist'}
+      />
 
       {user.role === 'dentist' && <UploadXrayForm onUpload={handleUpload} />}
 

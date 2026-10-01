@@ -29,7 +29,7 @@ Semantic colors keep stock Tailwind meaning:
 | Meaning | Color | Example |
 |---|---|---|
 | Success / active / create | `emerald` | Active badge, success toast |
-| Warning / needs attention / export | `amber` | Migrated Record, unreviewed X-ray badge |
+| Warning / needs attention / export | `amber` | Unreviewed X-ray badge, export actions |
 | Danger / delete / failed | `red` | Delete button, error box |
 | Update / info | `sky` | Update actions |
 | Neutral / view | `slate` | Default badge |
@@ -91,9 +91,31 @@ Destructive modals follow `DeletePatientModal.jsx`: red alert box with `AlertTri
 - Toasts: `const { showToast } = useToast()` → `showToast(msg)` / `showToast(msg, { type: 'error' })`.
 - Inline form error box: `rounded-md border border-red-200 bg-red-50 px-3 py-2 text-base text-red-700`.
 - Error message source: `err.response?.data?.error || 'Failed to ...'`.
-- Loading: `<p className="px-1 py-6 text-center text-sm text-slate-400">Loading...</p>`
-- Empty: card with `px-4 py-6 text-center text-sm text-slate-400`, e.g. "No patients found."
+- Loading: whole page/tab → `components/common/PageLoader.jsx` (`label`); lists/tables →
+  `SkeletonRows` from `components/common/Skeleton.jsx`. No plain "Loading..." text.
+- Empty: `components/common/EmptyState.jsx` (`icon`, `title`, `description`, optional `action`
+  button, `compact` inside tabs/cards). Say what's missing AND what to do next.
 - Missing value in a cell: em dash `'—'`.
+
+**Shared helpers (use these, don't re-implement)**
+- Dates: `utils/formatDate.js` → `formatDate` ("Oct 1, 2026"), `formatDateTime`, `formatActivityTime`
+  ("Today, 7:34 PM"), `formatRelativeDay` ("5 days ago"), `calculateAge`. Never `toLocaleString()` or
+  raw `YYYY-MM-DD` on screen. DATE strings are parsed as local dates (no UTC day shift).
+- Names: `utils/patientName.js` → `listName` ("Dela Cruz, Juan") for lists, `fullName` for headers,
+  `sexLabel`, `initials`.
+- `components/common/Avatar.jsx`: initials avatar (`size` sm|md|lg, `tone` light|dark).
+- `components/common/DropdownMenu.jsx`: "⋯" menu (`items: [{ label, icon, onClick, danger }]`) for
+  secondary/destructive actions. Fixed-positioned, so it is safe inside `overflow-x-auto` tables.
+- `components/common/BrandMark.jsx`: the official clinic mark (CSS mask, takes `text-*` color).
+  Official logo PNG: `assets/brand/teodosio-rufin-logo.png` (login, print headers via `PrintHeader`).
+- Patient search: the "Find patient" button / Ctrl+K palette lives in the top bar (`AppLayout`) on
+  every page, so pages don't add their own search-patient button.
+- Audit actions: `actionLabel()` (readable text), `groupAuditLogs()`, `auditPatientName()`,
+  `formatAuditDetails()` in `utils/auditAction.js`. Never show raw codes or numeric IDs.
+
+**Tailwind gotcha:** never build class names dynamically (`xl:grid-cols-${n}`); Tailwind scans
+source text, so write the full class (`n === 5 ? 'xl:grid-cols-5' : 'xl:grid-cols-4'`). Don't put
+a display class (`grid`/`flex`) and `hidden` on the same element; wrap it instead.
 
 ## 5. Tables
 ```
@@ -103,14 +125,25 @@ thead:   border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide t
 th/td:   px-4 py-3        tbody: divide-y divide-slate-100      tr: hover:bg-slate-50
 ```
 Primary cell link: `font-medium text-slate-900 hover:text-sky-700 hover:underline`. Other cells `text-slate-600`.
-Actions column `text-right`, and only rendered for the dentist.
+Actions column `text-right`, and only rendered for the dentist. Row actions go in a `DropdownMenu`
+(⋯), not side-by-side Edit/Delete buttons. When a row opens a record, make the whole `<tr>` clickable
+(`cursor-pointer`) but keep the name as a real `<Link>` (with `stopPropagation`) for keyboard users.
+Lists with more than one page need Prev/Next pagination (see `PatientsListPage`).
 
 ## 6. Responsive pattern
 - Breakpoint for layout switch is **`md`**. Lists render a **card list below md**
   (`space-y-3 md:hidden`, each item a card with a `<dl className="grid grid-cols-2 ...">`) and a
   **table at md+**. New list pages must provide both.
 - Grids: `grid grid-cols-1 gap-4 lg:grid-cols-2`, KPI rows `grid-cols-2 lg:grid-cols-4`.
-- Sidebar is fixed (`w-60`); `main` already has `md:pl-[16.5rem]`, so pages don't add their own left offset.
+- Navigation (`layouts/AppLayout.jsx`): white sticky **top bar** (h-16) on all screens + fixed
+  **bottom tab bar** below `md` (dentist only). There is no sidebar. `main` is centered
+  (`max-w-[1600px]`) and already reserves bottom space for the tab bar on phones, so pages add no
+  offsets. Anything pinned to the bottom on phones (sticky footers, toasts) must sit above the tab
+  bar: `bottom-[calc(4rem+env(safe-area-inset-bottom))] md:bottom-0`.
+- Check every page at **360, 768 (tablet portrait), 1024 (tablet landscape), and 1366**. Dense
+  tables switch to cards below `lg` when they have more than ~5 columns (Audit Log); short cells
+  get `whitespace-nowrap`; secondary columns use `hidden lg:table-cell`. Button labels must never
+  wrap (`whitespace-nowrap`); on phones, shorten to icon + `aria-label` instead.
 
 ## 7. Roles & routing
 - Two roles: `dentist` (full clinic) and `patient` (read-only, own record only).
@@ -118,7 +151,7 @@ Actions column `text-right`, and only rendered for the dentist.
   gate the nav item in `layouts/AppLayout.jsx`, **and** use `requireRole('dentist')` on the server route.
 - Hide write buttons (`user.role === 'dentist' && ...`) for patients. UI gating is cosmetic;
   the server check is the real one.
-- Print pages (`*PrintPage.jsx`) live outside `AppLayout` (no sidebar).
+- Print pages (`*PrintPage.jsx`) live outside `AppLayout` (no navigation bars).
 
 ## 8. Data layer
 - One service file per resource in `services/` exporting small functions returning `r.data`

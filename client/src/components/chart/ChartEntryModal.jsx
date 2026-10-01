@@ -4,6 +4,7 @@ import Modal from '../common/Modal'
 import { CONDITIONS, SURFACES, conditionColor } from '../../constants/dental'
 import { getToothHistory } from '../../services/chart'
 import { useToast } from '../../context/ToastContext'
+import { formatDate } from '../../utils/formatDate'
 
 // Maliit na version lang 'to ng same 5-region na "envelope" na iginuguhit
 // ng Tooth.jsx, para lang paalalahanan yung dentist kung anong parte ng
@@ -51,7 +52,7 @@ function timeAgo(dateString) {
   if (hours < 24) return `${hours}h ago`
   const days = Math.floor(hours / 24)
   if (days < 30) return `${days}d ago`
-  return new Date(dateString).toLocaleDateString()
+  return formatDate(dateString)
 }
 
 function surfaceLabelFor(code) {

@@ -1,9 +1,16 @@
 import { useState } from 'react'
-import { Columns2, Mail, UploadCloud } from 'lucide-react'
+import { Columns2, Mail, UploadCloud, ScanLine } from 'lucide-react'
 import XrayThumbnail from './XrayThumbnail'
 import StatusBadge from '../common/StatusBadge'
+import EmptyState from '../common/EmptyState'
+import { formatDate } from '../../utils/formatDate'
 
-export default function XrayGallery({ xrays, onOpen, onCompare }) {
+// Petsa ng X-ray: taken_date kung naitala, kung hindi, petsa ng upload
+function xrayDate(xray) {
+  return formatDate(xray.taken_date || xray.created_at)
+}
+
+export default function XrayGallery({ xrays, onOpen, onCompare, canUpload = false }) {
   const [selected, setSelected] = useState([])
 
   function toggleSelect(id) {
@@ -15,7 +22,18 @@ export default function XrayGallery({ xrays, onOpen, onCompare }) {
   }
 
   if (xrays.length === 0) {
-    return <p className="text-sm text-slate-400">No X-ray images yet.</p>
+    return (
+      <EmptyState
+        compact
+        icon={ScanLine}
+        title="No X-rays yet"
+        description={
+          canUpload
+            ? 'Upload the first X-ray with the form below. X-rays the patient emails to the clinic also appear here automatically.'
+            : 'X-rays taken at the clinic will appear here.'
+        }
+      />
+    )
   }
 
   return (
@@ -53,7 +71,7 @@ export default function XrayGallery({ xrays, onOpen, onCompare }) {
             >
               <input
                 type="checkbox"
-                aria-label={`Select X-ray from ${xray.taken_date || xray.created_at.slice(0, 10)} to compare`}
+                aria-label={`Select X-ray from ${xrayDate(xray)} to compare`}
                 checked={selected.includes(xray.id)}
                 onChange={() => toggleSelect(xray.id)}
                 className="h-5 w-5 cursor-pointer accent-sky-600"
@@ -65,7 +83,7 @@ export default function XrayGallery({ xrays, onOpen, onCompare }) {
               </div>
             )}
             <div className="absolute bottom-0 flex w-full items-center justify-between gap-1 bg-slate-900/75 px-2 py-1 text-xs text-white">
-              <span className="truncate">{xray.taken_date || xray.created_at.slice(0, 10)}</span>
+              <span className="truncate">{xrayDate(xray)}</span>
               <span className="flex shrink-0 items-center gap-1 text-slate-200">
                 {xray.source === 'email_inbound' ? (
                   <>
