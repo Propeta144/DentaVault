@@ -68,7 +68,7 @@ walang CORS, at walang binago sa frontend code (`/api` pa rin ang tinatawag).
    | `JWT_EXPIRES_IN` | `8h` |
    | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | galing sa local `.env` |
    | `MAILGUN_API_KEY`, `MAILGUN_DOMAIN`, `MAILGUN_WEBHOOK_SIGNING_KEY` | galing sa local `.env` |
-   | `TRUST_PROXY` | `2` (Vercel + Render, para tama ang IP sa Audit Log) |
+   | `TRUST_PROXY` | `4` (Vercel + Cloudflare + Render LB + Render internal proxy, para tama ang IP sa Audit Log; tingnan ang Gotcha #7) |
    | `AUDIT_RETENTION_ENABLED` | `false` (tingnan ang Gotcha #2) |
 
    Hindi kailangan ang `PORT` (si Render ang nagse-set) at `CORS_ORIGIN` (same-origin dahil sa Vercel proxy).
@@ -117,6 +117,10 @@ Sa Mailgun → **Receiving → Routes**, palitan ang forward URL ng:
 4. **Hindi gagana online ang mga lumang X-ray** na naka-save sa local disk. Cloudinary lang ang gumagana sa Render.
 5. **Bagong `JWT_SECRET` sa production.** Kapag pinalitan ito, kailangang mag-login ulit ang lahat.
 6. **PWA:** pagkatapos ng bawat deploy, lalabas ang "update available" prompt sa mga naka-install na app (`registerType: 'prompt'`).
+7. **IP Address sa Audit Log (`TRUST_PROXY=4`), sinubukan nang live:** `2` = Cloudflare IP, `3` = Vercel server IP,
+   `4` = totoong IP ng user. Limitasyon: ipinapasa ng Vercel rewrite ang `X-Forwarded-For` na galing sa user, kaya
+   mapepeke ang IP ng sadyang nagpadala ng pekeng header (hal. gamit ang curl). Hindi napepeke ang user (galing sa JWT).
+   Kapag nagpalit ng hosting, subukan ulit ang bilang.
 
 ## Code changes para sa deployment
 
