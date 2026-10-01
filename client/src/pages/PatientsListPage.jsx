@@ -137,9 +137,9 @@ export default function PatientsListPage() {
 
   return (
     <div>
-      {/* lg pataas lang magkatabi ang title at mga button; sa tablet, hiwalay
+      {/* xl pataas lang magkatabi ang title at mga button (sa lg, kinakain ng sidebar ang 256px); sa mas makitid, hiwalay
           na hanay ang mga button (dati nahahati ang "Export / CSV"). */}
-      <div className="mb-6 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+      <div className="mb-6 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-semibold text-slate-900">
             <Users className="h-6 w-6 text-sky-600" />
@@ -303,7 +303,7 @@ export default function PatientsListPage() {
                   <th className="whitespace-nowrap px-4 py-3">Age / Sex</th>
                   <th className="whitespace-nowrap px-4 py-3">Contact</th>
                   <th className="whitespace-nowrap px-4 py-3">Last Visit</th>
-                  <th className="hidden whitespace-nowrap px-4 py-3 lg:table-cell">Registered</th>
+                  <th className="hidden whitespace-nowrap px-4 py-3 xl:table-cell">Registered</th>
                   <th className="px-4 py-3">
                     <span className="sr-only">Actions</span>
                   </th>
@@ -342,7 +342,7 @@ export default function PatientsListPage() {
                     <td className="whitespace-nowrap px-4 py-2.5 text-slate-600">
                       <LastVisit date={p.last_treatment_date} />
                     </td>
-                    <td className="hidden whitespace-nowrap px-4 py-2.5 text-slate-600 lg:table-cell">{formatDate(p.created_at)}</td>
+                    <td className="hidden whitespace-nowrap px-4 py-2.5 text-slate-600 xl:table-cell">{formatDate(p.created_at)}</td>
                     <td className="px-2 py-2.5 text-right">
                       <div className="flex items-center justify-end">
                         {isDentist && <DropdownMenu label={`Actions for ${listName(p)}`} items={rowActions(p)} />}

@@ -195,7 +195,8 @@ export default function XrayInboxPage() {
                 <tr>
                   <th className="px-4 py-3">Received</th>
                   <th className="px-4 py-3">Patient</th>
-                  <th className="px-4 py-3">File</th>
+                  {/* File: sariling column sa xl lang; sa mas makitid, nasa ilalim ng pangalan */}
+                  <th className="hidden px-4 py-3 xl:table-cell">File</th>
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
@@ -212,8 +213,11 @@ export default function XrayInboxPage() {
                       >
                         {listName(x)}
                       </Link>
+                      <span className="block max-w-56 truncate text-sm text-slate-500 xl:hidden" title={x.original_filename}>
+                        {x.original_filename}
+                      </span>
                     </td>
-                    <td className="max-w-xs truncate px-4 py-3 text-slate-600" title={x.original_filename}>
+                    <td className="hidden max-w-xs truncate px-4 py-3 text-slate-600 xl:table-cell" title={x.original_filename}>
                       {x.original_filename}
                     </td>
                     <td className="px-4 py-3">

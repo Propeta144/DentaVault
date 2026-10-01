@@ -180,18 +180,21 @@ export default function AppLayout() {
   ]
   const accountHeader = (
     <>
-      <p className="truncate text-sm font-semibold text-slate-900">{user?.fullName}</p>
+      {/* Buong pangalan (wrap, hindi putol): sa sidebar, kasinglapad lang ng button ang menu */}
+      <p className="break-words text-sm font-semibold text-slate-900">{user?.fullName}</p>
       <p className="text-xs uppercase tracking-wide text-slate-500">{user?.role}</p>
     </>
   )
 
   const brand = (
-    <Link to="/" className="flex shrink-0 items-center gap-2.5 rounded-md pr-1" aria-label="DentaVault home">
+    // min-w-0 + truncate: sa 320px na phone, umiikli ang pangalan ng clinic
+    // imbes na itulak palabas ng screen ang search at avatar
+    <Link to="/" className="flex min-w-0 items-center gap-2.5 rounded-md pr-1" aria-label="DentaVault home">
       {/* Official mark sa eksaktong kulay ng logo (#3A2266) — brand asset, hindi UI color */}
-      <BrandMark className="h-9 w-9 text-[#3A2266]" />
-      <span className="leading-tight">
-        <span className="block text-base font-semibold tracking-tight text-slate-900">DentaVault</span>
-        <span className="block text-xs text-slate-500">Teodosio-Rufin Dental Clinic</span>
+      <BrandMark className="h-9 w-9 shrink-0 text-[#3A2266]" />
+      <span className="min-w-0 leading-tight">
+        <span className="block truncate text-base font-semibold tracking-tight text-slate-900">DentaVault</span>
+        <span className="block truncate text-xs text-slate-500">Teodosio-Rufin Dental Clinic</span>
       </span>
     </Link>
   )
@@ -238,6 +241,8 @@ export default function AppLayout() {
         <div className="border-t border-slate-100 p-3">
           <DropdownMenu
             label="Account menu"
+            align="left"
+            matchTriggerWidth
             triggerClassName="flex min-h-11 w-56 items-center gap-2.5 rounded-md p-2 text-left transition-colors hover:bg-slate-100"
             trigger={
               <>
@@ -259,7 +264,7 @@ export default function AppLayout() {
       <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur lg:hidden">
         <div className="flex h-16 items-center gap-2 px-3 sm:gap-4 sm:px-6">
           {brand}
-          <div className="ml-auto flex items-center gap-1 sm:gap-2">
+          <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-2">
             {isDentist && (
               <button
                 type="button"

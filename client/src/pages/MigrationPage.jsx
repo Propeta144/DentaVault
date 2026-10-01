@@ -1,7 +1,11 @@
-import { useState } from 'react'
+import { Suspense, lazy, useState } from 'react'
 import { PenLine, FileSpreadsheet, ArchiveRestore } from 'lucide-react'
-import BulkImportWizard from '../components/migration/BulkImportWizard'
-import LegacyTreatmentEntry from '../components/migration/LegacyTreatmentEntry'
+import PageLoader from '../components/common/PageLoader'
+
+// Lazy (Feature #9): ang napiling paraan LANG ang dina-download — hindi
+// kailangan ang buong wizard kung Manual Entry ang gagamitin, at vice versa.
+const BulkImportWizard = lazy(() => import('../components/migration/BulkImportWizard'))
+const LegacyTreatmentEntry = lazy(() => import('../components/migration/LegacyTreatmentEntry'))
 
 // Legacy Record Migration (Patient Records Module ng proposal): paglipat ng
 // lumang papel na record (galing pa sa dating may-ari ng clinic) papunta sa
@@ -74,8 +78,10 @@ export default function MigrationPage() {
         })}
       </div>
 
-      {mode === 'manual' && <LegacyTreatmentEntry />}
-      {mode === 'bulk' && <BulkImportWizard />}
+      <Suspense fallback={<PageLoader label="Loading..." />}>
+        {mode === 'manual' && <LegacyTreatmentEntry />}
+        {mode === 'bulk' && <BulkImportWizard />}
+      </Suspense>
       {!mode && (
         <p className="rounded-xl border border-dashed border-slate-300 bg-white px-6 py-10 text-center text-base text-slate-500">
           Choose how you want to bring in the old records.

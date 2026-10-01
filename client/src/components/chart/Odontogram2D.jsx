@@ -111,7 +111,7 @@ export default function Odontogram2D({ patientId, canEdit }) {
         gilid ng page, tahimik na mapuputol. Dahil w-full + viewBox na ang
         SVG, sumusukat na ito sa lapad ng print page nang proportional.
       */}
-      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6 print:overflow-visible print:border-0 print:p-0 print:shadow-none">
+      <div data-odontogram-scroll className="overflow-x-auto rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6 print:overflow-visible print:border-0 print:p-0 print:shadow-none">
         <svg
           viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
           className="mx-auto block h-auto w-full min-w-[600px]"

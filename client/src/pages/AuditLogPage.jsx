@@ -227,8 +227,8 @@ export default function AuditLogPage() {
 
       {!loading && groups.length > 0 && (
         <>
-          {/* Card list: phone at tablet (dati md lang; masyadong siksik ang 6 na column sa 768px) */}
-          <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:hidden">
+          {/* Card list hanggang lg (phone, tablet, at laptop na may sidebar): siksik ang 6 na column kapag kulang sa ~1000px */}
+          <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:hidden">
             {groups.map((g) => {
               const patientName = auditPatientName(g)
               const details = formatAuditDetails(g.details)
@@ -270,7 +270,7 @@ export default function AuditLogPage() {
           </ul>
 
           {/* Table: lg pataas */}
-          <div className="hidden overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm lg:block">
+          <div className="hidden overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm xl:block">
             <table className="w-full text-left text-sm">
               <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                 <tr>

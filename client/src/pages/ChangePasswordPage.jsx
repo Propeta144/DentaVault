@@ -136,7 +136,8 @@ export default function ChangePasswordPage() {
             </div>
           )}
 
-          <div className="flex gap-2 pt-2">
+          {/* 320px na phone: nakasalansan (hindi kasya ang dalawang button nang magkatabi) */}
+          <div className="flex flex-col-reverse gap-2 pt-2 min-[360px]:flex-row">
             {forced ? (
               <button
                 type="button"

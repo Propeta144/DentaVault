@@ -159,8 +159,8 @@ Lists with more than one page need Prev/Next pagination (see `PatientsListPage`)
   `bottom-[calc(4rem+env(safe-area-inset-bottom))] lg:bottom-0`.
 - New top-level page → add it to `navItems` in `AppLayout` (+ route + role gate), not to the page header.
 - Check every page at **360, 768 (tablet portrait), 1024 (tablet landscape), and 1366**. Dense
-  tables switch to cards below `lg` when they have more than ~5 columns (Audit Log); short cells
-  get `whitespace-nowrap`; secondary columns use `hidden lg:table-cell`. Button labels must never
+  tables switch to cards below `xl` when they have more than ~5 columns (Audit Log), because at lg the sidebar leaves only ~720px; short cells
+  get `whitespace-nowrap`; secondary columns use `hidden xl:table-cell`. Button labels must never
   wrap (`whitespace-nowrap`); on phones, shorten to icon + `aria-label` instead.
 
 ## 7. Roles & routing

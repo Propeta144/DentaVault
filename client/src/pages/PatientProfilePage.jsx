@@ -262,20 +262,21 @@ export default function PatientProfilePage() {
           Dati 8/12 lang ng lapad (may Patient Details sa kaliwa), kaya
           maliit ang Dental Chart sa laptop. */}
       <section className="min-h-[420px] rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-        <div className="mb-6 flex gap-4 overflow-x-auto border-b border-slate-200 sm:gap-6" role="tablist">
+        {/* 320px: mas maliit na gap at walang icon para kasya ang 3 tab nang walang scroll */}
+        <div className="mb-6 flex gap-2 overflow-x-auto border-b border-slate-200 min-[360px]:gap-4 sm:gap-6" role="tablist">
           <button type="button" role="tab" aria-selected={tab === 'history'} className={tabClass('history')} onClick={() => setTab('history')}>
-            <ClipboardList className="h-4 w-4" />
+            <ClipboardList className="hidden h-4 w-4 min-[360px]:block" />
             {/* Maikling label sa phone para kasya ang 3 tab — dati natatago ang X-rays */}
             <span className="sm:hidden">History</span>
             <span className="hidden sm:inline">Treatment History</span>
           </button>
           <button type="button" role="tab" aria-selected={tab === 'chart'} className={tabClass('chart')} onClick={() => setTab('chart')}>
-            <Grid3x3 className="h-4 w-4" />
+            <Grid3x3 className="hidden h-4 w-4 min-[360px]:block" />
             <span className="sm:hidden">Chart</span>
             <span className="hidden sm:inline">Dental Chart</span>
           </button>
           <button type="button" role="tab" aria-selected={tab === 'xrays'} className={tabClass('xrays')} onClick={() => setTab('xrays')}>
-            <ScanLine className="h-4 w-4" />
+            <ScanLine className="hidden h-4 w-4 min-[360px]:block" />
             X-rays
           </button>
         </div>

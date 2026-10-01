@@ -282,7 +282,8 @@ export default function BulkImportWizard() {
             {mappedColumns.length === 0 ? (
               <p className="text-sm text-slate-500">Match at least one column to see a preview.</p>
             ) : (
-              <div className="overflow-x-auto rounded-lg border border-slate-200">
+              <div data-scroll-ok className="overflow-x-auto rounded-lg border border-slate-200">
+                {/* Sinadyang naso-scroll pakanan: preview ng spreadsheet (hanggang 15 column) */}
                 <table className="w-full text-left text-sm">
                   <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                     <tr>

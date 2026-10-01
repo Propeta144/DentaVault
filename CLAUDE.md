@@ -742,6 +742,55 @@ Complete, manual entry 2 visit, Settings, account menu; 0 overflow, 0 console er
 `/xrays` at `/migration` → sariling record. Regression: functional 22/22, forms 41/41, phone 7/7, sweep 60/60, API 25/25.
 Build pasado (main 251 KB). Nilinis ang test data. **Hindi pa naka-push.**
 
+### 18a. Lazy loading ng mga bagong page (paalala ng adviser, tugma sa #9)
+- Ang `XrayInboxPage`, `MigrationPage`, at `SettingsPage` ay `lazy()` na sa `App.jsx` (hiwalay na file bawat isa).
+- **Dagdag:** sa loob ng Migration, lazy rin ang `BulkImportWizard` at `LegacyTreatmentEntry`. Ang napiling paraan
+  lang ang dina-download (may `<Suspense>` + `PageLoader`). `MigrationPage` 7.5 KB → 1.5 KB gzip.
+- Kaya maaaring hindi mapansin ang loader: maliliit ang files (2–5 KB gzip), at sa live site, dina-download na ng
+  service worker ang lahat ng page sa background pagkatapos mag-load (para sa offline, tingnan #9).
+- **Na-verify sa production build** (`vite preview`, naka-block ang service worker): Login → LoginPage lang;
+  Dashboard → DashboardPage; X-ray Inbox → XrayInboxPage; Migration → MigrationPage lang (walang wizard);
+  Bulk Import → BulkImportWizard; Manual Entry → LegacyTreatmentEntry; Settings → SettingsPage; pagbalik sa
+  X-ray Inbox → walang bagong download (cached). **8/8**. Flow E2E 54/54 pa rin.
+
+| Name | Type | Purpose |
+|---|---|---|
+| `client/src/pages/MigrationPage.jsx` | MODIFIED | `lazy()` + `<Suspense>` para sa dalawang migration flow. |
+
+### 18b. Responsiveness double-check (puna ng team: account menu sa sidebar)
+**Bug:** sa sidebar, lumalampas sa kaliwang gilid ng screen ang account menu (nakahanay sa kanan ng button,
+kaya itinulak pakaliwa ng mahabang pangalan). Inayos sa mismong `DropdownMenu`, kaya protektado ang LAHAT ng menu:
+- Bagong `align` ('right' default / 'left') at `matchTriggerWidth`. Laging may `maxWidth` batay sa natitirang
+  espasyo, kaya hindi na lalampas sa screen kahit anong menu. Sa sidebar: `align="left"`, kasinglapad ng button,
+  at nakabalot (wrap) ang buong pangalan.
+
+**Audit:** bagong script na binubuksan ang **33 screen/state** (lahat ng page, modal, menu, search, More, wizard
+steps, manual entry, patient view) sa **11 lapad** (320, 360, 390, 414, 768, 820, 1024, 1280, 1366, 1440, 1920).
+Awtomatikong sinusuri: page overflow, element na naputol sa gilid, popup na lumalabas sa screen, text na
+lumalabas sa button, at table na kailangang i-scroll pakanan. Napatunayang nahuhuli nito ang orihinal na bug.
+
+| Nakita | Ayos |
+|---|---|
+| 320px: top bar (logo + search + avatar) 3px lampas | Pangalan ng clinic `truncate` kapag kulang |
+| 320px: "Save new password" lampas | Nakasalansan ang 2 button below 360px |
+| 320px: profile tabs kailangang i-scroll | Mas maliit na gap, walang icon below 360px |
+| 1024px (may sidebar, ~720px na lang ang content): Audit Log table siksik | Cards hanggang `xl` (dati `lg`) |
+| 1024px: Patients header buttons nahahati, table 35px lampas | Header at "Registered" column `xl` |
+| 768/1024px: X-ray Inbox table 26px lampas | File column `xl` lang; sa mas makitid, nasa ilalim ng pangalan |
+| Sariling mali: JSX comment sa BulkImportWizard (hindi nag-load ang wizard) | Inilipat ang comment sa loob ng div |
+
+**Resulta:** 325 screens, **0 issues**, 0 page errors (sinadyang naso-scroll lang: 2D odontogram sa phone at ang
+spreadsheet preview sa Map Columns). Na-check din ang screenshots isa-isa. Regression: functional 22/22, forms
+41/41, phone 7/7, sweep 60/60, API 25/25, nav/migration 54/54, 3D drawing 14/14 + occlusal. Build pasado.
+
+| Name | Type | Purpose |
+|---|---|---|
+| `client/src/components/common/DropdownMenu.jsx` | MODIFIED | `align`, `matchTriggerWidth`, laging nasa loob ng screen (`maxWidth`). |
+| `client/src/layouts/AppLayout.jsx` | MODIFIED | Sidebar account menu `align="left"`; brand `truncate`; buong pangalan sa menu header. |
+| `client/src/pages/{AuditLog,PatientsList,XrayInbox,ChangePassword,PatientProfile}Page.jsx` | MODIFIED | Tingnan ang table sa itaas. |
+| `client/src/components/migration/BulkImportWizard.jsx`, `components/chart/Odontogram2D.jsx` | MODIFIED | `data-scroll-ok` / `data-odontogram-scroll` (sinadyang scroll); ayos ng comment. |
+| `.claude/skills/dentavault-ui/SKILL.md` | MODIFIED | Dense tables → cards below `xl`; secondary columns `xl:table-cell`. |
+
 ### Mga napansin sa paper na HINDI pa tugma sa system (para sa team)
 1. **Patient upload ng X-ray sa app**: sa Functional Requirements at Patient Dashboard wireframe, may "Upload X-ray Image"
    ang patient; sa system, email lang (Mailgun). Gawin, o linawin sa paper na email ang paraan.
