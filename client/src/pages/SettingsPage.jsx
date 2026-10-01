@@ -124,7 +124,7 @@ export default function SettingsPage() {
           ) : (
             <p className="text-base text-slate-600">
               {isDentist
-                ? 'The clinic X-ray email address is not set yet. Add CLINIC_XRAY_EMAIL (the Mailgun route address) to the server settings so patients can see it here.'
+                ? 'The clinic’s X-ray email address will appear here once it is ready, so you can share it with patients.'
                 : 'Ask the clinic for the email address where you can send your X-rays.'}
             </p>
           )}

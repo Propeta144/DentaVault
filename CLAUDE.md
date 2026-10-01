@@ -707,6 +707,9 @@ isang patient, nasa profile na) at "Feedback" (wala sa proposal).
 ### D. Settings (`/settings`, dentist at patient)
 Account (pangalan, email, role, Change password), **email ng clinic para sa X-ray** (bagong `CLINIC_XRAY_EMAIL` sa
 `.env`; ang address na naka-set sa Mailgun route), at para sa dentist: gaano katagal itinatago ang audit log.
+Habang wala pang `CLINIC_XRAY_EMAIL`, ang nakikita ng dentist ay "The clinic’s X-ray email address will appear here once it
+is ready, so you can share it with patients." (dati teknikal na tagubilin tungkol sa server settings, binago ayon sa puna ng
+team). Patient: "Ask the clinic for the email address where you can send your X-rays."
 
 | Name | Type | Purpose |
 |---|---|---|
