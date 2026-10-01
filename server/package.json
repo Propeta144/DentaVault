@@ -9,6 +9,7 @@
   },
   "scripts": {
     "dev": "node --watch-path=src --watch-path=server.js --watch-path=.env server.js",
+    "dev:aiven": "node --env-file=.env --env-file=.env.aiven --watch-path=src --watch-path=server.js server.js",
     "start": "node server.js",
     "migrate": "node db/migrate.js",
     "seed": "node db/seed.js",
