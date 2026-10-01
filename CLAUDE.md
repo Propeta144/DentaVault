@@ -805,3 +805,35 @@ spreadsheet preview sa Map Columns). Na-check din ang screenshots isa-isa. Regre
    I-update ang Figure 29 ayon sa aktwal na schema.
 7. **"Encrypting data at rest"** (Review of Related Literature): HTTPS at password hashing ang meron; kumpirmahin kung
    naka-encrypt ang database storage (Aiven) bago sabihin ito sa defense.
+
+---
+
+## 19. Hugis-ngipin na 2D Chart (puna: "masyadong kuwadrado")
+
+Dati: parehong parisukat na "envelope" (gitnang square + 4 na trapezoid) ang lahat ng 32 ngipin. Ngayon: **occlusal view**
+(tingin mula sa itaas ng kagat) ayon sa uri ng ngipin, at **pareho pa rin ang 5 napipindot na surface** sa parehong pwesto.
+
+| Uri | Hugis |
+|---|---|
+| Incisor (1–2) | Malapad at manipis (incisal edge), maliit na gitna |
+| Canine (3) | Bilugang diamond |
+| Premolar (4–5) | Oval, may 2 cusp (facial at lingual) + 1 groove |
+| Molar (6–8) | Malapad, may 4 cusp + "+" na fissure |
+
+- Paano: ang gilid ay superellipse (bilog ↔ parisukat) na may umbok para sa cusps; ang gitna (occlusal) ay parehong hugis,
+  pinaliit; ang 4 na gilid ay hinati ng mga linyang papunta sa "kanto" ng hugis. `polygon` pa rin ang bawat surface.
+- Palamuti lang ang balangkas at fissure lines (`pointerEvents="none"`), hindi humaharang sa pagpindot.
+- Extracted: abong hugis-ngipin na may X (dati abong parisukat). Pindot pa rin → whole-tooth modal.
+- Parehong hugis sa maliit na diagram ng ChartEntryModal at sa Print Chart.
+
+| Name | Type | Purpose |
+|---|---|---|
+| `client/src/components/chart/toothShape.js` | **NEW** | `toothType()`, `toothShape()` → `{ regions, outline, grooves }` (naka-cache bawat uri), `TOOTH_BOX`. |
+| `client/src/components/chart/Tooth.jsx` | MODIFIED | Gumagamit ng `toothShape`; balangkas at grooves; extracted na hugis-ngipin. |
+| `client/src/components/chart/ChartEntryModal.jsx` | MODIFIED | `SurfaceIndicator` gumagamit ng parehong hugis. |
+| `client/src/components/chart/Odontogram2D.jsx` | MODIFIED | `TOOTH_SIZE = TOOTH_BOX` (iisang pinanggagalingan). |
+
+**Na-verify (local, Edge):** bagong 2D test **30/30**: lahat ng 5 surface ng incisor 11, canine 23, premolar 35, molar 46
+(upper/lower, kaliwa/kanan) → tamang surface sa modal; save → tamang kulay; numero → Whole Tooth; extracted → abong hugis
++ X, napipindot pa rin; walang console error. Regression: functional 22/22, forms 41/41 (kasama ang highlight sa modal),
+sweep 60/60, responsive audit 148 screens 0 issues; screenshots ng chart, modal, at Print Chart. Build pasado.

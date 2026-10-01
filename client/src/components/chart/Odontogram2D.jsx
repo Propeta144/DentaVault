@@ -1,15 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import Tooth from './Tooth'
+import { TOOTH_BOX } from './toothShape'
 import ChartEntryModal from './ChartEntryModal'
 import { ODONTOGRAM_ROWS, CONDITIONS } from '../../constants/dental'
 import { getCurrentChart, createChartEntry } from '../../services/chart'
 
 
-// Dapat tugma 'to sa SIZE constant ng Tooth.jsx — hiwalay lang sila sa
-// magkaibang files (isa ang gumagawa ng SVG geometry ng isang ngipin, yung
-// isa naman ang naglalayout sa buong grid) pero same physical cell size
-// naman ang tinutukoy nila.
-const TOOTH_SIZE = 56
+// Iisang sukat ng ngipin para sa layout at sa hugis (toothShape.js)
+const TOOTH_SIZE = TOOTH_BOX
 const TOOTH_GAP = 8
 const QUADRANT_GAP = 24
 const ROW_GAP = 110

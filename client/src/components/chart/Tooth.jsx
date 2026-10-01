@@ -6,25 +6,17 @@ import {
   SURFACES,
 } from '../../constants/dental'
 
+import { TOOTH_BOX, toothShape } from './toothShape'
+
 // Pinalaki 'to galing sa original 40px cell para talagang ma-tap yung bawat
 // surface — pati yung number sa ilalim — sa tablet touchscreen, hindi lang
 // basta readable sa desktop monitor.
-const SIZE = 56
-const MARGIN = 16
-const INNER = SIZE - MARGIN // 40
+const SIZE = TOOTH_BOX
 
-// Yung classic 5-surface "envelope" diagram: may center square (occlusal /
-// incisal) na nakapaligiran ng apat na trapezoid (facial, lingual, mesial,
-// distal). Depende sa quadrant ng ngipin kung aling screen position
-// (top/bottom/left/right) ang tumutugma sa aling anatomical surface —
-// tignan yung toothOrientation().
-const REGION_POINTS = {
-  top: `0,0 ${SIZE},0 ${INNER},${MARGIN} ${MARGIN},${MARGIN}`,
-  bottom: `0,${SIZE} ${SIZE},${SIZE} ${INNER},${INNER} ${MARGIN},${INNER}`,
-  left: `0,0 ${MARGIN},${MARGIN} ${MARGIN},${INNER} 0,${SIZE}`,
-  right: `${SIZE},0 ${INNER},${MARGIN} ${INNER},${INNER} ${SIZE},${SIZE}`,
-  center: `${MARGIN},${MARGIN} ${INNER},${MARGIN} ${INNER},${INNER} ${MARGIN},${INNER}`,
-}
+// Hugis-ngipin na 5-surface diagram (tignan ang toothShape.js): gitnang
+// bahagi (occlusal / incisal) na napapaligiran ng apat na bahagi (facial,
+// lingual, mesial, distal). Depende sa quadrant kung aling screen position
+// (top/bottom/left/right) ang aling anatomical surface — toothOrientation().
 
 function surfaceLabel(code) {
   return SURFACES.find((s) => s.code === code)?.label || code
@@ -50,6 +42,7 @@ export default function Tooth({
     center: 'occlusal',
   }
 
+  const shape = toothShape(toothNumber)
   const wholeEntry = chartState.whole
   const isExtracted = wholeEntry?.condition_code === 'extracted'
 
@@ -70,27 +63,26 @@ export default function Tooth({
           className={canEdit ? 'cursor-pointer transition-all duration-150 hover:brightness-90' : ''}
         >
           <title>{`Tooth ${toothNumber} — Extracted / Missing`}</title>
-          <rect
-            width={SIZE}
-            height={SIZE}
+          <polygon
+            points={shape.outline}
             fill={conditionColor('extracted')}
             stroke={UNMARKED_STROKE}
-            rx={8}
+            strokeWidth={0.75}
           />
           <line
-            x1={10}
-            y1={10}
-            x2={SIZE - 10}
-            y2={SIZE - 10}
+            x1={16}
+            y1={16}
+            x2={SIZE - 16}
+            y2={SIZE - 16}
             stroke="white"
             strokeWidth={3}
             strokeLinecap="round"
           />
           <line
-            x1={SIZE - 10}
-            y1={10}
-            x2={10}
-            y2={SIZE - 10}
+            x1={SIZE - 16}
+            y1={16}
+            x2={16}
+            y2={SIZE - 16}
             stroke="white"
             strokeWidth={3}
             strokeLinecap="round"
@@ -98,7 +90,7 @@ export default function Tooth({
         </g>
       ) : (
         <>
-          {Object.entries(REGION_POINTS).map(([position, points]) => {
+          {Object.entries(shape.regions).map(([position, points]) => {
             const surfaceCode = positionToSurface[position]
             return (
               <polygon
@@ -107,6 +99,7 @@ export default function Tooth({
                 fill={fillFor(surfaceCode)}
                 stroke={UNMARKED_STROKE}
                 strokeWidth={0.75}
+                strokeLinejoin="round"
                 onClick={() => canEdit && onSurfaceClick(toothNumber, surfaceCode)}
                 className={canEdit ? 'cursor-pointer transition-all duration-150 hover:brightness-90' : ''}
               >
@@ -114,6 +107,27 @@ export default function Tooth({
               </polygon>
             )
           })}
+          {/* Palamuti lang (hindi napipindot): fissure sa biting surface at
+              mas madilim na balangkas ng ngipin */}
+          {shape.grooves && (
+            <path
+              d={shape.grooves}
+              fill="none"
+              stroke="#171123"
+              strokeOpacity={0.14}
+              strokeWidth={1.25}
+              strokeLinecap="round"
+              pointerEvents="none"
+            />
+          )}
+          <polygon
+            points={shape.outline}
+            fill="none"
+            stroke="#94a3b8"
+            strokeWidth={1}
+            strokeLinejoin="round"
+            pointerEvents="none"
+          />
         </>
       )}
       {/* Invisible hit area, mas malaki pa sa mismong nakalimbag na numero,

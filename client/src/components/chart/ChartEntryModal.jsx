@@ -6,6 +6,7 @@ import { getToothHistory } from '../../services/chart'
 import { useToast } from '../../context/ToastContext'
 import { formatDate } from '../../utils/formatDate'
 import { FIELD_LIMITS } from '../../constants/fieldLimits'
+import { TOOTH_BOX, toothShape } from './toothShape'
 
 // "root_canal" → "Root Canal" (dati raw code ang lumalabas sa "Currently ..."
 // at sa history)
@@ -13,20 +14,10 @@ function conditionLabel(code) {
   return CONDITIONS.find((c) => c.code === code)?.label || code
 }
 
-// Maliit na version lang 'to ng same 5-region na "envelope" na iginuguhit
-// ng Tooth.jsx, para lang paalalahanan yung dentist kung anong parte ng
-// ngipin yung kinlick niya. Orientation-aware (parehong mapping ng 2D
-// chart), tignan ang SurfaceIndicator sa baba.
-const ICON_SIZE = 56
-const ICON_MARGIN = 16
-const ICON_INNER = ICON_SIZE - ICON_MARGIN
-const ICON_REGIONS = {
-  top: `0,0 ${ICON_SIZE},0 ${ICON_INNER},${ICON_MARGIN} ${ICON_MARGIN},${ICON_MARGIN}`,
-  bottom: `0,${ICON_SIZE} ${ICON_SIZE},${ICON_SIZE} ${ICON_INNER},${ICON_INNER} ${ICON_MARGIN},${ICON_INNER}`,
-  left: `0,0 ${ICON_MARGIN},${ICON_MARGIN} ${ICON_MARGIN},${ICON_INNER} 0,${ICON_SIZE}`,
-  right: `${ICON_SIZE},0 ${ICON_INNER},${ICON_MARGIN} ${ICON_INNER},${ICON_INNER} ${ICON_SIZE},${ICON_SIZE}`,
-  center: `${ICON_MARGIN},${ICON_MARGIN} ${ICON_INNER},${ICON_MARGIN} ${ICON_INNER},${ICON_INNER} ${ICON_MARGIN},${ICON_INNER}`,
-}
+// Maliit na version ng parehong hugis-ngipin na iginuguhit ng Tooth.jsx
+// (toothShape.js), para paalalahanan ang dentist kung anong parte ng ngipin
+// ang pinindot. Orientation-aware (parehong mapping ng 2D chart).
+const ICON_SIZE = TOOTH_BOX
 
 // BUG FIX: dati `position === surface` ang check — pero top/bottom/left/
 // right/center ang mga position, at mesial/distal/facial/lingual/occlusal
@@ -45,7 +36,7 @@ function SurfaceIndicator({ surface, toothNumber }) {
   }
   return (
     <svg width={ICON_SIZE} height={ICON_SIZE} className="shrink-0 rounded-md bg-slate-50" aria-hidden="true">
-      {Object.entries(ICON_REGIONS).map(([position, points]) => {
+      {Object.entries(toothShape(toothNumber).regions).map(([position, points]) => {
         const highlighted = isWhole || positionToSurface[position] === surface
         return (
           <polygon
