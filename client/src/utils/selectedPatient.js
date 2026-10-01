@@ -14,8 +14,9 @@ export const PROFILE_PATH = '/patients/profile'
 
 // Gamitin sa <Link to={PROFILE_PATH} state={profileState(code)}> o
 // navigate(PROFILE_PATH, { state: profileState(code) }).
-export function profileState(patientCode) {
-  return { patientCode }
+// `tab` (optional): aling tab ang bukas pagdating (hal. 'xrays' galing X-ray inbox)
+export function profileState(patientCode, { tab } = {}) {
+  return tab ? { patientCode, tab } : { patientCode }
 }
 
 // Yung patient account, laging sarili lang niyang record, kaya hindi na

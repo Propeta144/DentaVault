@@ -3,6 +3,7 @@ import { body } from 'express-validator'
 import * as chartController from '../controllers/chart.controller.js'
 import { authenticate } from '../middleware/auth.js'
 import { requireRole } from '../middleware/rbac.js'
+import { FIELD_LIMITS } from '../utils/validators.js'
 
 const router = Router()
 
@@ -22,6 +23,10 @@ router.post(
     body('surface').isIn(SURFACES).withMessage('Invalid surface'),
     body('conditionCode').isIn(CONDITIONS).withMessage('Invalid condition'),
     body('strokeData').optional({ nullable: true }).isArray().withMessage('strokeData must be an array'),
+    body('notes')
+      .optional({ values: 'falsy' })
+      .isLength({ max: FIELD_LIMITS.notes })
+      .withMessage(`Notes must be ${FIELD_LIMITS.notes} characters or fewer`),
   ],
   chartController.createEntry,
 )

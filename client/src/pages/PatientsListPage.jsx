@@ -17,7 +17,6 @@ import { useAuth } from '../context/AuthContext'
 import { listPatients, getPatient, exportPatientsCsv } from '../services/patients'
 import EditPatientModal from '../components/patients/EditPatientModal'
 import DeletePatientModal from '../components/patients/DeletePatientModal'
-import ImportPatientsModal from '../components/patients/ImportPatientsModal'
 import StatusBadge from '../components/common/StatusBadge'
 import Avatar from '../components/common/Avatar'
 import DropdownMenu from '../components/common/DropdownMenu'
@@ -70,7 +69,6 @@ export default function PatientsListPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [editingPatient, setEditingPatient] = useState(null)
-  const [importing, setImporting] = useState(false)
   const [deletingPatient, setDeletingPatient] = useState(null)
   const [exporting, setExporting] = useState(false)
   const isDentist = user.role === 'dentist'
@@ -162,15 +160,16 @@ export default function PatientsListPage() {
               <Download className="h-4 w-4" />
               {exporting ? 'Exporting...' : 'Export CSV'}
             </button>
-            <button
-              type="button"
-              onClick={() => setImporting(true)}
+            {/* Import → Legacy Record Migration page (may Map Columns at
+                Validate bago mag-save; dati modal dito mismo) */}
+            <Link
+              to="/migration"
               className="flex min-h-11 whitespace-nowrap items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-4 text-base font-medium text-slate-700 transition-colors hover:bg-slate-50"
             >
               <FileUp className="h-4 w-4" />
               <span className="sm:hidden">Import</span>
               <span className="hidden sm:inline">Import Records</span>
-            </button>
+            </Link>
             <Link
               to="/patients/new"
               className="col-span-2 flex min-h-11 whitespace-nowrap items-center justify-center gap-2 rounded-md bg-sky-600 px-4 text-base font-semibold text-white transition-colors hover:bg-sky-700"
@@ -394,7 +393,6 @@ export default function PatientsListPage() {
         <EditPatientModal patient={editingPatient} onClose={() => setEditingPatient(null)} onSaved={handleSaved} />
       )}
 
-      {importing && <ImportPatientsModal onClose={() => setImporting(false)} onImported={reload} />}
 
       {deletingPatient && (
         <DeletePatientModal

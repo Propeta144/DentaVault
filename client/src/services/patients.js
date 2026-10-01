@@ -1,4 +1,5 @@
 import api from './api'
+import { todayISO } from '../utils/formatDate'
 
 export function listPatients({ search = '', sort = 'name', page = 1, limit = 20 } = {}) {
   return api.get('/patients', { params: { search, sort, page, limit } }).then((r) => r.data)
@@ -12,7 +13,7 @@ export async function exportPatientsCsv({ search = '' } = {}) {
   const url = URL.createObjectURL(response.data)
   const link = document.createElement('a')
   link.href = url
-  link.download = `dentavault-patients-${new Date().toISOString().slice(0, 10)}.csv`
+  link.download = `dentavault-patients-${todayISO()}.csv` // local na petsa, hindi UTC
   document.body.appendChild(link)
   link.click()
   link.remove()
@@ -59,4 +60,9 @@ export function resetPortalAccountPassword(patientId, payload) {
   return api
     .put(`/patients/${patientId}/portal-account/password`, payload)
     .then((r) => r.data.account)
+}
+
+// Legacy Record Migration → Manual Entry: maraming lumang treatment nang sabay
+export function addTreatmentsBatch(patientId, treatments) {
+  return api.post(`/patients/${patientId}/treatments/batch`, { treatments }).then((r) => r.data.treatments)
 }

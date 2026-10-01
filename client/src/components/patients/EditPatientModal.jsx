@@ -2,7 +2,7 @@ import Modal from '../common/Modal'
 import PatientForm from './PatientForm'
 import { updatePatient } from '../../services/patients'
 import { useToast } from '../../context/ToastContext'
-import QuickInputTextarea from '../common/QuickInputTextarea'
+import useDiscardGuard from '../../hooks/useDiscardGuard'
 
 // Snake_case yung DB rows; camelCase naman yung ginagamit ng PatientForm —
 // same shape na tinatanggap ng API — kaya kailangan i-map muna papuntang
@@ -25,6 +25,8 @@ function toFormValues(patient) {
 
 export default function EditPatientModal({ patient, onClose, onSaved }) {
   const { showToast } = useToast()
+  // X / Escape / Cancel: magtatanong muna kapag may binago
+  const guard = useDiscardGuard(onClose)
 
   async function handleSubmit(form) {
     try {
@@ -39,12 +41,12 @@ export default function EditPatientModal({ patient, onClose, onSaved }) {
   }
 
   return (
-    <Modal title={`Edit ${patient.first_name} ${patient.last_name}`} onClose={onClose} maxWidth="max-w-2xl">
+    <Modal title={`Edit ${patient.first_name} ${patient.last_name}`} onClose={guard.requestClose} maxWidth="max-w-2xl">
       <PatientForm
         initialValues={toFormValues(patient)}
         onSubmit={handleSubmit}
         submitLabel="Save Changes"
-        onCancel={onClose}
+        guard={guard}
       />
     </Modal>
   )

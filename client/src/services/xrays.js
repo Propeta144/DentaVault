@@ -37,3 +37,13 @@ export function deleteXray(xrayId) {
 export function getUnreviewedXrayCount() {
   return api.get('/xrays/unreviewed-count').then((r) => r.data.count)
 }
+
+// X-ray inbox (dentist): X-rays galing email sa buong clinic + mga email na
+// hindi na-match sa patient. status: 'new' (hindi pa nabubuksan) | 'all'
+export function getXrayInbox({ status = 'new', page = 1 } = {}) {
+  return api.get('/xrays/inbox', { params: { status, page } }).then((r) => r.data)
+}
+
+export function markXrayReviewed(xrayId) {
+  return api.put(`/xrays/${xrayId}/reviewed`)
+}

@@ -234,7 +234,10 @@ export default function AuditLogPage() {
               const details = formatAuditDetails(g.details)
               return (
                 <li key={g.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                  <div className="flex items-start justify-between gap-2">
+                  {/* flex-wrap: sa makitid na phone, bumababa ang oras sa
+                      ilalim ng mahabang badge (hal. "Reset patient portal
+                      password") imbes na tumulak palabas ng screen */}
+                  <div className="flex flex-wrap items-start justify-between gap-x-2 gap-y-1">
                     <ActionBadge group={g} />
                     <span className="shrink-0 text-right text-sm text-slate-400">
                       <GroupTime group={g} />

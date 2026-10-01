@@ -6,6 +6,7 @@ import chartRoutes from './chart.routes.js'
 import webhooksRoutes from './webhooks.routes.js'
 import auditLogRoutes from './auditLog.routes.js'
 import dashboardRoutes from './dashboard.routes.js'
+import settingsRoutes from './settings.routes.js'
 
 const router = Router()
 
@@ -15,6 +16,7 @@ router.get('/health', (req, res) => {
 
 router.use('/auth', authRoutes)
 router.use('/patients', patientsRoutes)
+router.use('/settings', settingsRoutes)
 // DAPAT mauna maregister ang webhooksRoutes bago yung xraysRoutes/
 // chartRoutes: yung dalawang 'yon kasi, minomount nila si `authenticate`
 // gamit ang router.use() sa sarili nilang root (walang path), kaya

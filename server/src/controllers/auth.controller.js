@@ -15,6 +15,20 @@ export const login = asyncHandler(async (req, res) => {
   res.json(result)
 })
 
+export const changePassword = asyncHandler(async (req, res) => {
+  const errors = validationResult(req)
+  if (!errors.isEmpty()) {
+    throw new AppError(errors.array()[0].msg, 422)
+  }
+  const result = await authService.changePassword({
+    userId: req.user.userId,
+    currentPassword: req.body.currentPassword,
+    newPassword: req.body.newPassword,
+    ipAddress: req.ip,
+  })
+  res.json(result)
+})
+
 export const me = asyncHandler(async (req, res) => {
   const user = await findUserById(req.user.userId)
   if (!user) throw new AppError('User not found', 404)

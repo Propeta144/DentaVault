@@ -26,7 +26,11 @@ export default function Modal({ title, onClose, children, maxWidth = 'max-w-lg' 
             <X className="h-5 w-5" />
           </button>
         </div>
-        <div className="max-h-[75vh] overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">{children}</div>
+        {/* Taas ng screen bawas ang itaas na gilid + header (dati 75vh lang,
+            kaya sa phone natatakpan ang Save ng mahahabang form kahit may
+            espasyo pa). dvh: tama kahit lumalabas/nawawala ang address bar
+            ng mobile browser. */}
+        <div className="max-h-[calc(100dvh-8.5rem)] overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">{children}</div>
       </div>
     </div>
   )

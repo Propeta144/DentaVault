@@ -125,6 +125,7 @@ export default function DashboardPage() {
           icon={MailWarning}
           accent={stats.unreviewedXrays > 0}
           hint={stats.unreviewedXrays > 0 ? 'From email, not opened yet' : 'All caught up'}
+          to="/xrays"
         />
       </div>
 

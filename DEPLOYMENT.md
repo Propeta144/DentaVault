@@ -69,6 +69,7 @@ walang CORS, at walang binago sa frontend code (`/api` pa rin ang tinatawag).
    | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | galing sa local `.env` |
    | `MAILGUN_API_KEY`, `MAILGUN_DOMAIN`, `MAILGUN_WEBHOOK_SIGNING_KEY` | galing sa local `.env` |
    | `TRUST_PROXY` | `4` (Vercel + Cloudflare + Render LB + Render internal proxy, para tama ang IP sa Audit Log; tingnan ang Gotcha #7) |
+   | `CLINIC_TIMEZONE` | *(optional)* default `Asia/Manila`. Ginagamit sa "hindi puwedeng future" na check ng mga petsa (UTC ang oras ng Render) |
    | `AUDIT_RETENTION_ENABLED` | `false` (tingnan ang Gotcha #2) |
 
    Hindi kailangan ang `PORT` (si Render ang nagse-set) at `CORS_ORIGIN` (same-origin dahil sa Vercel proxy).
@@ -121,6 +122,9 @@ Sa Mailgun → **Receiving → Routes**, palitan ang forward URL ng:
    `4` = totoong IP ng user. Limitasyon: ipinapasa ng Vercel rewrite ang `X-Forwarded-For` na galing sa user, kaya
    mapepeke ang IP ng sadyang nagpadala ng pekeng header (hal. gamit ang curl). Hindi napepeke ang user (galing sa JWT).
    Kapag nagpalit ng hosting, subukan ulit ang bilang.
+8. **Bagong migration = patakbuhin din sa Aiven.** Hindi ito ginagawa ng Render nang kusa. Bago/kasabay ng push,
+   sa `server/`: `$env:DOTENV_CONFIG_PATH=".env.aiven"; npm run migrate`. Kapag nauna ang code (hal. 010
+   `must_change_password`), magkakaroon ng database error ang login hangga't wala ang column.
 
 ## Code changes para sa deployment
 

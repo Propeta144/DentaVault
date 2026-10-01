@@ -26,7 +26,7 @@ export function ToastProvider({ children }) {
       {children}
       {/* Phone: buong lapad (may 1rem na gilid) at nasa ibabaw ng bottom tab
           bar (h-16). md pataas: kanan-ibaba, 320px. */}
-      <div className="fixed inset-x-4 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-[100] flex flex-col gap-2 md:inset-x-auto md:bottom-4 md:right-4 md:w-80">
+      <div className="fixed inset-x-4 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-[100] flex flex-col gap-2 md:inset-x-auto md:right-4 md:w-80 lg:bottom-4">
         {toasts.map((t) => (
           <div
             key={t.id}

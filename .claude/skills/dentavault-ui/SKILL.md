@@ -97,6 +97,21 @@ Destructive modals follow `DeletePatientModal.jsx`: red alert box with `AlertTri
   button, `compact` inside tabs/cards). Say what's missing AND what to do next.
 - Missing value in a cell: em dash `'—'`.
 
+**Forms (see `PatientForm.jsx`, `AddTreatmentForm.jsx`)**
+- `noValidate` + own inline errors (red text under the field). Never rely on browser popups.
+- Every `<label>` is linked (`htmlFor` + `useId`); errors/hints via `aria-describedby`, `aria-invalid`.
+  `Field` in `PatientForm` does this automatically and takes a `hint`.
+- After a failed submit, scroll to and focus the first `[aria-invalid="true"]` field.
+- `maxLength` from `constants/fieldLimits.js` (mirrors DB column sizes; server enforces the same).
+- Phones: `type="tel" inputMode="tel"`; emails `inputMode="email" autoCapitalize="none"`; names
+  `autoCapitalize="words"`; patient fields `autoComplete="off"` (the dentist is typing).
+- Dates: default/`max` with `todayISO()` (local date). Never `new Date().toISOString()` (UTC).
+- Choices with few options (sex, procedure, condition) = big buttons with `role="radio"` in a
+  `role="radiogroup"`, no silent default for clinically important fields.
+- Unsaved changes: `hooks/useDiscardGuard` + `components/common/DiscardChangesBar` (modal X/Escape
+  and Cancel ask first). Report dirty with `useLayoutEffect`.
+- Server errors and 409 warnings render in the form footer (visible even when scrolled down).
+
 **Shared helpers (use these, don't re-implement)**
 - Dates: `utils/formatDate.js` → `formatDate` ("Oct 1, 2026"), `formatDateTime`, `formatActivityTime`
   ("Today, 7:34 PM"), `formatRelativeDay` ("5 days ago"), `calculateAge`. Never `toLocaleString()` or
@@ -108,8 +123,8 @@ Destructive modals follow `DeletePatientModal.jsx`: red alert box with `AlertTri
   secondary/destructive actions. Fixed-positioned, so it is safe inside `overflow-x-auto` tables.
 - `components/common/BrandMark.jsx`: the official clinic mark (CSS mask, takes `text-*` color).
   Official logo PNG: `assets/brand/teodosio-rufin-logo.png` (login, print headers via `PrintHeader`).
-- Patient search: the "Find patient" button / Ctrl+K palette lives in the top bar (`AppLayout`) on
-  every page, so pages don't add their own search-patient button.
+- Patient search: the "Find patient" button / Ctrl+K palette lives in the sidebar (lg+) and the top
+  bar (below lg) in `AppLayout` on every page, so pages don't add their own search-patient button.
 - Audit actions: `actionLabel()` (readable text), `groupAuditLogs()`, `auditPatientName()`,
   `formatAuditDetails()` in `utils/auditAction.js`. Never show raw codes or numeric IDs.
 
@@ -135,11 +150,14 @@ Lists with more than one page need Prev/Next pagination (see `PatientsListPage`)
   (`space-y-3 md:hidden`, each item a card with a `<dl className="grid grid-cols-2 ...">`) and a
   **table at md+**. New list pages must provide both.
 - Grids: `grid grid-cols-1 gap-4 lg:grid-cols-2`, KPI rows `grid-cols-2 lg:grid-cols-4`.
-- Navigation (`layouts/AppLayout.jsx`): white sticky **top bar** (h-16) on all screens + fixed
-  **bottom tab bar** below `md` (dentist only). There is no sidebar. `main` is centered
-  (`max-w-[1600px]`) and already reserves bottom space for the tab bar on phones, so pages add no
-  offsets. Anything pinned to the bottom on phones (sticky footers, toasts) must sit above the tab
-  bar: `bottom-[calc(4rem+env(safe-area-inset-bottom))] md:bottom-0`.
+- Navigation (`layouts/AppLayout.jsx`): **sidebar** (`w-64`, fixed) at **lg+** with logo, Find patient,
+  menu, and the account menu at the bottom. **Below lg** (phone + tablet): white sticky top bar (h-16)
+  + fixed **bottom tab bar** (max 5 slots; extra items go in its "More" menu via `more: true` in
+  `navItems`). Content width at lg is viewport minus 256px (1024 → ~720px), so design for that.
+  `main` already reserves bottom space for the tab bar, so pages add no offsets. Anything pinned to
+  the bottom (sticky footers, toasts) must sit above the tab bar until lg:
+  `bottom-[calc(4rem+env(safe-area-inset-bottom))] lg:bottom-0`.
+- New top-level page → add it to `navItems` in `AppLayout` (+ route + role gate), not to the page header.
 - Check every page at **360, 768 (tablet portrait), 1024 (tablet landscape), and 1366**. Dense
   tables switch to cards below `lg` when they have more than ~5 columns (Audit Log); short cells
   get `whitespace-nowrap`; secondary columns use `hidden lg:table-cell`. Button labels must never

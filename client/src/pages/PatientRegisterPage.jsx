@@ -3,21 +3,27 @@ import { UserPlus } from 'lucide-react'
 import PatientForm from '../components/patients/PatientForm'
 import { createPatient } from '../services/patients'
 import { useToast } from '../context/ToastContext'
+import useDiscardGuard from '../hooks/useDiscardGuard'
 import { PROFILE_PATH, profileState } from '../utils/selectedPatient'
 
 export default function PatientRegisterPage() {
   const navigate = useNavigate()
   const { showToast } = useToast()
+  // Babala bago mawala ang na-type (Cancel, o pagsara/refresh ng tab)
+  const guard = useDiscardGuard(() => navigate('/patients'), { warnOnUnload: true })
 
-  async function handleSubmit(form) {
+  async function handleSubmit(form, { allowDuplicate }) {
     try {
-      const patient = await createPatient(form)
+      const patient = await createPatient({ ...form, allowDuplicate })
       showToast(`${patient.first_name} ${patient.last_name} registered successfully.`, {
         type: 'success',
       })
       navigate(PROFILE_PATH, { state: profileState(patient.patient_code) })
     } catch (err) {
-      showToast(err.response?.data?.error || 'Failed to register patient.', { type: 'error' })
+      // 409 duplicate: ipinapakita na ng PatientForm bilang babala (hindi error)
+      if (err.response?.status !== 409) {
+        showToast(err.response?.data?.error || 'Failed to register patient.', { type: 'error' })
+      }
       throw err
     }
   }
@@ -37,7 +43,11 @@ export default function PatientRegisterPage() {
         <PatientForm
           onSubmit={handleSubmit}
           submitLabel="Register Patient"
-          onCancel={() => navigate('/patients')}
+          guard={guard}
+          onOpenExisting={(code) => {
+            guard.setDirty(false)
+            navigate(PROFILE_PATH, { state: profileState(code) })
+          }}
           stickyFooter
         />
       </div>

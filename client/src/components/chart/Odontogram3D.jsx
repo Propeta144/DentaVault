@@ -1,79 +1,24 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import * as THREE from 'three'
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
 import { PenLine, Undo2, Save, X } from 'lucide-react'
-import Tooth3D, { classifySurface, mostCommon, toothExtents } from './Tooth3D'
+import Tooth3D, { mostCommon, surfaceForUV } from './Tooth3D'
+import Gingiva from './Gingiva'
+import { ARCHES, toothPlacement } from './archLayout'
 import ChartEntryModal from './ChartEntryModal'
 import { ODONTOGRAM_ROWS, CONDITIONS, conditionColor } from '../../constants/dental'
 import { getCurrentChart, createChartEntry } from '../../services/chart'
 
-// Same physical dental arch (upper + lower) as Odontogram2D, just curved
-// into 3D instead of laid out as a flat grid. Each row's 16 teeth are
-// spread across an arc so the whole thing forms a rotatable horseshoe
-// shape — index 0 of a row sits at -HALF_ANGLE, index 15 at +HALF_ANGLE,
-// inheriting the same FDI ordering (and patient-orientation mirroring)
-// ODONTOGRAM_ROWS already encodes for the 2D chart.
-//
-// Radius is tuned to the extracted tooth model's actual crown width
-// (~0.83 units after PCA re-alignment — see scripts/extract-tooth-model.js)
-// so adjacent teeth sit edge-to-edge without interpenetrating: chord
-// length between neighboring tooth centers is 2R·sin(halfStep), so for a
-// ~0.85-unit chord with 16 teeth over a 150° arc (halfStep = 150°/15/2 =
-// 5°), R ≈ 0.85 / (2·sin(5°)) ≈ 4.9. This has nothing to do with the
-// arch's on-screen size — individual tooth scale is fixed regardless of
-// radius.
-const ARCH_RADIUS = 4.9
-const HALF_ANGLE = (75 * Math.PI) / 180
-const ROW_Y = { 0: 0.75, 1: -0.75 }
+// Same physical dental arch (upper + lower) as Odontogram2D, laid out in
+// 3D, inheriting the same FDI ordering (and patient-orientation mirroring)
+// ODONTOGRAM_ROWS already encodes for the 2D chart. Ang hugis ng arch,
+// pwesto at hilig ng bawat ngipin ay nasa archLayout.js; ang gums ay
+// Gingiva.jsx (sumusunod sa parehong arch).
 const NO_STROKES = []
-
-function archPoint(theta, y) {
-  return new THREE.Vector3(ARCH_RADIUS * Math.sin(theta), y, -ARCH_RADIUS + ARCH_RADIUS * Math.cos(theta))
-}
-
-function toothTransform(rowIndex, indexInRow, rowLength) {
-  const theta = -HALF_ANGLE + (2 * HALF_ANGLE * indexInRow) / (rowLength - 1)
-  const { x, y, z } = archPoint(theta, ROW_Y[rowIndex])
-  // The extracted tooth template is authored crown-up (see extraction
-  // script) — correct for a lower tooth, since lower crowns point up
-  // toward the bite line. Upper teeth need flipping so their crowns point
-  // down instead; a 180° turn around the tooth's own front-back (Z) axis
-  // does that while leaving its facial side pointing outward either way —
-  // it only swaps which physical side ends up mesial vs distal, which
-  // `mesialOnPositiveX` below compensates for.
-  const flipUpper = rowIndex === 0
-  const mesialOnPositiveX = flipUpper ? theta > 0 : theta < 0
-  return { position: [x, y, z], rotationY: theta, flipUpper, mesialOnPositiveX }
-}
-
-// A simple pink ridge tracing the same arc the teeth sit on, so the arch
-// doesn't look like a row of teeth floating in mid-air — stands in for
-// gums without needing a separate downloaded/licensed asset. `edgeY` is
-// where the ridge should touch the visible arch (just past the crown tips
-// on the row's outward vertical edge); it tapers to `rootY` behind that.
-function GumRidge({ edgeY, rootY }) {
-  const curve = useMemo(() => {
-    const points = []
-    const steps = 40
-    for (let i = 0; i <= steps; i++) {
-      const theta = -HALF_ANGLE + (2 * HALF_ANGLE * i) / steps
-      points.push(archPoint(theta, (edgeY + rootY) / 2))
-    }
-    return new THREE.CatmullRomCurve3(points)
-  }, [edgeY, rootY])
-
-  const geometry = useMemo(
-    () => new THREE.TubeGeometry(curve, 48, Math.abs(rootY - edgeY) / 2 + 0.12, 10, false),
-    [curve, edgeY, rootY],
-  )
-
-  return (
-    <mesh geometry={geometry} receiveShadow>
-      <meshStandardMaterial color="#e0a8a3" roughness={0.7} />
-    </mesh>
-  )
-}
+// Stable na "walang entry" — para hindi mag-recompute ang kulay-layer ng
+// bawat ngipin sa bawat render (hal. habang nagdo-drawing)
+const NO_CHART = {}
+const PLACEMENTS = ODONTOGRAM_ROWS.map((row, rowIndex) => row.map((_, i) => toothPlacement(rowIndex, i)))
 
 // This is the module React.lazy() loads for the 3D tab — kept as a
 // standalone component (not split further) so the lazy import boundary in
@@ -125,18 +70,6 @@ export default function Odontogram3D({ patientId, canEdit, onPendingChange }) {
     [entries],
   )
 
-  // toothNumber -> mesialOnPositiveX, precomputed once so handleSaveMark
-  // can classify without re-deriving the whole arch layout.
-  const mesialMap = useMemo(() => {
-    const map = {}
-    ODONTOGRAM_ROWS.forEach((row, rowIndex) => {
-      row.forEach((toothNumber, i) => {
-        map[toothNumber] = toothTransform(rowIndex, i, row.length).mesialOnPositiveX
-      })
-    })
-    return map
-  }, [])
-
   const handleStrokeComplete = useCallback((toothNumber, stroke) => {
     setPending((prev) => {
       if (prev && prev.toothNumber === toothNumber) return { ...prev, strokes: [...prev.strokes, stroke] }
@@ -155,10 +88,12 @@ export default function Odontogram3D({ patientId, canEdit, onPendingChange }) {
 
   function handleSaveMark() {
     if (!pending) return
-    const points = pending.strokes.flatMap((s) => s.local)
-    if (points.length === 0) return
-    const extents = toothExtents(pending.toothNumber)
-    const surface = mostCommon(points.map((p) => classifySurface(p, mesialMap[pending.toothNumber], extents)))
+    const uvPoints = pending.strokes.flatMap((s) => s.uv)
+    if (uvPoints.length === 0) return
+    // Surface = ang UV cell na pinakamaraming tinamaan ng drawing (tingnan
+    // ang surfaceForUV). Laging mesial ang +X cell, dahil mina-mirror ng
+    // Tooth3D ang geometry sa kabilang side ng bibig.
+    const surface = mostCommon(uvPoints.map(surfaceForUV))
     // Carried through to ChartEntryModal so the actual drawn strokes (not
     // just which surface they landed on) get saved alongside the entry —
     // see stroke_data on chart_entries.
@@ -264,32 +199,33 @@ export default function Odontogram3D({ patientId, canEdit, onPendingChange }) {
           chart's fixed pixel width: a shrunk canvas makes drag-painting
           individual tooth surfaces impractical on small screens. */}
       <div className="h-[480px] overflow-hidden rounded-xl border border-slate-200 bg-slate-50 shadow-sm">
-        <Canvas shadows camera={{ position: [0, 2, 7.5], fov: 45 }}>
-          <ambientLight intensity={0.7} />
+        <Canvas shadows camera={{ position: [0, 2.6, 7.6], fov: 45 }}>
+          <ambientLight intensity={0.6} />
+          {/* Fill light mula sa ibaba, para hindi madilim ang gums at
+              upper teeth kapag tiningnan mula sa ilalim */}
+          <hemisphereLight args={['#ffffff', '#f3d6d4', 0.35]} />
           <directionalLight position={[4, 6, 6]} intensity={0.9} castShadow />
           <directionalLight position={[-4, 3, -2]} intensity={0.3} />
           <OrbitControls
             ref={controlsRef}
-            target={[0, 0, -1.2]}
+            target={[0, 0, -2.2]}
             enablePan={false}
             minDistance={3}
             maxDistance={14}
           />
-          <GumRidge edgeY={1} rootY={1.5} />
-          <GumRidge edgeY={-1} rootY={-1.5} />
+          {ARCHES.map((arch) => (
+            <Gingiva key={arch.upper ? 'upper' : 'lower'} arch={arch} />
+          ))}
           {ODONTOGRAM_ROWS.map((row, rowIndex) =>
             row.map((toothNumber, i) => {
-              const { position, rotationY, flipUpper, mesialOnPositiveX } = toothTransform(
-                rowIndex,
-                i,
-                row.length,
-              )
+              const { position, rotationY, flipUpper, mesialOnPositiveX, tiltX, labelY } = PLACEMENTS[rowIndex][i]
               const isPendingTooth = pending?.toothNumber === toothNumber
               return (
                 <Tooth3D
                   key={toothNumber}
                   toothNumber={toothNumber}
-                  chartState={chartByTooth[toothNumber] || {}}
+                  chartState={chartByTooth[toothNumber] || NO_CHART}
+                  labelY={labelY}
                   canEdit={canEdit}
                   paintEnabled={canEdit && penActive && (!pending || isPendingTooth)}
                   pendingStrokes={isPendingTooth ? pending.strokes : NO_STROKES}
@@ -298,6 +234,7 @@ export default function Odontogram3D({ patientId, canEdit, onPendingChange }) {
                   rotationY={rotationY}
                   flipUpper={flipUpper}
                   mesialOnPositiveX={mesialOnPositiveX}
+                  tiltX={tiltX}
                   penColor={conditionColor(activeCondition)}
                   onPaintStart={() => setOrbitEnabled(false)}
                   onPaintEnd={() => setOrbitEnabled(true)}

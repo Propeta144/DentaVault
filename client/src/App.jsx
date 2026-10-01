@@ -23,6 +23,10 @@ const AuditLogPage = lazy(() => import('./pages/AuditLogPage'))
 const PatientSummaryPrintPage = lazy(() => import('./pages/PatientSummaryPrintPage'))
 const ChartPrintPage = lazy(() => import('./pages/ChartPrintPage'))
 const XrayPrintPage = lazy(() => import('./pages/XrayPrintPage'))
+const ChangePasswordPage = lazy(() => import('./pages/ChangePasswordPage'))
+const XrayInboxPage = lazy(() => import('./pages/XrayInboxPage'))
+const MigrationPage = lazy(() => import('./pages/MigrationPage'))
+const SettingsPage = lazy(() => import('./pages/SettingsPage'))
 
 // Yung dentist, dashboard muna ang una niyang makikita — buong clinic view
 // kasi 'yan. Pero yung patient, sarili lang niyang record meron, kaya diretso
@@ -48,6 +52,10 @@ function App() {
             <Route path="/login" element={<LoginPage />} />
 
             <Route element={<ProtectedRoute />}>
+              {/* Pagpalit ng password: sapilitan kapag temporary password pa
+                  (tignan ProtectedRoute), o kusa mula sa account menu. */}
+              <Route path="change-password" element={<ChangePasswordPage />} />
+
               {/* Standalone 'to, walang sidebar — para malinis tignan pag pinrint.
                   Walang patient/X-ray ID sa URL — galing sa history state
                   (tignan utils/selectedPatient.js). */}
@@ -70,6 +78,14 @@ function App() {
                 <Route path="dashboard" element={<ProtectedRoute allowedRoles={['dentist']} />}>
                   <Route index element={<DashboardPage />} />
                 </Route>
+                <Route path="xrays" element={<ProtectedRoute allowedRoles={['dentist']} />}>
+                  <Route index element={<XrayInboxPage />} />
+                </Route>
+                <Route path="migration" element={<ProtectedRoute allowedRoles={['dentist']} />}>
+                  <Route index element={<MigrationPage />} />
+                </Route>
+                {/* Settings: dentist at patient (kanya-kanyang account) */}
+                <Route path="settings" element={<SettingsPage />} />
               </Route>
             </Route>
           </Routes>

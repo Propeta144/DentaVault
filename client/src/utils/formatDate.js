@@ -19,6 +19,13 @@ function toDate(value) {
   return Number.isNaN(parsed.getTime()) ? null : parsed
 }
 
+// Petsa NGAYON sa oras ng device (YYYY-MM-DD) — para sa default ng date
+// inputs at `max` (bawal ang future). HUWAG `new Date().toISOString()`:
+// UTC iyon, kaya bago mag-8 AM sa Pilipinas, kahapon ang lumalabas.
+export function todayISO() {
+  return format(new Date(), 'yyyy-MM-dd')
+}
+
 // "Oct 1, 2026"
 export function formatDate(value, fallback = '—') {
   const date = toDate(value)

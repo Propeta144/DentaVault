@@ -155,9 +155,20 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <p className="mt-8 text-center text-sm text-slate-400">
-            Forgot your password? Ask the clinic to reset it.
-          </p>
+          {/* Dalawang magkaibang sitwasyon (dati iisang linya lang, kaya parang
+              salungat sa "Change password" sa loob ng app):
+              - Nakalimutan: walang self-service email reset (sandbox ang
+                Mailgun, hindi makakapagpadala sa mga pasyente), kaya ang
+                clinic ang magbibigay ng temporary password — na papalitan
+                agad ng pasyente sa pag-login (tignan ChangePasswordPage).
+              - Alam pa pero gustong palitan: sa loob ng app mismo. */}
+          <div className="mt-8 space-y-1 text-center text-sm text-slate-500">
+            <p>
+              <span className="font-medium text-slate-600">Forgot your password?</span> Contact the clinic for a
+              temporary password. You&apos;ll set a new one right after you sign in.
+            </p>
+            <p className="text-slate-400">To change a password you know, sign in and open your account menu.</p>
+          </div>
         </div>
       </main>
     </div>

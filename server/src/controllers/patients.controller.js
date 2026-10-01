@@ -8,6 +8,7 @@ import { hashPassword } from '../services/authService.js'
 import asyncHandler from '../utils/asyncHandler.js'
 import AppError from '../utils/AppError.js'
 import { csvField } from '../utils/csv.js'
+import { FIELD_LIMITS, clinicToday } from '../utils/validators.js'
 
 function assertValid(req) {
   const errors = validationResult(req)
@@ -70,6 +71,24 @@ export const exportCsv = asyncHandler(async (req, res) => {
 
 export const create = asyncHandler(async (req, res) => {
   assertValid(req)
+
+  // Duplicate warning: parehong pangalan + birthday ng isang aktibong
+  // patient (parehong panuntunan ng Import). Hindi ito tuluyang bawal —
+  // puwedeng magkapareho talaga ang dalawang tao — kaya kapag sinadya ng
+  // dentist ("Register anyway"), ipinapadala ng client ang allowDuplicate.
+  if (req.body.allowDuplicate !== true) {
+    const existing = await patientModel.findPatientByNameAndDob(
+      req.body.firstName.trim(),
+      req.body.lastName.trim(),
+      req.body.dateOfBirth,
+    )
+    if (existing) {
+      throw new AppError('A patient with the same name and date of birth already exists', 409, {
+        duplicate: { patientCode: existing.patient_code },
+      })
+    }
+  }
+
   const patient = await patientModel.createPatient(req.body)
 
   await recordAuditLog({
@@ -176,6 +195,68 @@ export const addTreatment = asyncHandler(async (req, res) => {
   res.status(201).json({ treatment })
 })
 
+// Legacy Record Migration → Manual Entry: sabay-sabay na pag-encode ng mga
+// lumang treatment galing sa papel (hal. 8 visit mula 2019). Sinusuri muna
+// LAHAT bago may isulat — kapag may mali kahit isa, walang mase-save, at
+// sinasabi kung aling row ang aayusin (para hindi kalahati lang ang pumasok).
+const MAX_BATCH_TREATMENTS = 50
+
+function validateTreatmentEntry(entry, index) {
+  const row = `Row ${index + 1}`
+  const procedureName = String(entry?.procedureName || '').trim()
+  const treatmentDate = String(entry?.treatmentDate || '').trim()
+  const toothNumber = String(entry?.toothNumber || '').trim().toUpperCase()
+  const notes = entry?.notes ? String(entry.notes).trim() : ''
+
+  if (!procedureName) throw new AppError(`${row}: procedure is required`, 422)
+  if (procedureName.length > FIELD_LIMITS.procedureName) {
+    throw new AppError(`${row}: procedure must be ${FIELD_LIMITS.procedureName} characters or fewer`, 422)
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(treatmentDate) || Number.isNaN(new Date(treatmentDate).getTime())) {
+    throw new AppError(`${row}: a valid treatment date is required`, 422)
+  }
+  if (treatmentDate > clinicToday()) throw new AppError(`${row}: treatment date cannot be in the future`, 422)
+  if (toothNumber && toothNumber !== 'ALL' && !/^[1-4][1-8]$/.test(toothNumber)) {
+    throw new AppError(`${row}: tooth must be an FDI number (11-48) or ALL`, 422)
+  }
+  if (notes.length > FIELD_LIMITS.notes) {
+    throw new AppError(`${row}: notes must be ${FIELD_LIMITS.notes} characters or fewer`, 422)
+  }
+  return { procedureName, treatmentDate, toothNumber: toothNumber || null, notes: notes || null }
+}
+
+export const addTreatmentsBatch = asyncHandler(async (req, res) => {
+  const patient = await patientModel.findPatientByCode(req.params.code)
+  if (!patient) throw new AppError('Patient not found', 404)
+
+  const entries = req.body?.treatments
+  if (!Array.isArray(entries) || entries.length === 0) {
+    throw new AppError('Add at least one treatment', 422)
+  }
+  if (entries.length > MAX_BATCH_TREATMENTS) {
+    throw new AppError(`Save at most ${MAX_BATCH_TREATMENTS} treatments at a time`, 422)
+  }
+  const valid = entries.map(validateTreatmentEntry)
+
+  const treatments = []
+  for (const entry of valid) {
+    treatments.push(
+      await treatmentModel.createTreatment({ ...entry, patientId: patient.id, createdBy: req.user.userId }),
+    )
+  }
+
+  await recordAuditLog({
+    userId: req.user.userId,
+    action: 'MIGRATE_TREATMENT_HISTORY',
+    entityType: 'patient',
+    entityId: patient.id,
+    details: { patientId: patient.id, count: treatments.length },
+    ipAddress: req.ip,
+  })
+
+  res.status(201).json({ treatments })
+})
+
 export const getPortalAccount = asyncHandler(async (req, res) => {
   const patient = await patientModel.findPatientByCode(req.params.code)
   if (!patient) throw new AppError('Patient not found', 404)
@@ -202,6 +283,7 @@ export const createPortalAccount = asyncHandler(async (req, res) => {
     email: req.body.email,
     passwordHash,
     fullName: `${patient.first_name} ${patient.last_name}`,
+    mustChangePassword: true, // alam ng dentist ang temporary password, kaya papalitan sa unang login
   })
 
   await recordAuditLog({
@@ -225,7 +307,7 @@ export const resetPortalAccountPassword = asyncHandler(async (req, res) => {
   if (!account) throw new AppError('This patient does not have a portal account yet', 404)
 
   const passwordHash = await hashPassword(req.body.password)
-  await userModel.updatePasswordHash(account.id, passwordHash)
+  await userModel.updatePasswordHash(account.id, passwordHash, { mustChangePassword: true })
 
   await recordAuditLog({
     userId: req.user.userId,

@@ -45,8 +45,12 @@ const ACTION_LABELS = {
   IMPORT_LEGACY_PATIENTS: { label: 'Imported patient records' },
   INBOUND_XRAY_EMAIL: { label: 'Received an X-ray by email' },
   INBOUND_XRAY_EMAIL_UNMATCHED: { label: 'X-ray email from unknown sender' },
+  VIEW_XRAY_INBOX: { label: 'Opened the X-ray inbox' },
+  MARK_XRAY_REVIEWED: { label: 'Marked an X-ray as reviewed', plural: (n) => `Marked ${n} X-rays as reviewed` },
+  MIGRATE_TREATMENT_HISTORY: { label: 'Encoded past treatments (migration)' },
   CREATE_PATIENT_PORTAL_ACCOUNT: { label: 'Created patient portal account' },
   RESET_PATIENT_PORTAL_PASSWORD: { label: 'Reset patient portal password' },
+  CHANGE_OWN_PASSWORD: { label: 'Changed own password' },
   PRUNE_AUDIT_LOGS: { label: 'Archived old audit entries' },
 }
 

@@ -127,3 +127,25 @@ export async function listDistinctActions() {
   const [rows] = await pool.execute('SELECT DISTINCT action FROM audit_logs ORDER BY action ASC')
   return rows.map((r) => r.action)
 }
+
+// X-ray inbox: mga email na may X-ray pero hindi na-match sa kahit anong
+// patient (hindi naka-record ang email ng sender). Hindi sila naiimbak bilang
+// X-ray (walang patient na pagkakabitan), kaya ang audit log lang ang may
+// bakas — dito kinukuha para makita ng dentist at maidagdag ang email sa
+// tamang patient. Huling `days` araw lang.
+export async function listUnmatchedInboundEmails({ days = 90, limit = 20 } = {}) {
+  const [rows] = await pool.execute(
+    `SELECT id, details, created_at
+     FROM audit_logs
+     WHERE action = 'INBOUND_XRAY_EMAIL_UNMATCHED'
+       AND created_at >= NOW() - INTERVAL ${Math.max(1, Math.trunc(Number(days)) || 90)} DAY
+     ORDER BY created_at DESC, id DESC
+     ${limitOffset(limit, 0)}`,
+  )
+  return rows.map(parseDetails).map((row) => ({
+    id: row.id,
+    senderEmail: row.details?.senderEmail || null,
+    subject: row.details?.subject || null,
+    receivedAt: row.created_at,
+  }))
+}

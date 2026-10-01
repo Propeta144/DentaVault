@@ -3,13 +3,14 @@ import * as THREE from 'three'
 import { Text, useGLTF } from '@react-three/drei'
 import { conditionColor } from '../../constants/dental'
 import teethModelUrl from '../../assets/models/teeth.glb?url'
+import TEETH_EXTENTS from '../../assets/models/teethExtents.json'
 
-// 8 distinct crown shapes, one per FDI tooth *position* (1 = central
-// incisor ... 8 = 3rd molar), extracted/re-centered/PCA-aligned from a
-// Poly-by-Google "Teeth" asset (see scripts/extract-tooth-set.cjs) — each
-// mirrored across all 4 quadrants by position rather than stamping one
-// single shape everywhere. Preloading avoids a pop-in flash the first
-// time a tooth scrolls into view.
+// 16 crown shapes mula sa procedural generator ng team (scripts/teeth-
+// source/, inihanda ng scripts/prep-procedural-teeth.cjs): Tooth1..8 =
+// upper, LowerTooth1..8 = lower (1 = central incisor ... 8 = 3rd molar).
+// Dati: 8 hugis lang (~236 triangles) mula sa "Teeth by Poly by Google",
+// iisa sa itaas at ibaba. Preloading avoids a pop-in flash the first time
+// a tooth scrolls into view.
 useGLTF.preload(teethModelUrl)
 
 const INK_CANVAS_SIZE = 256
@@ -20,43 +21,42 @@ const INK_CANVAS_SIZE = 256
 // texture instead of just lifting the pen.
 const MAX_CONNECTED_UV_JUMP = 0.2
 
-// Mesial-distal (X) and facial-lingual (Z) half-extents per FDI *position*
-// (1-8), read straight off scripts/extract-tooth-set.cjs's printed bbox for
-// each shape — crown height (Y) is always normalized to ±0.5 by that same
-// script regardless of position, so only X/Z vary here. Re-run that script
-// (e.g. picking different source meshes) and these need updating to match
-// its new printed output.
-const TOOTH_EXTENTS = {
-  1: { x: 0.482, z: 0.134 },
-  2: { x: 0.414, z: 0.129 },
-  3: { x: 0.426, z: 0.147 },
-  4: { x: 0.387, z: 0.157 },
-  5: { x: 0.324, z: 0.148 },
-  6: { x: 0.34, z: 0.18 },
-  7: { x: 0.318, z: 0.218 },
-  8: { x: 0.328, z: 0.344 },
+// Isang cell bawat surface sa UV atlas ng bawat ngipin. KAPAREHO ng
+// UV_CELLS sa scripts/prep-procedural-teeth.cjs (at ng lumang atlas, kaya
+// lumalabas pa rin ang mga lumang drawing). Sa geometry, +X = mesial: ang
+// mga ngipin sa kabilang side ay mina-mirror (tingnan Tooth3D), kaya laging
+// posX ang mesial at negX ang distal.
+const UV_CELLS = {
+  occlusal: [0, 2 / 3, 1, 1],
+  facial: [0, 1 / 3, 0.5, 2 / 3],
+  lingual: [0.5, 1 / 3, 1, 2 / 3],
+  mesial: [0, 0, 0.5, 1 / 3],
+  distal: [0.5, 0, 1, 1 / 3],
 }
 
+// Quadrant 3/4 = lower (mandibular) na hugis
+function toothNodeName(toothNumber) {
+  const lower = toothNumber[0] === '3' || toothNumber[0] === '4'
+  return `${lower ? 'LowerTooth' : 'Tooth'}${toothNumber[1]}`
+}
+
+// Half-extents (x = mesial-distal, y = taas, z = facial-lingual) ng mismong
+// hugis na ginagamit ng ngiping ito, mula teethExtents.json
 export function toothExtents(toothNumber) {
-  return TOOTH_EXTENTS[toothNumber[1]]
+  return TEETH_EXTENTS[toothNodeName(toothNumber)]
 }
 
-// Classify a touched point — local to the tooth's own un-rotated frame,
-// the same one surfaceLayouts() below was measured against — into one of
-// the 5 anatomical surfaces using the model's real proportions rather than
-// an approximate flat proxy shape: near the crown tip is occlusal,
-// otherwise whichever of the mesial-distal (X) or facial-lingual (Z) axis
-// the point sits proportionally further out on, relative to that axis's
-// real extent for this specific tooth's shape (see TOOTH_EXTENTS above —
-// this varies per position now that each one has its own crown shape,
-// unlike the single stamped-everywhere template this replaced).
-export function classifySurface(localPoint, mesialOnPositiveX, extents) {
-  const { x, y, z } = localPoint
-  if (y > 0.32) return 'occlusal'
-  const xFrac = Math.abs(x) / extents.x
-  const zFrac = Math.abs(z) / extents.z
-  if (xFrac > zFrac) return x > 0 === mesialOnPositiveX ? 'mesial' : 'distal'
-  return z > 0 ? 'facial' : 'lingual'
+// Kung saang surface tumama ang isang drawing point, mula sa UV niya: bawat
+// surface ay may sariling UV cell (tingnan ang UV_CELLS), kaya ang cell na
+// tinamaan = ang surface. Dati, kinukuwenta mula sa 3D position (taas at
+// lapad), na hindi laging tugma sa kung saan talaga lumalabas ang kulay —
+// hal. ang central fossa ng molar ay mababa kaya napupunta sa "facial".
+// Ngayon iisa ang batayan ng pintura at ng classification.
+export function surfaceForUV([u, v]) {
+  for (const [surface, [u0, v0, u1, v1]] of Object.entries(UV_CELLS)) {
+    if (u >= u0 && u <= u1 && v >= v0 && v <= v1) return surface
+  }
+  return 'occlusal'
 }
 
 export function mostCommon(list) {
@@ -195,17 +195,17 @@ function InkLayer({ geometry, strokes = [], paintEnabled, penColor, onStrokeComp
   )
 }
 
-// Read-only counterpart to InkLayer: redraws the actual strokes a dentist
-// drew for already-saved entries (chart_entries.stroke_data), so a saved
-// mark keeps looking like what was actually drawn instead of collapsing
-// into a flat colored plane — same UV space as InkLayer, but each mark
-// carries its own color (whatever condition was selected when it was
-// saved), not one shared live pen color. No pointer handlers and raycast
-// disabled — this is a pure visual layer, must not block InkLayer's own
-// paint surface underneath it (the exact bug fixed for the condition-plane
-// indicators below: an object with no handlers still intercepts the
-// raycast unless explicitly excluded).
-function HistoryInkLayer({ geometry, marks }) {
+// Read-only na layer ng KULAY sa ibabaw ng crown (parehong UV ng InkLayer):
+// 1. `fills`: buong surface na kinukulayan ayon sa condition — para sa mga
+//    entry na walang drawing (galing sa 2D chart, o bago pa nagkaroon ng
+//    stroke_data). Dati, patag na parihaba itong nakalutang sa tabi ng
+//    ngipin; ngayon nakapinta na mismo sa surface (UV cell ng surface na iyon).
+// 2. `marks`: ang mismong strokes na iginuhit ng dentist sa mga na-save na
+//    entry (chart_entries.stroke_data), sa kulay ng condition nila.
+// No pointer handlers and raycast disabled — pure visual layer, must not
+// block InkLayer's own paint surface underneath it (an object with no
+// handlers still intercepts the raycast unless explicitly excluded).
+function SurfaceLayer({ geometry, fills, marks }) {
   const canvas = useMemo(() => {
     const el = document.createElement('canvas')
     el.width = INK_CANVAS_SIZE
@@ -222,6 +222,15 @@ function HistoryInkLayer({ geometry, marks }) {
   useEffect(() => {
     const s = INK_CANVAS_SIZE
     ctx.clearRect(0, 0, s, s)
+
+    for (const { surface, color } of fills) {
+      const [u0, v0, u1, v1] = UV_CELLS[surface]
+      ctx.globalAlpha = 0.72
+      ctx.fillStyle = color
+      // canvas y = 1 - v (parehong convention ng strokes sa baba)
+      ctx.fillRect(u0 * s, (1 - v1) * s, (u1 - u0) * s, (v1 - v0) * s)
+    }
+
     for (const mark of marks) {
       const pts = mark.points
       if (!pts || pts.length === 0) continue
@@ -255,7 +264,7 @@ function HistoryInkLayer({ geometry, marks }) {
     }
     ctx.globalAlpha = 1
     texture.needsUpdate = true
-  }, [ctx, texture, marks])
+  }, [ctx, texture, fills, marks])
 
   return (
     <mesh geometry={geometry} scale={1.012} raycast={() => null}>
@@ -264,36 +273,7 @@ function HistoryInkLayer({ geometry, marks }) {
   )
 }
 
-// Where each of the 5 surfaces' status panels sit around the crown — only
-// rendered when that surface actually has a recorded entry, as an at-a-
-// glance summary of the chart (drawing itself now happens directly on the
-// tooth via InkLayer, not by touching these). Numbers below were tuned
-// against the original single template (x:±0.415, z:±0.148) — scaled here
-// by each position's own extents (TOOTH_EXTENTS) so panels still sit flush
-// against the crown's actual mesiodistal/faciolingual size instead of the
-// old template's proportions.
-const TUNED_X_HALF = 0.415
-const TUNED_Z_HALF = 0.148
-
-function surfaceLayouts(mesialOnPositiveX, extents) {
-  const sx = extents.x / TUNED_X_HALF
-  const sz = extents.z / TUNED_Z_HALF
-  return {
-    facial: { args: [0.68 * sx, 0.72], position: [0, -0.06, 0.16 * sz], rotation: [0, 0, 0] },
-    lingual: { args: [0.68 * sx, 0.72], position: [0, -0.06, -0.16 * sz], rotation: [0, Math.PI, 0] },
-    mesial: {
-      args: [0.3 * sz, 0.72],
-      position: [mesialOnPositiveX ? 0.43 * sx : -0.43 * sx, -0.06, 0],
-      rotation: [0, mesialOnPositiveX ? -Math.PI / 2 : Math.PI / 2, 0],
-    },
-    distal: {
-      args: [0.3 * sz, 0.72],
-      position: [mesialOnPositiveX ? -0.43 * sx : 0.43 * sx, -0.06, 0],
-      rotation: [0, mesialOnPositiveX ? Math.PI / 2 : -Math.PI / 2, 0],
-    },
-    occlusal: { args: [0.68 * sx, 0.32 * sz], position: [0, 0.52, 0], rotation: [-Math.PI / 2, 0, 0] },
-  }
-}
+const SURFACES = ['facial', 'lingual', 'mesial', 'distal', 'occlusal']
 
 export default function Tooth3D({
   toothNumber,
@@ -306,91 +286,113 @@ export default function Tooth3D({
   rotationY,
   flipUpper,
   mesialOnPositiveX,
+  tiltX = 0,
+  labelY,
   penColor,
   onPaintStart,
   onPaintEnd,
   highlighted,
 }) {
   const { nodes } = useGLTF(teethModelUrl)
-  // toothNumber is FDI notation: quadrant digit + position digit (1-8,
-  // central incisor -> 3rd molar) — same shape reused across all 4
-  // quadrants, mirrored/rotated into place by the group transforms below.
-  const positionDigit = toothNumber[1]
-  const toothGeometry = nodes[`Tooth${positionDigit}`]?.geometry
+  // FDI: quadrant digit + position digit (1-8). Upper (Q1/Q2) at lower
+  // (Q3/Q4) ay may kani-kaniyang hugis na.
+  const nodeName = toothNodeName(toothNumber)
+  const toothGeometry = nodes[nodeName]?.geometry
+  const extents = TEETH_EXTENTS[nodeName]
   const isExtracted = chartState.whole?.condition_code === 'extracted'
 
-  const layouts = surfaceLayouts(mesialOnPositiveX, TOOTH_EXTENTS[positionDigit])
-  const surfaces = ['facial', 'lingual', 'mesial', 'distal', 'occlusal']
+  // Hindi simetriko ang mga ngipin (iba ang mesial at distal na side), at
+  // +X = mesial sa geometry. Sa mga posisyong nasa kabilang direksyon ang
+  // midline, mina-mirror ang X para laging nakaharap sa midline ang mesial —
+  // gaya ng totoong bibig (magkasalamin ang kanan at kaliwa). Kaya ang +X
+  // UV cell ay laging mesial (tingnan ang UV_CELLS at surfaceForUV).
+  // (Inaayos ng three.js ang face winding kapag negative ang scale.)
+  const mirrorX = !mesialOnPositiveX
+
   // Ang kulay ay kinukuha sa condition_code NGAYON, hindi sa hex na
   // naka-save sa stroke_data noong iginuhit — kaya kapag nagbago ang
   // palette (hal. ginawang color-blind safe), sumusunod din ang mga lumang
   // drawing at tugma pa rin sa legend.
-  const historyMarks = surfaces.flatMap((surface) => {
-    const entry = chartState[surface]
-    return (entry?.stroke_data || []).map((mark) => ({ ...mark, color: conditionColor(entry.condition_code) }))
-  })
+  const { fills, marks } = useMemo(() => {
+    const fillList = []
+    const markList = []
+    for (const surface of SURFACES) {
+      const entry = chartState[surface]
+      if (!entry) continue
+      const color = conditionColor(entry.condition_code)
+      // May totoong drawing → ang drawing ang ipinapakita; kung wala,
+      // buong surface ang kinukulayan
+      if (entry.stroke_data?.length) entry.stroke_data.forEach((mark) => markList.push({ ...mark, color }))
+      else fillList.push({ surface, color })
+    }
+    return { fills: fillList, marks: markList }
+  }, [chartState])
 
   return (
+    // `position` = gitna ng cervical line (leeg ng ngipin, kung saan lumalabas
+    // sa gums). Dito umiikot ang labial tilt (`tiltX`), tapos inaangat ang
+    // crown nang kalahating taas niya papunta sa kagat.
     <group position={position} rotation={[0, rotationY, 0]} scale={highlighted ? 1.15 : 1}>
-      <group rotation={[0, 0, flipUpper ? Math.PI : 0]}>
-        {toothGeometry && (
-          <mesh castShadow receiveShadow geometry={toothGeometry} raycast={() => null}>
-            <meshStandardMaterial color={isExtracted ? '#94a3b8' : '#fdfcfa'} roughness={0.55} />
-          </mesh>
-        )}
+      <group rotation={[tiltX, 0, 0]}>
+        {/* Isang group (three.js: scale → rotation → position): mirror X,
+            baligtad para sa upper, tapos inaangat ang crown mula sa leeg */}
+        <group
+          position={[0, extents ? (flipUpper ? -extents.y : extents.y) : 0, 0]}
+          rotation={[0, 0, flipUpper ? Math.PI : 0]}
+          scale={[mirrorX ? -1 : 1, 1, 1]}
+        >
+          {toothGeometry && (
+            <mesh castShadow receiveShadow geometry={toothGeometry} raycast={() => null}>
+              {/* Enamel: bahagyang malamig na off-white, may kaunting kinang
+                  (clearcoat) — dati flat na puti. Extracted = abo. */}
+              <meshPhysicalMaterial
+                color={isExtracted ? '#94a3b8' : '#f2eee6'}
+                roughness={isExtracted ? 0.7 : 0.38}
+                clearcoat={isExtracted ? 0 : 0.35}
+                clearcoatRoughness={0.35}
+                transparent={isExtracted}
+                opacity={isExtracted ? 0.55 : 1}
+              />
+            </mesh>
+          )}
 
-        {toothGeometry && !isExtracted && canEdit && (
-          <InkLayer
-            geometry={toothGeometry}
-            strokes={pendingStrokes}
-            paintEnabled={paintEnabled}
-            penColor={penColor}
-            onStrokeComplete={onStrokeComplete}
-            onPaintStart={onPaintStart}
-            onPaintEnd={onPaintEnd}
-          />
-        )}
+          {toothGeometry && !isExtracted && canEdit && (
+            <InkLayer
+              geometry={toothGeometry}
+              strokes={pendingStrokes}
+              paintEnabled={paintEnabled}
+              penColor={penColor}
+              onStrokeComplete={onStrokeComplete}
+              onPaintStart={onPaintStart}
+              onPaintEnd={onPaintEnd}
+            />
+          )}
 
-        {!isExtracted &&
-          surfaces.map((surface) => {
-            const entry = chartState[surface]
-            // Entries with real stroke_data get their actual drawing back
-            // via HistoryInkLayer below instead — the flat plane is only a
-            // fallback for entries with no captured strokes (2D-originated
-            // saves, or anything recorded before stroke_data existed).
-            if (!entry || entry.stroke_data) return null
-            const layout = layouts[surface]
-            return (
-              <mesh key={surface} position={layout.position} rotation={layout.rotation} raycast={() => null}>
-                <planeGeometry args={layout.args} />
-                <meshStandardMaterial
-                  color={conditionColor(entry.condition_code)}
-                  transparent
-                  opacity={0.85}
-                  side={2}
-                />
-              </mesh>
-            )
-          })}
-
-        {toothGeometry && !isExtracted && historyMarks.length > 0 && (
-          <HistoryInkLayer geometry={toothGeometry} marks={historyMarks} />
-        )}
+          {toothGeometry && !isExtracted && (fills.length > 0 || marks.length > 0) && (
+            <SurfaceLayer geometry={toothGeometry} fills={fills} marks={marks} />
+          )}
+        </group>
       </group>
 
-      {/* Kept outside the flip group deliberately — the label must stay
-          upright and land near the gumline (away from the biting edge)
-          for both rows, so it needs its own offset rather than inheriting
-          the 180° crown-orientation flip applied to upper teeth above. */}
-      <Text
-        position={[0, flipUpper ? 0.68 : -0.68, 0]}
-        fontSize={0.22}
-        color="#475569"
-        anchorX="center"
-        anchorY="middle"
-      >
-        {toothNumber}
-      </Text>
+      {/* Tooth number: nakadikit sa harap ng gums (facial side, +Z), ~3 mm
+          lampas sa leeg ng ngipin. Labas sa tilt/flip/mirror para laging
+          tuwid at nababasa. */}
+      {extents && (
+        <Text
+          position={[0, labelY, extents.z + 0.22]}
+          fontSize={0.2}
+          color="#ffffff"
+          outlineWidth={0.014}
+          outlineColor="#8a3442"
+          anchorX="center"
+          anchorY="middle"
+          raycast={() => null}
+          // Harap lang: kapag tiningnan mula sa likod, hindi lalabas na baligtad
+          material-side={THREE.FrontSide}
+        >
+          {toothNumber}
+        </Text>
+      )}
     </group>
   )
 }

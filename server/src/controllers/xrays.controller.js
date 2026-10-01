@@ -1,7 +1,7 @@
 import { validationResult } from 'express-validator'
 import * as xrayModel from '../models/xrayModel.js'
 import * as patientModel from '../models/patientModel.js'
-import { recordAuditLog } from '../models/auditLogModel.js'
+import { recordAuditLog, listUnmatchedInboundEmails } from '../models/auditLogModel.js'
 import { canAccessPatientRecord } from '../middleware/rbac.js'
 import { storeXrayFile, resolveXrayFile } from '../services/xrayStorageService.js'
 import asyncHandler from '../utils/asyncHandler.js'
@@ -35,6 +35,48 @@ export const list = asyncHandler(async (req, res) => {
 export const unreviewedCount = asyncHandler(async (req, res) => {
   const count = await xrayModel.countUnreviewedEmailXrays()
   res.json({ count })
+})
+
+// X-ray inbox (dentist-only, tignan route): lahat ng X-ray na natanggap sa
+// email sa buong clinic + mga email na hindi na-match sa patient. Ito ang
+// "notification" na nasa proposal (dentist is notified when an emailed X-ray
+// is processed) — dati badge count lang, walang listahan.
+export const inbox = asyncHandler(async (req, res) => {
+  const status = req.query.status === 'all' ? 'all' : 'new'
+  const page = Math.max(1, Number(req.query.page) || 1)
+  const limit = 20
+  const [{ rows, total }, unreviewed, unmatched] = await Promise.all([
+    xrayModel.listInboxXrays({ status, limit, offset: (page - 1) * limit }),
+    xrayModel.countUnreviewedEmailXrays(),
+    listUnmatchedInboundEmails(),
+  ])
+
+  await recordAuditLog({
+    userId: req.user.userId,
+    action: 'VIEW_XRAY_INBOX',
+    entityType: 'xray_image',
+    details: { status, page },
+    ipAddress: req.ip,
+  })
+
+  res.json({ xrays: rows, total, page, limit, status, unreviewedCount: unreviewed, unmatched })
+})
+
+// "Mark as reviewed" mula sa inbox, nang hindi binubuksan ang X-ray (hal.
+// alam na ng dentist kung ano 'yon). Idempotent.
+export const markReviewed = asyncHandler(async (req, res) => {
+  const xray = await xrayModel.findXrayById(req.params.id)
+  if (!xray) throw new AppError('X-ray not found', 404)
+  await xrayModel.markXrayReviewed(xray.id)
+  await recordAuditLog({
+    userId: req.user.userId,
+    action: 'MARK_XRAY_REVIEWED',
+    entityType: 'xray_image',
+    entityId: xray.id,
+    details: { patientId: xray.patient_id },
+    ipAddress: req.ip,
+  })
+  res.status(204).send()
 })
 
 export const upload = asyncHandler(async (req, res) => {

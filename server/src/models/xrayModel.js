@@ -1,4 +1,5 @@
 import pool from '../config/db.js'
+import { limitOffset } from '../utils/sqlLimit.js'
 
 // Ibinabalik ni mysql2 yung JSON columns bilang raw text, hindi parsed
 // value — kailangan i-parse pabalik dito sa bawat read path, kung hindi,
@@ -111,6 +112,30 @@ export async function countUnreviewedEmailXrays() {
      WHERE source = 'email_inbound' AND reviewed_at IS NULL AND deleted_at IS NULL`,
   )
   return count
+}
+
+// X-ray inbox (dentist): lahat ng X-ray na dumating sa email, sa buong
+// clinic, pinakabago muna — para hindi na kailangang buksan isa-isa ang
+// bawat patient para malaman kung sino ang may bagong X-ray. `status`:
+// 'new' = hindi pa nabubuksan (reviewed_at IS NULL), 'all' = lahat.
+// Hindi kasama ang X-ray ng na-delete na patient.
+export async function listInboxXrays({ status = 'new', limit, offset }) {
+  const where = `x.source = 'email_inbound' AND x.deleted_at IS NULL AND p.deleted_at IS NULL${
+    status === 'new' ? ' AND x.reviewed_at IS NULL' : ''
+  }`
+  const [rows] = await pool.execute(
+    `SELECT x.id, x.original_filename, x.mime_type, x.taken_date, x.reviewed_at, x.created_at,
+            p.patient_code, p.first_name, p.last_name
+     FROM xray_images x
+     JOIN patients p ON p.id = x.patient_id
+     WHERE ${where}
+     ORDER BY x.created_at DESC, x.id DESC
+     ${limitOffset(limit, offset)}`,
+  )
+  const [[{ total }]] = await pool.execute(
+    `SELECT COUNT(*) AS total FROM xray_images x JOIN patients p ON p.id = x.patient_id WHERE ${where}`,
+  )
+  return { rows, total }
 }
 
 export async function softDeleteXray(id) {

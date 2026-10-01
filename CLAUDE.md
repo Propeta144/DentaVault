@@ -501,3 +501,255 @@ search, patient view) = 60 screen, **0 horizontal overflow, 0 page errors**. Pho
 nasa ibaba at gumagana ang tap, huling card hindi natatakpan, sticky Register button at toast nasa ibabaw ng tab
 bar, account menu kasya sa screen. Functional e2e 22/22 pa rin. Build pasado (main bundle 245 KB).
 **Hindi pa naka-push.**
+
+---
+
+## 15. Mga Form: Bug Fixes, Kaligtasan ng Pasyente, at Usability (A + B + C)
+
+Review ng lahat ng form (Register, Edit, Add Treatment, Dental Chart entry, X-ray upload, Portal account, Import,
+Login) gamit ang code, screenshots, at API tests. Lahat ng nakita ay inayos. Required na ang **Allergies** at **Sex**
+(desisyon ng team).
+
+### A. Mga bug na naayos (lahat kumpirmado bago ayusin)
+| # | Bug | Ayos |
+|---|---|---|
+| 1 | **Add Treatment: kahapon ang default na petsa bago mag-8 AM** (UTC ang `toISOString`). Ganito rin ang CSV filename | `todayISO()` (local) sa `utils/formatDate.js` |
+| 2 | **Walang limit ang haba ng input.** Local: tahimik na pinuputol (300 → 255 char address). Aiven (strict): 500 error | `FIELD_LIMITS` sa server (`utils/validators.js`, = laki ng DB column) + `maxLength` sa client + row errors sa Import |
+| 3 | **Chart modal: hindi kailanman nagha-highlight ang single surface** (`top/left` vs `mesial/lingual`) | `toothOrientation()` mapping, gaya ng 2D chart |
+| 4 | Chart modal: raw code ("root_canal") | `conditionLabel()` |
+| 5 | Import modal: "Migrated Record" pa rin | "Imported" |
+| 6 | Add Treatment: browser popup ang validation; "Save Treatment" nahahati sa phone | Sariling inline errors; nowrap |
+| 7 | Register: kapag naka-scroll sa ibaba, wala sa screen ang mga error | Scroll + focus sa unang mali; server error/duplicate sa footer |
+| 8 | Bakanteng `<label>` sa Medical History | Tinanggal ang `Field` wrapper |
+| 9 | "Copied ✓" kahit pumalya ang copy | Chine-check ang resulta; may "Couldn't copy" na mensahe |
+| + | **Sobrang laking X-ray file = "Internal server error"** (walang status ang MulterError) | 413 + malinaw na mensahe (`errorHandler.js`) |
+
+### B. Kaligtasan ng pasyente at kalidad ng data
+- **Allergies required** (client + server, Register at Edit). Blangkong lumang record = **"Not recorded yet"** (amber), hindi "None".
+- **Sex required, walang default** (dati "Male" na agad): dalawang button (Female/Male). Label "Sex" na (dati "Gender").
+- **Duplicate warning** (pareho ang pangalan at birthday): "Open existing record" o "Different person, register anyway"
+  (server: 409 maliban kung `allowDuplicate: true`).
+- **Bawal ang future na petsa** (birthday, treatment, X-ray date taken): `max` sa date picker + server check gamit ang
+  oras sa Pilipinas (`CLINIC_TIMEZONE`, default `Asia/Manila`; UTC ang Render).
+- **Presets:** toggle na (pindutin ulit para tanggalin); ang "None" ay nagtatanong muna bago palitan ang listahan.
+
+### C. Usability
+- Number pad sa phone (`type="tel"`), walang autofill ng browser sa patient fields, auto-capitalize ng pangalan.
+- Tumatanggap ng "0917 123 4567" / "0917-123-4567" (nililinis sa client at server). May hint sa ilalim ng field.
+- **Babala bago mawala ang binago** (Register, Edit, Add Treatment): Cancel / X / Escape → "Keep editing / Discard";
+  Register: pati pagsara/refresh ng tab.
+- **Add Treatment:** procedures bilang malalaking button, "Add another treatment after saving". Kita ang Save nang
+  hindi nag-i-scroll sa laptop (1366×768), tablet (768), at 390px phone; sa 360×760 na phone, kaunting scroll sa loob
+  ng modal (mas mataas na limit ng Modal body: `100dvh − 8.5rem`, dati `75vh`).
+- **X-ray upload:** preview, drag-and-drop, check ng uri at laki bago mag-upload.
+- **Chart modal:** Cancel button, radio semantics.
+- **Import:** file picker muna; nakatiklop ang instructions ("How importing works"); 2×2 results sa phone.
+- **Portal account:** "Print slip" para sa pasyente, linked labels.
+- **Pagpalit ng password sa unang login:** ang temporary password mula sa dentist ay kailangang palitan bago makagamit
+  ng app. **Server-side:** `must_change_password` (migration 010) → nasa JWT → 403 sa lahat ng API maliban sa
+  `/auth/me` at `/auth/change-password`. Bagong page `/change-password` (sapilitan, o kusa mula sa account menu
+  "Change password"). Naka-log bilang "Changed own password".
+
+| Name | Type | Purpose |
+|---|---|---|
+| `server/db/migrations/010_add_must_change_password.sql` | **NEW** | `users.must_change_password`. Napatakbo na sa local. **Kailangang patakbuhin sa Aiven bago/kasabay ng push.** |
+| `server/src/utils/validators.js` | **NEW** | `FIELD_LIMITS`, `clinicToday()`, `notInFuture`, `stripPhoneFormatting`. |
+| `server/src/routes/{patients,xrays,chart,auth}.routes.js` | MODIFIED | Lengths, future dates, allergies required, phone cleanup, `/auth/change-password`. |
+| `server/src/controllers/{patients,auth}.controller.js` | MODIFIED | Duplicate 409; portal create/reset = must change; `changePassword`. |
+| `server/src/services/authService.js` | MODIFIED | `signToken` (may `mustChangePassword`), `changePassword()`. |
+| `server/src/middleware/{auth,errorHandler}.js`, `utils/AppError.js` | MODIFIED | 403 hangga't hindi napapalitan; MulterError → 413; `extra` fields sa error JSON. |
+| `server/src/models/userModel.js`, `services/patientImportService.js` | MODIFIED | Flag sa create/update/findById; length checks bawat import row. |
+| `client/src/pages/ChangePasswordPage.jsx` | **NEW** | Sapilitan/kusang pagpalit ng password. |
+| `client/src/hooks/useDiscardGuard.js`, `components/common/DiscardChangesBar.jsx` | **NEW** | Babala bago mawala ang binago. |
+| `client/src/components/patients/PortalCredentials.jsx` | **NEW** | Shared: credentials (Copy/Print slip/Done) + `TemporaryPasswordField`. |
+| `client/src/constants/fieldLimits.js` | **NEW** | Kapareho ng server `FIELD_LIMITS` + X-ray max size. |
+| `client/src/components/patients/{PatientForm,AddTreatmentForm,EditPatientModal,CreatePortalAccountModal,ResetPortalPasswordModal,ImportPatientsModal}.jsx` | MODIFIED | Tignan A/B/C. |
+| `client/src/components/common/{QuickInputTextarea,MedicalAlertBadge,ProtectedRoute,Modal}.jsx` | MODIFIED | Presets, "Not recorded", forced password change, modal height. |
+| `client/src/components/chart/ChartEntryModal.jsx`, `components/xray/UploadXrayForm.jsx` | MODIFIED | Tignan A/C. |
+| `client/src/pages/{PatientRegister,PatientProfile}Page.jsx`, `App.jsx`, `context/AuthContext.jsx`, `layouts/AppLayout.jsx` | MODIFIED | Guard, duplicate, route, `changePassword()`, "Change password" sa account menu. |
+| `client/src/services/patients.js`, `utils/{formatDate,auditAction}.js` | MODIFIED | Local date sa CSV; `todayISO()`; label ng CHANGE_OWN_PASSWORD. |
+| `DEPLOYMENT.md`, `.claude/skills/dentavault-ui/SKILL.md` | MODIFIED | `CLINIC_TIMEZONE`, Gotcha #8 (migrations sa Aiven); form conventions. |
+
+**Na-verify (local):** API tests **25/25** (required/length/future/phone/duplicate/password flow + 403 block);
+forms e2e **41/41** sa Edge (lahat ng nasa A/B/C, kasama ang first-login password change at Escape-guard);
+regression: functional **22/22**, phone **7/7**, responsive sweep **60/60** (0 overflow), build pasado (main 246 KB).
+Lahat ng test data (patients, portal accounts) ay nilinis pagkatapos.
+**Hindi pa naka-push.** Hindi rin isinama ang middle name at relationship field ng emergency contact (kailangan ng
+desisyon at migration); may hint muna sa Contact Name na isama ang relationship.
+
+### 15a. "Forgot password" vs "Change password" (puna ng team)
+Parang salungat dati: may "Change password" na sa loob ng app, pero "Ask the clinic to reset it" ang nasa login.
+Magkaibang sitwasyon talaga sila: **Change password** = alam pa ang password; **Forgot** = hindi na makaka-login.
+- **Walang self-service email reset, sinadya:** sandbox ang Mailgun domain (sa mga na-verify na address lang
+  makakapagpadala, hindi sa mga pasyente), at walang email-sending code ang app. Mas ligtas din para sa medical records:
+  kilala ng clinic ang pasyente nang personal, naka-log ang bawat reset, at **sapilitang papalitan** ng pasyente ang
+  temporary password pagka-login (#15C), kaya hindi alam ng clinic ang huling password.
+- **Ayos:** dalawang malinaw na linya na sa login page (`LoginPage.jsx`): "Forgot your password? Contact the clinic for
+  a temporary password. You'll set a new one right after you sign in." at "To change a password you know, sign in and
+  open your account menu."
+- **Dentist account:** kapag nakalimutan, `node db/seed.js <email> "<bagong password>"` sa server (tignan DEPLOYMENT.md).
+- **Kung gusto sa hinaharap:** email reset link kapag may verified na Mailgun domain (kailangan ng token table,
+  expiry, at rate limit).
+
+---
+
+## 16. Bagong 3D Teeth Model (Procedural, Hiwalay ang Upper at Lower)
+
+**Problema (dati):** iisang set ng 8 crown (galing sa "Teeth by Poly by Google") ang ginagamit ng upper at lower, kaya
+pareho ang hugis ng lower molars sa upper. Ang mga kondisyon ay nakalutang na "plane panels" sa harap ng ngipin, hindi
+nakapinta sa mismong surface.
+
+**Ayos:** 16 na bagong ngipin (8 upper + 8 lower) na **ginawa ng sarili nating procedural generator**
+(`generate_teeth.py`). Walang third-party license na kailangang i-credit.
+
+- **Prep script** (`prep-procedural-teeth.cjs`): bina-bundle ang 16 GLB papunta sa iisang `teeth.glb` (nodes
+  `Tooth1..8`, `LowerTooth1..8`) at hinahati ang bawat ngipin sa **5 surface region** gamit ang UV atlas
+  (occlusal / facial / lingual / mesial / distal). Ang occlusal ay batay sa taas **at** sa direksyon ng surface (normal),
+  para hindi tusok-tusok ang kulay sa molars. Gumagawa rin ng `teethExtents.json` (laki ng bawat ngipin, para sa arch spacing).
+- **Kondisyon nakapinta na sa surface mismo:** buong UV cell ang kinukulayan (alpha 0.72) kapag walang drawing; kapag may
+  naka-save na drawing (`stroke_data`), yung stroke ang ipinapakita.
+- **Mirror:** ang kaliwang side ng bibig ay naka-mirror (negative scale X), kaya **laging nakaharap sa midline ang mesial**
+  sa lahat ng 4 na quadrant. Dahil dito, simple na ang pag-detect ng surface: `surfaceForUV()` (kung saang UV cell
+  tumama ang drawing). Tinanggal na ang lumang `classifySurface` at `mesialMap`.
+- **Arch:** ang pwesto ng ngipin ay batay sa totoong lapad ng bawat isa (`TOOTH_GAP` 0.04), naka-angkla sa gilagid
+  (`CERVICAL_Y`). Ang tooth number labels ay nasa harap ng gilagid at hindi na naka-mirror kapag tinitingnan mula sa likod.
+- **Extracted:** abo at translucent, at hindi pwedeng drawing-an (walang ink layer).
+- **Laki ng file:** `teeth.glb` ~1.5 MB (KHR_mesh_quantization). Lazy pa rin, dina-download lang pagbukas ng 3D Chart.
+
+> ⚠️ **Caveat sa lumang drawings:** ang mga 3D stroke na na-save **bago** ang pagbabagong ito sa mesial/distal ng ngipin
+> na dating hindi naka-mirror ay maaaring lumabas sa kabilang gilid ng ngipin. Tama pa rin ang naka-save na `surface`
+> at ang 2D chart, ang posisyon lang ng lumang guhit sa 3D ang posibleng iba.
+
+| Name | Type | Purpose |
+|---|---|---|
+| `client/scripts/prep-procedural-teeth.cjs` | **NEW** | 16 GLB → `teeth.glb` + `teethExtents.json`; region per triangle; UV atlas; quantized output. Gamit: `node scripts/prep-procedural-teeth.cjs <folder ng tooth1..16.glb>`. |
+| `client/scripts/teeth-source/generate_teeth.py`, `README.md` | **NEW** | Ang generator at paano mag-regenerate. |
+| `client/src/assets/models/teeth.glb` | MODIFIED (pinalitan) | Bagong 16 na ngipin. Ang luma ay nasa git history. |
+| `client/src/assets/models/teethExtents.json` | **NEW** | Lapad/taas/kapal ng bawat ngipin. |
+| `client/src/components/chart/Tooth3D.jsx` | MODIFIED | `toothNodeName` (upper/lower), `toothExtents`, `surfaceForUV`, bagong `SurfaceLayer` (fills + strokes, pinalitan ang HistoryInkLayer at plane panels), mirror group, bagong material, label. |
+| `client/src/components/chart/Odontogram3D.jsx` | MODIFIED | Arch spacing batay sa extents, `toothTransform` (may `labelY`, `mesialOnPositiveX`), Save Mark gamit `surfaceForUV`. |
+| `client/scripts/extract-tooth-set.cjs`, `extract-tooth-model.js` | (hindi ginalaw) | Luma, **hindi na ginagamit**; iniwan bilang reference. |
+
+**Na-verify (local, Edge via Playwright):** drawing test **14/14**: pen off = orbit lang; pen on → pending banner; 2nd stroke;
+naka-lock ang ibang ngipin habang may pending; Undo; Discard; Save Mark → modal "Tooth 22 — Facial / Buccal" → save →
+nananatili pagka-reload (at lumalabas sa 2D/print bilang Facial); surface detection: 11 Mesial, 21 Mesial, 32 Facial.
+Mirror test (mesial = pink, distal = yellow sa 12 ngipin, 4 quadrant): lahat ng pink ay nakaharap sa midline.
+Regression: functional **22/22**, forms **41/41**, phone **7/7**, sweep **60/60**, 2D chart + Print Chart OK, 3D sa
+768px at 400px OK, 0 console errors, build pasado. Nilinis ang test patients. **Hindi pa naka-push.**
+
+---
+
+## 17. Mas Realistic na Gums at Pwesto ng Ngipin (3D Chart)
+
+**Problema (dati):** bilog na arko (75°) ang pwesto ng mga ngipin, kaya ~10 cm ang lapad sa likod at mababaw: parang
+pamaypay, hindi bibig. Ang gums ay simpleng tubo na nakalutang sa itaas at ibaba ng ngipin.
+
+**Ayos:**
+- **Totoong hugis ng arch (ovoid):** batay sa karaniwang sukat ng adult (mm): bilugan sa harap, halos tuwid ang molars
+  sa likod. Mas makitid ang lower sa harap. 1 unit ≈ 10 mm (tugma sa lapad ng mga ngipin sa model, kaya halos eksaktong
+  tumatama ang bawat ngipin sa karaniwang posisyon nito).
+- **Normal na kagat:** ang upper ay nasa harap at labas ng lower (overjet ~2.3 mm). Lahat ng dulo ng crown ay nasa iisang
+  occlusal plane, bahagyang nakabuka para makita at madrawingan pa rin ang biting surfaces.
+- **Hilig ng ngipin:** ang incisors ay nakahilig pasulong (upper 14°/11°, lower 9°/8°), bahagya ang canine, tuwid ang likod.
+  Umiikot sa leeg ng ngipin, kaya nananatiling nakabaon sa gums.
+- **Bagong gums (`Gingiva.jsx`)**, parang dental study model: scalloped na gilid na kumukurba sa leeg ng bawat ngipin at
+  tumutulis sa pagitan (papilla); facial at lingual na pader na may umbok; maputla malapit sa ngipin, mas mapula sa itaas;
+  basang kinang; bilugang dulo sa likod ng huling molar; at **palate** (ngalangala) sa upper.
+- **Mas magkakadikit ang ngipin** (`TOOTH_GAP` 0.04 → 0.015), parang totoong contact points.
+- **Tooth number** nakadikit sa gums, puti na may outline para mabasa sa pink.
+- Camera at ilaw inayos (hemisphere fill light) para kita ang buong harap ng arch, pati sa phone.
+- **Walang binago sa data, drawing, o classification.** Pareho pa rin ang geometry ng bawat ngipin (UV), kaya ang mga
+  naka-save na drawing ay nasa parehong lugar pa rin sa ngipin.
+
+| Name | Type | Purpose |
+|---|---|---|
+| `client/src/components/chart/archLayout.js` | **NEW** | Arch curves (mm control points → CatmullRom, arc-length), `ARCHES`, `toothPlacement()` (pivot sa cervical line, `rotationY`, `tiltX`, mirror), `archFrame()`, `marginAt()` (scalloped), `thicknessAt()`. |
+| `client/src/components/chart/Gingiva.jsx` | **NEW** | Gum mesh (sweep ng cross-section sa kahabaan ng arch, vertex colors) + palate. Pinalitan ang `GumRidge`. |
+| `client/src/components/chart/Odontogram3D.jsx` | MODIFIED | Gumagamit ng `archLayout`/`Gingiva`; tinanggal ang lumang circular arc at `GumRidge`; camera, target, hemisphere light. |
+| `client/src/components/chart/Tooth3D.jsx` | MODIFIED | `position` = leeg ng ngipin; bagong `tiltX` prop; pinagsama ang flip/mirror/lift sa isang group; puting label na may outline. |
+
+**Na-verify (local, Edge via Playwright):** drawing test **14/14** (pen, undo, discard, lock, save, reload; 22 Facial, 11 at 21
+Mesial, 32 Facial), plus occlusal ng molar 48 mula sa side view; mirror test (mesial nakaharap sa midline sa lahat ng quadrant);
+functional 22/22, phone 7/7, sweep 60/60; 2D/Print Chart OK; 3D sa 768px at 400px OK; 0 console errors; build pasado.
+Nilinis ang test patients. **Hindi pa naka-push.**
+
+---
+
+## 18. Bagong Navigation (Sidebar) + X-ray Inbox + Legacy Record Migration + Settings
+
+Batay sa mockup at sa proposal paper (`DENTAVAULT_FORSOFTBIND.pdf`): "Legacy Record Migration" (bulk import via
+CSV/Excel templates + guided manual entry for treatment histories), "notifies the dentist" kapag may X-ray galing email,
+at ang Notifications/Alerts sa dashboard wireframe. **Hindi** ginawa ang top-level "Dental Chart" (laging para sa
+isang patient, nasa profile na) at "Feedback" (wala sa proposal).
+
+### A. Navigation
+- **lg pataas: sidebar** (logo, Find patient, menu, account sa ibaba). Phone/tablet: top bar + **bottom tab bar**
+  (Dashboard, Patients, X-rays, Audit Log, **More** → Migration, Settings). Bumalik ang sidebar dahil 6 na ang menu.
+- Ang badge ng bagong email X-ray ay nasa **X-ray Inbox** na (dati sa Patients).
+- Patient account: My Record + Settings. Account menu: Settings, Change password, Sign out.
+- Dahil hanggang `lg` na ang bottom bar, ang sticky Register footer at toasts ay `lg:bottom-0` na (dati `md`).
+
+### B. X-ray Inbox (`/xrays`, dentist)
+- Lahat ng X-ray na dumating sa email, buong clinic: **New** (hindi pa nabubuksan) / **All from email**.
+- **Open** → profile ng patient, diretso sa X-rays tab (doon nagiging "reviewed", gaya ng dati). **Mark reviewed** nang
+  hindi binubuksan. Dashboard tile "Unreviewed X-rays" → dito.
+- **Emails from unknown senders** (huling 90 araw, galing sa audit log `INBOUND_XRAY_EMAIL_UNMATCHED`): hindi naiimbak
+  ang mga ito, kaya dito lang makikita para maidagdag ang email sa tamang patient.
+
+### C. Legacy Record Migration (`/migration`, dentist) — pinalitan ang Import modal
+- **Bulk Import**, 5 hakbang gaya ng mockup: Upload → **Map Columns** (auto-match: "First Name", "Surname", "Gender",
+  "Birthdate", "Phone"...; puwedeng palitan) → **Validate** (dry run sa server, walang isinusulat) → **Preview &
+  Confirm** → Complete. CSV o JSON; Excel = "Save As CSV" (walang bagong library).
+- **Manual Entry**: hanapin ang patient (o i-register muna), i-encode ang lahat ng lumang visit (date, procedure, tooth,
+  notes), isang Save. Sinusuri muna ng server ang **lahat**: kapag may mali, walang mase-save at sinasabi ang row.
+- Ang "Import Records" sa Patients ay link na papunta rito. Gumagana pa rin ang lumang CSV format (walang mapping).
+
+### D. Settings (`/settings`, dentist at patient)
+Account (pangalan, email, role, Change password), **email ng clinic para sa X-ray** (bagong `CLINIC_XRAY_EMAIL` sa
+`.env`; ang address na naka-set sa Mailgun route), at para sa dentist: gaano katagal itinatago ang audit log.
+
+| Name | Type | Purpose |
+|---|---|---|
+| `client/src/layouts/AppLayout.jsx` | MODIFIED | Sidebar (lg+), top bar + bottom tab bar + `MoreMenu` (below lg), bagong menu items, badge sa X-ray Inbox. |
+| `client/src/pages/XrayInboxPage.jsx` | **NEW** | Inbox: filter, table/cards, Open, Mark reviewed, pagination, unknown senders. |
+| `client/src/pages/MigrationPage.jsx` | **NEW** | Pagpili ng Manual Entry / Bulk Import. |
+| `client/src/components/migration/BulkImportWizard.jsx` | **NEW** | 5-step wizard (stepper, mapping, dry run, confirm). |
+| `client/src/components/migration/LegacyTreatmentEntry.jsx` | **NEW** | Patient picker + maraming lumang visit, batch save. |
+| `client/src/components/migration/ImportResultLists.jsx` | **NEW** | Bilang at listahan ng resulta (galing sa lumang modal). |
+| `client/src/pages/SettingsPage.jsx`, `services/settings.js` | **NEW** | Settings page at API wrapper. |
+| `client/src/components/patients/ImportPatientsModal.jsx` | **BINURA** | Pinalitan ng Migration page. |
+| `client/src/App.jsx` | MODIFIED | Routes `/xrays`, `/migration` (dentist), `/settings` (lahat). |
+| `client/src/pages/PatientsListPage.jsx` | MODIFIED | "Import Records" → link sa `/migration`. |
+| `client/src/pages/PatientProfilePage.jsx`, `utils/selectedPatient.js` | MODIFIED | `profileState(code, { tab })`: bumubukas sa tamang tab. |
+| `client/src/pages/DashboardPage.jsx` | MODIFIED | Unreviewed X-rays tile → `/xrays`. |
+| `client/src/services/{xrays,patients,patientImport}.js` | MODIFIED | `getXrayInbox`, `markXrayReviewed`, `addTreatmentsBatch`, `previewImportFile`, `importPatientsFile(file, { mapping, dryRun })`. |
+| `client/src/utils/auditAction.js` | MODIFIED | Labels: VIEW_XRAY_INBOX, MARK_XRAY_REVIEWED, MIGRATE_TREATMENT_HISTORY. |
+| `client/src/components/patients/PatientForm.jsx`, `context/ToastContext.jsx` | MODIFIED | `md:bottom-0` → `lg:bottom-0` (bottom bar hanggang lg na). |
+| `server/src/models/xrayModel.js` | MODIFIED | `listInboxXrays({ status, limit, offset })` (JOIN patients, walang numeric patient id sa response). |
+| `server/src/models/auditLogModel.js` | MODIFIED | `listUnmatchedInboundEmails()`. |
+| `server/src/controllers/xrays.controller.js`, `routes/xrays.routes.js` | MODIFIED | `GET /xrays/inbox`, `PUT /xrays/:id/reviewed` (dentist). |
+| `server/src/services/patientImportService.js` | MODIFIED | Orihinal na headers, `suggestMapping()` (aliases), `previewImport()`, `importPatients(..., { mapping, dryRun })`. |
+| `server/src/controllers/patientImport.controller.js`, `routes/patients.routes.js` | MODIFIED | `POST /patients/import/preview`, `?dryRun=1`, `mapping`; `POST /patients/:code/treatments/batch`. |
+| `server/src/controllers/patients.controller.js` | MODIFIED | `addTreatmentsBatch` (max 50, all-or-nothing validation, audit `MIGRATE_TREATMENT_HISTORY`). |
+| `server/src/controllers/settings.controller.js`, `routes/settings.routes.js`, `routes/index.js` | **NEW**/MODIFIED | `GET /api/settings`. |
+| `server/.env.example` | MODIFIED | `CLINIC_XRAY_EMAIL`. |
+| `.claude/skills/dentavault-ui/SKILL.md` | MODIFIED | Bagong navigation pattern. |
+
+**Na-verify (local, Edge via Playwright + API):** bagong API tests **23/23** (inbox, mark reviewed, preview/auto-map, dry run
+walang isinusulat, kulang na mapping = 422, totoong import, lumang format, batch + all-or-nothing); navigation/flow E2E
+**54/54** (sidebar sa 1366, bottom bar + More sa 768 at 390, tile → inbox, Open → X-rays tab, buong wizard hanggang
+Complete, manual entry 2 visit, Settings, account menu; 0 overflow, 0 console error); patient: My Record + Settings lang,
+`/xrays` at `/migration` → sariling record. Regression: functional 22/22, forms 41/41, phone 7/7, sweep 60/60, API 25/25.
+Build pasado (main 251 KB). Nilinis ang test data. **Hindi pa naka-push.**
+
+### Mga napansin sa paper na HINDI pa tugma sa system (para sa team)
+1. **Patient upload ng X-ray sa app**: sa Functional Requirements at Patient Dashboard wireframe, may "Upload X-ray Image"
+   ang patient; sa system, email lang (Mailgun). Gawin, o linawin sa paper na email ang paraan.
+2. **Print ng 3D chart**: "Print the graphical dental chart (2D or 3D view)"; 2D lang ang Print Chart.
+3. **Excel**: "CSV/Excel templates"; CSV lang (Save As CSV).
+4. **Search by ID**: tinanggal sa #7 (hiling ng adviser); "name or ID" pa rin sa paper.
+5. **Kulay ng Caries**: red sa paper, magenta na (#12, color-blind safe).
+6. **ERD**: iba sa totoong database (hal. `roles` table, `middle_name`, `chief_complaint`/`diagnosis`, `dental_chart_records`).
+   I-update ang Figure 29 ayon sa aktwal na schema.
+7. **"Encrypting data at rest"** (Review of Related Literature): HTTPS at password hashing ang meron; kumpirmahin kung
+   naka-encrypt ang database storage (Aiven) bago sabihin ito sa defense.

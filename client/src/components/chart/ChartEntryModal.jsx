@@ -1,16 +1,22 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { AlertTriangle, Clock, History, Loader2 } from 'lucide-react'
 import Modal from '../common/Modal'
-import { CONDITIONS, SURFACES, conditionColor } from '../../constants/dental'
+import { CONDITIONS, SURFACES, conditionColor, toothOrientation } from '../../constants/dental'
 import { getToothHistory } from '../../services/chart'
 import { useToast } from '../../context/ToastContext'
 import { formatDate } from '../../utils/formatDate'
+import { FIELD_LIMITS } from '../../constants/fieldLimits'
+
+// "root_canal" → "Root Canal" (dati raw code ang lumalabas sa "Currently ..."
+// at sa history)
+function conditionLabel(code) {
+  return CONDITIONS.find((c) => c.code === code)?.label || code
+}
 
 // Maliit na version lang 'to ng same 5-region na "envelope" na iginuguhit
 // ng Tooth.jsx, para lang paalalahanan yung dentist kung anong parte ng
-// ngipin yung kinlick niya — hindi na siya orientation-aware kagaya ng
-// totoong chart, kasi decorative lang naman siya, wala namang magbabasa
-// ng mesial/distal dito.
+// ngipin yung kinlick niya. Orientation-aware (parehong mapping ng 2D
+// chart), tignan ang SurfaceIndicator sa baba.
 const ICON_SIZE = 56
 const ICON_MARGIN = 16
 const ICON_INNER = ICON_SIZE - ICON_MARGIN
@@ -22,12 +28,25 @@ const ICON_REGIONS = {
   center: `${ICON_MARGIN},${ICON_MARGIN} ${ICON_INNER},${ICON_MARGIN} ${ICON_INNER},${ICON_INNER} ${ICON_MARGIN},${ICON_INNER}`,
 }
 
-function SurfaceIndicator({ surface }) {
+// BUG FIX: dati `position === surface` ang check — pero top/bottom/left/
+// right/center ang mga position, at mesial/distal/facial/lingual/occlusal
+// ang mga surface, kaya HINDI KAILANMAN nagha-highlight ang isang surface
+// (whole tooth lang ang gumagana). Ngayon, parehong toothOrientation() ng
+// 2D chart (Tooth.jsx) ang gamit, kaya tugma ang highlight sa pinindot.
+function SurfaceIndicator({ surface, toothNumber }) {
   const isWhole = surface === 'whole'
+  const orientation = toothOrientation(toothNumber)
+  const positionToSurface = {
+    [orientation.facialSide]: 'facial',
+    [orientation.lingualSide]: 'lingual',
+    [orientation.mesialSide]: 'mesial',
+    [orientation.distalSide]: 'distal',
+    center: 'occlusal',
+  }
   return (
-    <svg width={ICON_SIZE} height={ICON_SIZE} className="shrink-0 rounded-md bg-slate-50">
+    <svg width={ICON_SIZE} height={ICON_SIZE} className="shrink-0 rounded-md bg-slate-50" aria-hidden="true">
       {Object.entries(ICON_REGIONS).map(([position, points]) => {
-        const highlighted = isWhole || position === surface
+        const highlighted = isWhole || positionToSurface[position] === surface
         return (
           <polygon
             key={position}
@@ -70,6 +89,7 @@ export default function ChartEntryModal({
   onSubmit,
 }) {
   const { showToast } = useToast()
+  const formId = useId()
   const isWholeTooth = surface === 'whole'
   // Yung whole-tooth entry point, dalawang whole-tooth-level facts lang
   // ang ino-offer niya (present vs. missing) — hindi yung mga surface-specific
@@ -162,7 +182,7 @@ export default function ChartEntryModal({
     <Modal title={`Tooth ${toothNumber} — ${surfaceLabel}`} onClose={onClose}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-3">
-          <SurfaceIndicator surface={surface} />
+          <SurfaceIndicator surface={surface} toothNumber={toothNumber} />
           <div className="text-base text-slate-500">
             {isWholeTooth ? (
               <p>Whether the tooth is present or extracted — applies to all 5 surfaces at once.</p>
@@ -185,7 +205,7 @@ export default function ChartEntryModal({
           <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500">
             <p className="flex items-center gap-1.5">
               <Clock className="h-3.5 w-3.5" />
-              Currently <span className="font-medium text-slate-700">{currentEntry.condition_code}</span>
+              Currently <span className="font-medium text-slate-700">{conditionLabel(currentEntry.condition_code)}</span>
               {' — '}
               {timeAgo(currentEntry.recorded_at)} by {currentEntry.dentist_name}
             </p>
@@ -223,7 +243,7 @@ export default function ChartEntryModal({
                   <div key={h.id} className="border-b border-slate-100 pb-2 text-xs last:border-0 last:pb-0">
                     <div className="flex items-center justify-between gap-2">
                       <span className="font-medium text-slate-700">
-                        {surfaceLabelFor(h.surface)} — {h.condition_code}
+                        {surfaceLabelFor(h.surface)} — {conditionLabel(h.condition_code)}
                       </span>
                       <span className="shrink-0 text-slate-400">{timeAgo(h.recorded_at)}</span>
                     </div>
@@ -236,12 +256,17 @@ export default function ChartEntryModal({
         </div>
 
         <div>
-          <label className="mb-2 block text-base font-medium text-slate-700">Condition</label>
-          <div className="grid grid-cols-2 gap-2.5">
+          <p id={`${formId}-condition`} className="mb-2 block text-base font-medium text-slate-700">
+            Condition
+          </p>
+          {/* radiogroup: para malaman ng screen reader kung alin ang napili */}
+          <div role="radiogroup" aria-labelledby={`${formId}-condition`} className="grid grid-cols-2 gap-2.5">
             {availableConditions.map((c) => (
               <button
                 key={c.code}
                 type="button"
+                role="radio"
+                aria-checked={conditionCode === c.code}
                 onClick={() => setConditionCode(c.code)}
                 className={`flex min-h-12 items-center gap-2.5 rounded-md border px-4 py-3 text-base transition-all duration-150 ${
                   conditionCode === c.code
@@ -270,22 +295,36 @@ export default function ChartEntryModal({
         )}
 
         <div>
-          <label className="mb-1 block text-base font-medium text-slate-700">Notes (optional)</label>
+          <label htmlFor={`${formId}-notes`} className="mb-1 block text-base font-medium text-slate-700">
+            Notes <span className="font-normal text-slate-400">(optional)</span>
+          </label>
           <textarea
+            id={`${formId}-notes`}
             rows={2}
             value={notes}
+            maxLength={FIELD_LIMITS.notes}
             onChange={(e) => setNotes(e.target.value)}
-            className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-100"
+            className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base text-slate-900 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-100"
           />
         </div>
 
-        <button
-          type="submit"
-          disabled={submitting}
-          className="w-full rounded-md bg-sky-600 px-4 py-3 text-base font-semibold text-white transition-colors hover:bg-sky-700 disabled:opacity-50"
-        >
-          {submitting ? 'Saving...' : 'Save Entry'}
-        </button>
+        {/* Dalawang button gaya ng ibang modal (dati Save lang) */}
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="min-h-11 flex-1 rounded-md border border-slate-300 bg-white px-4 py-3 text-base font-medium text-slate-700 transition-colors hover:bg-slate-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={submitting}
+            className="min-h-11 flex-1 rounded-md bg-sky-600 px-4 py-3 text-base font-semibold text-white transition-colors hover:bg-sky-700 disabled:opacity-50"
+          >
+            {submitting ? 'Saving...' : 'Save Entry'}
+          </button>
+        </div>
       </form>
     </Modal>
   )

@@ -5,6 +5,7 @@ import * as patientImportController from '../controllers/patientImport.controlle
 import { authenticate } from '../middleware/auth.js'
 import { requireRole } from '../middleware/rbac.js'
 import { uploadImportFile } from '../config/importUpload.js'
+import { FIELD_LIMITS, notInFuture, stripPhoneFormatting } from '../utils/validators.js'
 
 const router = Router()
 
@@ -15,28 +16,62 @@ router.use(authenticate)
 // yung client check ng kahit sinong tumatawag diretso sa API.
 const PH_MOBILE_PATTERN = /^(09\d{9}|\+639\d{9})$/
 
+// Haba ng bawat field: tignan ang FIELD_LIMITS sa utils/validators.js.
+const maxLength = (field, label) =>
+  body(field)
+    .optional({ values: 'falsy' })
+    .isLength({ max: FIELD_LIMITS[field] })
+    .withMessage(`${label} must be ${FIELD_LIMITS[field]} characters or fewer`)
+
 const patientValidation = [
   body('firstName').trim().notEmpty().withMessage('First name is required'),
+  maxLength('firstName', 'First name'),
   body('lastName').trim().notEmpty().withMessage('Last name is required'),
-  body('sex').isIn(['male', 'female']).withMessage('Sex must be male or female'),
-  body('dateOfBirth').isISO8601().withMessage('A valid date of birth is required'),
-  body('email').optional({ values: 'falsy' }).isEmail().withMessage('Email must be valid'),
+  maxLength('lastName', 'Last name'),
+  // Walang default sa form (dati "Male" na agad), kaya required dito
+  body('sex').isIn(['male', 'female']).withMessage('Select the patient’s sex'),
+  body('dateOfBirth')
+    .isISO8601()
+    .withMessage('A valid date of birth is required')
+    .bail()
+    .custom(notInFuture)
+    .withMessage('Date of birth cannot be in the future'),
+  body('email').optional({ values: 'falsy' }).trim().isEmail().withMessage('Email must be valid'),
+  maxLength('email', 'Email'),
   body('contactNumber')
-    .trim()
+    .customSanitizer(stripPhoneFormatting)
     .notEmpty()
     .withMessage('Contact number is required')
     .bail()
     .matches(PH_MOBILE_PATTERN)
     .withMessage('Contact number must be a valid PH mobile number (09XXXXXXXXX or +639XXXXXXXXX)'),
+  maxLength('address', 'Address'),
+  maxLength('emergencyContactName', 'Emergency contact name'),
   body('emergencyContactPhone')
+    .customSanitizer(stripPhoneFormatting)
     .optional({ values: 'falsy' })
     .matches(PH_MOBILE_PATTERN)
     .withMessage('Emergency contact phone must be a valid PH mobile number (09XXXXXXXXX or +639XXXXXXXXX)'),
+  maxLength('medicalHistory', 'Medical history'),
+  // Kaligtasan ng pasyente: kapag blangko, hindi malaman kung "walang
+  // allergy" o "hindi natanong" — kaya kailangang sagutin ("None" o listahan).
+  body('allergies')
+    .trim()
+    .notEmpty()
+    .withMessage('Allergies is required. Choose "None" if the patient has no known allergies.'),
+  maxLength('allergies', 'Allergies'),
 ]
 
 const treatmentValidation = [
   body('procedureName').trim().notEmpty().withMessage('Procedure name is required'),
-  body('treatmentDate').isISO8601().withMessage('A valid treatment date is required'),
+  maxLength('procedureName', 'Procedure name'),
+  body('treatmentDate')
+    .isISO8601()
+    .withMessage('A valid treatment date is required')
+    .bail()
+    .custom(notInFuture)
+    .withMessage('Treatment date cannot be in the future'),
+  maxLength('notes', 'Notes'),
 ]
 
 // Dentist lang ang nagrerehistro/nag-eedit ng patients at nag-lo-log ng
@@ -51,6 +86,12 @@ router.post('/', requireRole('dentist'), patientValidation, patientsController.c
 // "import"/"export" tapos hindi na kailanman tatakbo itong mga route na
 // 'to.
 router.get('/import/template', requireRole('dentist'), patientImportController.downloadTemplate)
+router.post(
+  '/import/preview',
+  requireRole('dentist'),
+  uploadImportFile.single('file'),
+  patientImportController.previewFile,
+)
 router.post(
   '/import',
   requireRole('dentist'),
@@ -70,6 +111,9 @@ router.post(
   treatmentValidation,
   patientsController.addTreatment,
 )
+
+// Legacy Record Migration → Manual Entry (maraming lumang treatment nang sabay)
+router.post('/:code/treatments/batch', requireRole('dentist'), patientsController.addTreatmentsBatch)
 
 router.get('/:code/summary', patientsController.summary)
 

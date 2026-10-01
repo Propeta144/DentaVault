@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, lazy, Suspense } from 'react'
-import { Navigate, useNavigate } from 'react-router-dom'
+import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import {
   Printer,
   Pencil,
@@ -39,6 +39,7 @@ import PageLoader from '../components/common/PageLoader'
 import { useSelectedPatientCode, openPrintTab, profileState, PROFILE_PATH } from '../utils/selectedPatient'
 import { fullName, sexLabel } from '../utils/patientName'
 import { calculateAge, formatDate } from '../utils/formatDate'
+import useDiscardGuard from '../hooks/useDiscardGuard'
 
 const Odontogram3D = lazy(() => import('../components/chart/Odontogram3D'))
 
@@ -104,7 +105,11 @@ export default function PatientProfilePage() {
   const [treatments, setTreatments] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [tab, setTab] = useState('history')
+  const location = useLocation()
+  // Puwedeng may kasamang tab ang link (hal. X-ray inbox → 'xrays')
+  const [tab, setTab] = useState(() =>
+    ['history', 'chart', 'xrays'].includes(location.state?.tab) ? location.state.tab : 'history',
+  )
   const [chartView, setChartView] = useState('2d')
 
   const [has3DPendingDrawing, setHas3DPendingDrawing] = useState(false)
@@ -115,6 +120,9 @@ export default function PatientProfilePage() {
   const [portalAccount, setPortalAccount] = useState(undefined)
   const [creatingAccount, setCreatingAccount] = useState(false)
   const [resettingPassword, setResettingPassword] = useState(false)
+  // X / Escape / Cancel sa Add Treatment: magtatanong muna kapag may na-type
+  const closeAddTreatment = useCallback(() => setAddingTreatment(false), [])
+  const addTreatmentGuard = useDiscardGuard(closeAddTreatment)
 
   const load = useCallback(() => {
     if (!id) return
@@ -143,11 +151,11 @@ export default function PatientProfilePage() {
     load()
   }, [load])
 
-  async function handleAddTreatment(payload) {
+  async function handleAddTreatment(payload, { keepOpen }) {
     await addTreatment(id, payload)
     await reloadTreatments()
-    setAddingTreatment(false)
     setTab('history') // para makita agad ang bagong entry
+    if (!keepOpen) setAddingTreatment(false) // "Add another" = manatiling bukas
   }
 
   // Kinopya/tinype lang yung URL, o nag-expire yung history state — walang
@@ -402,8 +410,14 @@ export default function PatientProfilePage() {
 
       {/* MODALS */}
       {addingTreatment && (
-        <Modal title={`Add Treatment — ${fullName(patient)}`} onClose={() => setAddingTreatment(false)}>
-          <AddTreatmentForm onSubmit={handleAddTreatment} onCancel={() => setAddingTreatment(false)} />
+        // max-w-2xl: isang linya lang ang bawat procedure button, kaya kasya
+        // ang buong form (pati Save) sa 768px na taas ng laptop
+        <Modal
+          title={`Add Treatment — ${fullName(patient)}`}
+          onClose={addTreatmentGuard.requestClose}
+          maxWidth="max-w-2xl"
+        >
+          <AddTreatmentForm onSubmit={handleAddTreatment} guard={addTreatmentGuard} />
         </Modal>
       )}
 

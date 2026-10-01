@@ -28,6 +28,14 @@ export function AuthProvider({ children }) {
     return data.user
   }
 
+  // Bagong token ang ibinabalik ng server (wala nang mustChangePassword)
+  async function changePassword(currentPassword, newPassword) {
+    const { data } = await api.post('/auth/change-password', { currentPassword, newPassword })
+    localStorage.setItem(TOKEN_KEY, data.token)
+    setUser(data.user)
+    return data.user
+  }
+
   function logout() {
     localStorage.removeItem(TOKEN_KEY)
     setUser(null)
@@ -42,7 +50,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, changePassword }}>
       {children}
     </AuthContext.Provider>
   )
