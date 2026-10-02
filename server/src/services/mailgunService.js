@@ -26,6 +26,46 @@ export function verifyMailgunSignature({ timestamp, token, signature }) {
   return crypto.timingSafeEqual(expectedBuf, signatureBuf)
 }
 
+// Kinukuha ang isang header na idinagdag ni Mailgun sa parsed inbound POST.
+// Ipinapadala ito bilang sariling field (hal. "X-Mailgun-Spf") at nasa loob
+// din ng `message-headers` (JSON na listahan ng [pangalan, value]). Hindi
+// pare-pareho ang capitalization, kaya case-insensitive ang paghahanap.
+function mailgunHeader(body, name) {
+  const wanted = name.toLowerCase()
+  for (const [key, value] of Object.entries(body || {})) {
+    if (key.toLowerCase() === wanted && typeof value === 'string') return value.trim()
+  }
+  try {
+    const headers = typeof body?.['message-headers'] === 'string' ? JSON.parse(body['message-headers']) : null
+    const found = Array.isArray(headers) && headers.find((h) => Array.isArray(h) && String(h[0]).toLowerCase() === wanted)
+    if (found) return String(found[1]).trim()
+  } catch {
+    // sirang JSON: ituring na walang header
+  }
+  return null
+}
+
+// Napapatunayan ng verifyMailgunSignature() na galing kay Mailgun ang
+// request, pero HINDI na ang pasyente talaga ang nagpadala — madaling
+// pekein ang sender address ng email. Kaya tinitingnan din ang SPF result
+// na idinadagdag ni Mailgun: "Pass" = pinahintulutan ng domain ng sender
+// (hal. gmail.com) ang server na nagpadala.
+//
+// SPF lang ang batayan, hindi DKIM: ang `sender` field (envelope sender) ang
+// itinutugma natin sa patient, at iyon mismo ang sinusuri ng SPF. Ang DKIM
+// "Pass" naman ay hindi sinasabi kung KANINONG domain ang pumirma (puwedeng
+// sariling domain ng nagpapanggap), kaya itinatala lang ito.
+//
+// MAILGUN_REQUIRE_SPF=false: para lang sa testing/kung hindi nagpapadala si
+// Mailgun ng header. Default true (ligtas): kapag walang result, hindi pasado.
+export function senderAuthentication(body) {
+  const spf = mailgunHeader(body, 'X-Mailgun-Spf')
+  const dkim = mailgunHeader(body, 'X-Mailgun-Dkim-Check-Result')
+  const required = String(process.env.MAILGUN_REQUIRE_SPF ?? 'true').toLowerCase() !== 'false'
+  const verified = !required || (spf || '').toLowerCase() === 'pass'
+  return { spf, dkim, verified }
+}
+
 // Bare address na yung `sender` field ni Mailgun, pero mag-fallback na
 // lang sa pag-parse galing sa `From` ("Juan Dela Cruz <juan@example.com>")
 // sakaling naiiba ang pagka-configure ng isang route sa inaasahan.

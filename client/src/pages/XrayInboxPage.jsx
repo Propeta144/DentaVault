@@ -6,6 +6,7 @@ import { useToast } from '../context/ToastContext'
 import StatusBadge from '../components/common/StatusBadge'
 import EmptyState from '../components/common/EmptyState'
 import { SkeletonRows } from '../components/common/Skeleton'
+import HeldXrayEmails from '../components/xray/HeldXrayEmails'
 import { PROFILE_PATH, profileState } from '../utils/selectedPatient'
 import { listName } from '../utils/patientName'
 import { formatActivityTime, formatDate } from '../utils/formatDate'
@@ -18,6 +19,8 @@ import { formatActivityTime, formatDate } from '../utils/formatDate'
 // - New: hindi pa nabubuksan; "Open" → diretso sa X-rays tab ng patient
 //   (doon nagiging "reviewed" — parehong patakaran ng dati).
 // - Mark reviewed: kapag alam na ng dentist, hindi na kailangang buksan.
+// - Needs your decision: X-ray emails na hinawakan muna (iisang email ng
+//   ilang patient, o hindi verified ang sender) — ang dentist ang pipili.
 // - Mga email na hindi na-match (hindi kilala ang sender): hindi sila
 //   naiimbak, kaya dito lang makikita para maidagdag ang email sa patient.
 const FILTERS = [
@@ -82,6 +85,7 @@ export default function XrayInboxPage() {
   const xrays = data?.xrays || []
   const totalPages = data ? Math.max(1, Math.ceil(data.total / data.limit)) : 1
   const unmatched = data?.unmatched || []
+  const held = data?.held || []
 
   return (
     <div>
@@ -94,6 +98,8 @@ export default function XrayInboxPage() {
           <p className="text-base text-slate-500">X-rays patients sent by email. Open one to review it in their record.</p>
         </div>
       </div>
+
+      {held.length > 0 && <HeldXrayEmails holds={held} onChanged={load} />}
 
       {/* Filter: New / All (segmented, gaya ng 2D/3D toggle) */}
       <div className="mb-4 inline-flex rounded-lg border border-slate-200 bg-slate-100 p-1" role="tablist" aria-label="Filter">

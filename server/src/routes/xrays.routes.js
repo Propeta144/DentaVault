@@ -40,6 +40,16 @@ router.get('/xrays/unreviewed-count', requireRole('dentist'), xraysController.un
 router.get('/xrays/inbox', requireRole('dentist'), xraysController.inbox)
 router.put('/xrays/:id/reviewed', requireRole('dentist'), xraysController.markReviewed)
 
+// X-ray emails na hinawakan muna (shared email / hindi pumasa sa SPF)
+router.get('/xrays/holds/:holdId/files/:fileId', requireRole('dentist'), xraysController.getHeldFile)
+router.post(
+  '/xrays/holds/:holdId/assign',
+  requireRole('dentist'),
+  [body('patientCode').trim().notEmpty().withMessage('Choose a patient')],
+  xraysController.assignHeld,
+)
+router.post('/xrays/holds/:holdId/dismiss', requireRole('dentist'), xraysController.dismissHeld)
+
 // X-ray-scoped 'to: gumagana sa isang image, base sa sarili niyang id.
 router.get('/xrays/:id/file', xraysController.getFile)
 router.put('/xrays/:id/annotations', requireRole('dentist'), xraysController.updateAnnotations)

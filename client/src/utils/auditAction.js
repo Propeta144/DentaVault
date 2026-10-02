@@ -4,6 +4,7 @@
 // DELETE_PATIENT, ...).
 export function actionVariant(action) {
   if (action.includes('DELETE') || action.includes('FAILED') || action.includes('UNMATCHED')) return 'red'
+  if (action === 'INBOUND_XRAY_EMAIL_HELD') return 'amber' // naghihintay ng desisyon ng dentist
   if (action.includes('CREATE') || action.includes('SUCCESS') || action.includes('IMPORT')) return 'emerald'
   if (action.includes('UPDATE') || action.includes('RESET') || action.includes('ANNOTATE') || action.includes('INBOUND')) return 'sky'
   if (action.includes('EXPORT')) return 'amber'
@@ -45,6 +46,10 @@ const ACTION_LABELS = {
   IMPORT_LEGACY_PATIENTS: { label: 'Imported patient records' },
   INBOUND_XRAY_EMAIL: { label: 'Received an X-ray by email' },
   INBOUND_XRAY_EMAIL_UNMATCHED: { label: 'X-ray email from unknown sender' },
+  INBOUND_XRAY_EMAIL_HELD: { label: 'X-ray email held for review' },
+  VIEW_HELD_XRAY: { label: 'Viewed a held X-ray email', plural: (n) => `Viewed held X-ray files (${n})` },
+  ASSIGN_HELD_XRAY: { label: 'Filed a held X-ray email to a patient' },
+  DISMISS_HELD_XRAY: { label: 'Dismissed a held X-ray email' },
   VIEW_XRAY_INBOX: { label: 'Opened the X-ray inbox' },
   MARK_XRAY_REVIEWED: { label: 'Marked an X-ray as reviewed', plural: (n) => `Marked ${n} X-rays as reviewed` },
   MIGRATE_TREATMENT_HISTORY: { label: 'Encoded past treatments (migration)' },
@@ -65,7 +70,7 @@ export function actionLabel(action, count = 1) {
 // patientId (numeric na internal ID — Feature #7: walang patient ID sa
 // screen; nasa "Patient" column na ang pangalan) at messageId (mahabang
 // email header, walang silbi sa dentist).
-const HIDDEN_DETAIL_KEYS = new Set(['patientId', 'messageId', 'propagatedToAllSurfaces'])
+const HIDDEN_DETAIL_KEYS = new Set(['patientId', 'messageId', 'propagatedToAllSurfaces', 'holdId', 'dkim'])
 
 const DETAIL_FORMATTERS = {
   name: (v) => `Patient: ${v}`,
@@ -82,6 +87,10 @@ const DETAIL_FORMATTERS = {
   treatmentsAddedCount: (v) => `${v} treatments added`,
   duplicateCount: (v) => `${v} duplicates`,
   errorCount: (v) => `${v} errors`,
+  reason: (v) => (v === 'shared_email' ? 'Email shared by several patients' : v === 'unverified_sender' ? 'Sender not verified' : v),
+  matchCount: (v) => `${v} matching patient${Number(v) === 1 ? '' : 's'}`,
+  fileCount: (v) => `${v} file${Number(v) === 1 ? '' : 's'}`,
+  spf: (v) => `Sender check (SPF): ${v}`,
 }
 
 export function formatAuditDetails(details) {
@@ -104,7 +113,7 @@ export function auditPatientName(log) {
 // VIEW_XRAY bawat thumbnail (6 na X-ray → 6 na row). Pinagsasama sila sa
 // isang row kapag magkakasunod, parehong user, parehong patient, at nasa
 // loob ng 2 minuto mula sa una.
-const GROUPABLE = new Set(['VIEW_XRAY', 'CREATE_CHART_ENTRY', 'ANNOTATE_XRAY', 'LOGIN_FAILED'])
+const GROUPABLE = new Set(['VIEW_XRAY', 'VIEW_HELD_XRAY', 'CREATE_CHART_ENTRY', 'ANNOTATE_XRAY', 'LOGIN_FAILED'])
 const GROUP_WINDOW_MS = 2 * 60 * 1000
 
 // Bawat group: { ...unang log (pinakabago), count, logs: [lahat] }.

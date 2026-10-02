@@ -102,6 +102,19 @@ export const create = asyncHandler(async (req, res) => {
   res.status(201).json({ patient })
 })
 
+// Babala sa Register/Edit form: may ibang patient na bang gumagamit ng
+// email na 'to? Hindi bawal (normal sa pamilya na iisa ang email), pero
+// kailangang malaman ng dentist na ang X-ray na ipapadala mula rito ay
+// hindi na awtomatikong mafa-file — siya ang pipili sa X-ray Inbox.
+// `exceptCode`: ang patient na ine-edit (hindi kasama ang sarili).
+export const emailUsage = asyncHandler(async (req, res) => {
+  const email = String(req.query.email || '').trim()
+  if (!email) return res.json({ patients: [] })
+  const except = req.query.exceptCode ? await patientModel.findPatientByCode(req.query.exceptCode) : null
+  const rows = await patientModel.findPatientsByEmail(email, { exceptId: except?.id ?? null })
+  res.json({ patients: rows.map((p) => ({ first_name: p.first_name, last_name: p.last_name })) })
+})
+
 export const getOne = asyncHandler(async (req, res) => {
   const patient = await patientModel.findPatientByCode(req.params.code)
   if (!patient) throw new AppError('Patient not found', 404)

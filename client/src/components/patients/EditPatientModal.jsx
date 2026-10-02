@@ -47,6 +47,7 @@ export default function EditPatientModal({ patient, onClose, onSaved }) {
         onSubmit={handleSubmit}
         submitLabel="Save Changes"
         guard={guard}
+        patientCode={patient.patient_code}
       />
     </Modal>
   )

@@ -1,9 +1,10 @@
 import { validationResult } from 'express-validator'
 import * as xrayModel from '../models/xrayModel.js'
 import * as patientModel from '../models/patientModel.js'
+import * as xrayHoldModel from '../models/xrayHoldModel.js'
 import { recordAuditLog, listUnmatchedInboundEmails } from '../models/auditLogModel.js'
 import { canAccessPatientRecord } from '../middleware/rbac.js'
-import { storeXrayFile, resolveXrayFile } from '../services/xrayStorageService.js'
+import { storeXrayFile, resolveXrayFile, deleteXrayFile } from '../services/xrayStorageService.js'
 import asyncHandler from '../utils/asyncHandler.js'
 import AppError from '../utils/AppError.js'
 
@@ -32,9 +33,14 @@ export const list = asyncHandler(async (req, res) => {
 // Sidebar badge count 'to — dentist-only (tignan route), kaya hindi na
 // kailangan ng patient-record access check dito: global count naman 'to,
 // hindi scoped sa isang chart lang.
+// Kasama ang mga email na naghihintay ng desisyon (holds), dahil pareho
+// silang "may kailangang tingnan sa X-ray Inbox".
 export const unreviewedCount = asyncHandler(async (req, res) => {
-  const count = await xrayModel.countUnreviewedEmailXrays()
-  res.json({ count })
+  const [unreviewed, held] = await Promise.all([
+    xrayModel.countUnreviewedEmailXrays(),
+    xrayHoldModel.countPendingHolds(),
+  ])
+  res.json({ count: unreviewed + held })
 })
 
 // X-ray inbox (dentist-only, tignan route): lahat ng X-ray na natanggap sa
@@ -45,10 +51,11 @@ export const inbox = asyncHandler(async (req, res) => {
   const status = req.query.status === 'all' ? 'all' : 'new'
   const page = Math.max(1, Number(req.query.page) || 1)
   const limit = 20
-  const [{ rows, total }, unreviewed, unmatched] = await Promise.all([
+  const [{ rows, total }, unreviewed, unmatched, held] = await Promise.all([
     xrayModel.listInboxXrays({ status, limit, offset: (page - 1) * limit }),
     xrayModel.countUnreviewedEmailXrays(),
     listUnmatchedInboundEmails(),
+    xrayHoldModel.listPendingHolds(),
   ])
 
   await recordAuditLog({
@@ -59,7 +66,7 @@ export const inbox = asyncHandler(async (req, res) => {
     ipAddress: req.ip,
   })
 
-  res.json({ xrays: rows, total, page, limit, status, unreviewedCount: unreviewed, unmatched })
+  res.json({ xrays: rows, total, page, limit, status, unreviewedCount: unreviewed, unmatched, held })
 })
 
 // "Mark as reviewed" mula sa inbox, nang hindi binubuksan ang X-ray (hal.
@@ -76,6 +83,75 @@ export const markReviewed = asyncHandler(async (req, res) => {
     details: { patientId: xray.patient_id },
     ipAddress: req.ip,
   })
+  res.status(204).send()
+})
+
+// --- X-ray emails na hinawakan muna (shared email / hindi pumasa sa SPF) ---
+// Dentist-only lahat (tignan route). Tignan webhooks.controller.js kung
+// kailan nangyayari ang hold.
+
+// Thumbnail/preview para makapagpasya ang dentist kung kanino ito.
+export const getHeldFile = asyncHandler(async (req, res) => {
+  const file = await xrayHoldModel.findHoldFile(req.params.holdId, req.params.fileId)
+  if (!file || file.status !== 'pending') throw new AppError('File not found', 404)
+
+  await recordAuditLog({
+    userId: req.user.userId,
+    action: 'VIEW_HELD_XRAY',
+    entityType: 'inbound_xray_hold',
+    entityId: file.hold_id,
+    ipAddress: req.ip,
+  })
+
+  const { redirectUrl, localPath } = resolveXrayFile(file.file_url)
+  if (redirectUrl) return res.redirect(redirectUrl)
+  res.setHeader('Content-Type', file.mime_type)
+  res.sendFile(localPath)
+})
+
+// I-file sa napiling patient. Kahit sinong patient (hindi lang ang may
+// tugmang email): kung minsan ang tamang pasyente ay ang anak na walang
+// sariling email sa record.
+export const assignHeld = asyncHandler(async (req, res) => {
+  assertValid(req)
+  const patient = await patientModel.findPatientByCode(req.body.patientCode)
+  if (!patient) throw new AppError('Patient not found', 404)
+
+  const count = await xrayHoldModel.assignHold(req.params.holdId, { patientId: patient.id, userId: req.user.userId })
+  if (count === null) throw new AppError('This email was already handled', 409)
+
+  await recordAuditLog({
+    userId: req.user.userId,
+    action: 'ASSIGN_HELD_XRAY',
+    entityType: 'patient',
+    entityId: patient.id,
+    details: { holdId: Number(req.params.holdId), xrayCount: count },
+    ipAddress: req.ip,
+  })
+
+  res.json({ xrayCount: count })
+})
+
+// Hindi ifa-file (hal. spam o hindi kilala). Binubura ang mga file.
+export const dismissHeld = asyncHandler(async (req, res) => {
+  const fileUrls = await xrayHoldModel.dismissHold(req.params.holdId, { userId: req.user.userId })
+  if (fileUrls === null) throw new AppError('This email was already handled', 409)
+
+  await recordAuditLog({
+    userId: req.user.userId,
+    action: 'DISMISS_HELD_XRAY',
+    entityType: 'inbound_xray_hold',
+    entityId: Number(req.params.holdId),
+    details: { fileCount: fileUrls.length },
+    ipAddress: req.ip,
+  })
+
+  // Pagkatapos ng commit: kapag pumalya ang pagbura ng isang file, naka-
+  // dismiss pa rin (hindi na lalabas kahit saan); ila-log lang.
+  for (const url of fileUrls) {
+    await deleteXrayFile(url).catch((err) => console.error('Failed to delete held X-ray file:', err.message))
+  }
+
   res.status(204).send()
 })
 

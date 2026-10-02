@@ -4,6 +4,8 @@ import QuickInputTextarea from '../common/QuickInputTextarea'
 import DiscardChangesBar from '../common/DiscardChangesBar'
 import { FIELD_LIMITS } from '../../constants/fieldLimits'
 import { formatDate, todayISO } from '../../utils/formatDate'
+import { getEmailUsage } from '../../services/patients'
+import { listName } from '../../utils/patientName'
 
 // Walang default ang `sex` (dati "male" na agad): kapag nakalimutang
 // palitan, mali ang record nang walang babala. Required na ito.
@@ -181,6 +183,7 @@ function SexPicker({ value, onChange, error }) {
 //   meron, ito ang tinatawag ng Cancel at dito nanggagaling ang dirty.
 // - onOpenExisting(patientCode): para sa duplicate warning (Register lang)
 // - stickyFooter: Register page lang (laging kita ang Save/Cancel)
+// - patientCode: Edit lang — para hindi isama ang sarili sa "shared email" check
 // onSubmit(form, { allowDuplicate }) — ang form ay may malinis nang
 // contact numbers (walang espasyo/gitling).
 export default function PatientForm({
@@ -191,6 +194,7 @@ export default function PatientForm({
   guard,
   onOpenExisting,
   stickyFooter = false,
+  patientCode,
 }) {
   const [initial] = useState(() => ({ ...EMPTY_FORM, ...initialValues }))
   const [form, setForm] = useState(initial)
@@ -200,6 +204,29 @@ export default function PatientForm({
   const [submitting, setSubmitting] = useState(false)
   const [submitAttempt, setSubmitAttempt] = useState(0)
   const formRef = useRef(null)
+  const [sharedWith, setSharedWith] = useState([]) // ibang patient na may parehong email
+
+  // Babala (hindi bawal): kapag may ibang patient na may ganitong email (hal.
+  // magulang at mga anak), ang X-ray na ipapadala mula rito ay hindi na
+  // awtomatikong mafa-file — ang dentist ang pipili sa X-ray Inbox. Sinusuri
+  // 500ms pagkatapos huminto mag-type.
+  const emailToCheck = form.email.trim()
+  useEffect(() => {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailToCheck)) {
+      setSharedWith([])
+      return undefined
+    }
+    let cancelled = false
+    const timer = setTimeout(() => {
+      getEmailUsage(emailToCheck, patientCode)
+        .then((patients) => !cancelled && setSharedWith(patients))
+        .catch(() => !cancelled && setSharedWith([])) // babala lang; hindi dapat humarang
+    }, 500)
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [emailToCheck, patientCode])
 
   const dirty = JSON.stringify(form) !== JSON.stringify(initial)
   const setDirty = guard?.setDirty
@@ -330,7 +357,19 @@ export default function PatientForm({
             onChange={(e) => update('contactNumber', e.target.value)}
           />
         </Field>
-        <Field label="Email" error={fieldErrors.email}>
+        <Field
+          label="Email"
+          error={fieldErrors.email}
+          hint={
+            sharedWith.length > 0 && (
+              <span className="text-amber-700">
+                Also on {sharedWith.slice(0, 3).map(listName).join('; ')}
+                {sharedWith.length > 3 ? ` and ${sharedWith.length - 3} more` : ''}. X-rays emailed from this address
+                will wait in the X-ray Inbox for you to choose the patient.
+              </span>
+            )
+          }
+        >
           <input
             type="email"
             inputMode="email"

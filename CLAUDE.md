@@ -837,3 +837,53 @@ Dati: parehong parisukat na "envelope" (gitnang square + 4 na trapezoid) ang lah
 (upper/lower, kaliwa/kanan) → tamang surface sa modal; save → tamang kulay; numero → Whole Tooth; extracted → abong hugis
 + X, napipindot pa rin; walang console error. Regression: functional 22/22, forms 41/41 (kasama ang highlight sa modal),
 sweep 60/60, responsive audit 148 screens 0 issues; screenshots ng chart, modal, at Print Chart. Build pasado.
+
+---
+
+## 20. X-ray Email: Shared Email at Pekeng Sender (Hold for Review)
+
+**Problema (dati):** (1) Walang `UNIQUE` sa `patients.email` at `LIMIT 1` ang pagtugma, kaya kapag iisa ang email ng
+magulang para sa mga anak, ang X-ray ay napupunta sa **unang** tugma, at walang babala (puwedeng maling anak).
+(2) Napapatunayan ng Mailgun signature na galing kay Mailgun ang request, pero **hindi** na ang pasyente talaga ang
+nagpadala (madaling pekein ang sender address).
+
+**Ayos:** hindi na awtomatikong ifa-file ang X-ray kapag:
+- **2+ patient ang may ganitong email** (`shared_email`), o
+- **hindi "Pass" ang SPF** ni Mailgun (`unverified_sender`; kasama ang Fail, SoftFail, Neutral, at walang header).
+  SPF lang ang batayan: sinusuri nito ang envelope sender, na siya mismong itinutugma natin. Ang DKIM "Pass" ay hindi
+  sinasabi kung kaninong domain ang pumirma, kaya itinatala lang.
+
+Iniimbak muna ang file (hindi na kailangang ipadala ulit ng pasyente) sa hiwalay na table, kaya **hindi nakikita sa
+kahit anong patient record** hangga't walang desisyon. Sa **X-ray Inbox → "Needs your decision"**: thumbnail (pindutin
+para lumaki), dahilan, at mga button na **"File to <patient>"** (lahat ng may ganitong email) o **Dismiss** (may
+kumpirmasyon; binubura ang file). Ang na-file ay lalabas sa "New" gaya ng karaniwang email X-ray. Kasama sa badge ng
+X-ray Inbox ang mga naghihintay. Walang pagbabago sa unknown sender (hindi pa rin iniimbak).
+
+**Babala sa Register/Edit:** kapag may ibang patient na may parehong email, may amber na paalala sa ilalim ng Email
+("Also on ... X-rays emailed from this address will wait in the X-ray Inbox"). Hindi bawal, dahil normal sa pamilya.
+
+| Name | Type | Purpose |
+|---|---|---|
+| `server/db/migrations/011_add_inbound_xray_holds.sql` | **NEW** | `inbound_xray_holds` (reason, sender, SPF/DKIM, status pending/assigned/dismissed) + `inbound_xray_hold_files`. Napatakbo na sa local. **Kailangang patakbuhin sa Aiven bago/kasabay ng push.** |
+| `server/src/models/xrayHoldModel.js` | **NEW** | `createHold`, `listPendingHolds` (may candidates batay sa kasalukuyang email), `findHoldFile`, `assignHold`/`dismissHold` (transaction; "inaangkin" muna ang hold kaya walang doble kahit dalawang beses pindutin), `countPendingHolds`. |
+| `server/src/models/patientModel.js` | MODIFIED | `findPatientByEmail` (LIMIT 1) → `findPatientsByEmail(email, { exceptId })` (lahat ng tugma). |
+| `server/src/services/mailgunService.js` | MODIFIED | `senderAuthentication()`: SPF/DKIM mula sa field o `message-headers`; `MAILGUN_REQUIRE_SPF` (default true). |
+| `server/src/controllers/webhooks.controller.js` | MODIFIED | 0 tugma = unmatched (dati); 2+ o hindi verified = hold (dedupe sa Message-Id); 1 + SPF Pass = file agad (dati). |
+| `server/src/services/xrayStorageService.js` | MODIFIED | `deleteXrayFile()` (local o Cloudinary), para sa Dismiss lang. |
+| `server/src/controllers/xrays.controller.js`, `routes/xrays.routes.js` | MODIFIED | `held` sa inbox response; badge count + holds; `GET /xrays/holds/:holdId/files/:fileId`, `POST .../assign`, `POST .../dismiss` (dentist). |
+| `server/src/controllers/patients.controller.js`, `routes/patients.routes.js` | MODIFIED | `GET /patients/email-usage?email=&exceptCode=` (dentist; pangalan lang ang ibinabalik). |
+| `server/.env.example` | MODIFIED | `MAILGUN_REQUIRE_SPF=true`. |
+| `client/src/components/xray/HeldXrayEmails.jsx` | **NEW** | "Needs your decision" section. |
+| `client/src/pages/XrayInboxPage.jsx`, `services/xrays.js`, `services/patients.js` | MODIFIED | Section sa itaas ng Inbox; API wrappers. |
+| `client/src/components/patients/PatientForm.jsx`, `EditPatientModal.jsx` | MODIFIED | Shared-email paalala (500ms debounce; hindi kasama ang sarili sa Edit). |
+| `client/src/utils/auditAction.js` | MODIFIED | Labels: INBOUND_XRAY_EMAIL_HELD (amber), VIEW/ASSIGN/DISMISS_HELD_XRAY; readable details (reason, SPF). |
+
+**Na-verify (local, Cloudinary storage):** API **36/36** (form check, SPF Pass/Fail/SoftFail/wala, SPF sa loob ng
+`message-headers`, shared → hold, Mailgun retry = walang doble, unknown sender, bad signature 401, preview, maling hold
+404, patient 403, assign → tamang anak lang, 2nd assign/dismiss 409, nabura ang file sa Cloudinary, audit entries). UI
+sa Edge **22/22** (360/390/768/1366px, 0 overflow, preview, assign, dismiss, Register hint, audit labels, 0 console error).
+Build pasado. Nalinis ang lahat ng test data (DB, Cloudinary, audit).
+**Napansin:** kapag pumalya ang Cloudinary habang tumatanggap ng email, 500 ang sagot, kaya magre-retry si Mailgun at
+walang mawawala. **Hindi pa sakop:** pag-file sa patient na wala sa candidates (hal. anak na walang email sa record):
+mag-Dismiss muna at i-upload nang manual, o idagdag muna ang email sa record. Wala pang `role="dialog"` ang shared
+`Modal` (luma, hindi ginalaw). **Hindi pa naka-push.**

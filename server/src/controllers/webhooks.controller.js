@@ -1,7 +1,8 @@
 import * as patientModel from '../models/patientModel.js'
 import * as xrayModel from '../models/xrayModel.js'
+import * as xrayHoldModel from '../models/xrayHoldModel.js'
 import { recordAuditLog } from '../models/auditLogModel.js'
-import { verifyMailgunSignature, extractSenderEmail } from '../services/mailgunService.js'
+import { verifyMailgunSignature, extractSenderEmail, senderAuthentication } from '../services/mailgunService.js'
 import { storeXrayFile } from '../services/xrayStorageService.js'
 import asyncHandler from '../utils/asyncHandler.js'
 import AppError from '../utils/AppError.js'
@@ -25,20 +26,80 @@ export const mailgunInbound = asyncHandler(async (req, res) => {
   }
 
   const senderEmail = extractSenderEmail({ sender, from })
-  const patient = senderEmail ? await patientModel.findPatientByEmail(senderEmail) : null
+  const matches = senderEmail ? await patientModel.findPatientsByEmail(senderEmail) : []
+  const auth = senderAuthentication(req.body)
 
-  if (!patient) {
+  if (matches.length === 0) {
     await recordAuditLog({
       userId: null,
       action: 'INBOUND_XRAY_EMAIL_UNMATCHED',
       entityType: 'xray_image',
-      details: { senderEmail, subject, messageId },
+      details: { senderEmail, subject, messageId, spf: auth.spf },
       ipAddress: req.ip,
     })
     return res.status(200).json({ status: 'no matching patient' })
   }
 
   const attachments = files.filter((f) => f.fieldname.startsWith('attachment'))
+  const allowed = attachments.filter((f) => ALLOWED_MIME_TYPES.has(f.mimetype))
+
+  // Hindi awtomatikong ifa-file kapag:
+  // - 2+ patient ang may ganitong email (hal. iisang email ng magulang para
+  //   sa mga anak) — dati, LIMIT 1 lang, kaya puwedeng mapunta ang X-ray sa
+  //   maling anak nang walang babala;
+  // - hindi pumasa sa SPF (puwedeng peke ang sender — tignan mailgunService).
+  // Iniimbak muna ang mga file (para hindi na kailangang ipadala ulit ng
+  // pasyente), pero hindi makikita sa kahit anong patient record hangga't
+  // hindi pinipili ng dentist sa X-ray Inbox.
+  const holdReason = matches.length > 1 ? 'shared_email' : !auth.verified ? 'unverified_sender' : null
+  if (holdReason) {
+    if (messageId && (await xrayHoldModel.findHoldByMessageId(messageId))) {
+      return res.status(200).json({ status: 'duplicate' }) // retry ni Mailgun
+    }
+    if (allowed.length === 0) {
+      await recordAuditLog({
+        userId: null,
+        action: 'INBOUND_XRAY_EMAIL_HELD',
+        entityType: 'inbound_xray_hold',
+        details: { senderEmail, subject, messageId, reason: holdReason, matchCount: matches.length, spf: auth.spf, dkim: auth.dkim, fileCount: 0 },
+        ipAddress: req.ip,
+      })
+      return res.status(200).json({ status: 'held', files: 0 })
+    }
+
+    const stored = []
+    for (let i = 0; i < allowed.length; i++) {
+      const file = allowed[i]
+      stored.push({
+        fileUrl: await storeXrayFile(file.buffer, file.originalname),
+        originalFilename: file.originalname,
+        mimeType: file.mimetype,
+        fileSizeBytes: file.size,
+        // parehong patakaran ng dedupeId sa baba
+        dedupeId: messageId ? (allowed.length > 1 ? `${messageId}#${i}` : messageId) : null,
+      })
+    }
+    const holdId = await xrayHoldModel.createHold({
+      reason: holdReason,
+      senderEmail,
+      subject,
+      messageId,
+      spf: auth.spf,
+      dkim: auth.dkim,
+      files: stored,
+    })
+    await recordAuditLog({
+      userId: null,
+      action: 'INBOUND_XRAY_EMAIL_HELD',
+      entityType: 'inbound_xray_hold',
+      entityId: holdId,
+      details: { senderEmail, subject, messageId, reason: holdReason, matchCount: matches.length, spf: auth.spf, dkim: auth.dkim, fileCount: stored.length },
+      ipAddress: req.ip,
+    })
+    return res.status(200).json({ status: 'held', files: stored.length })
+  }
+
+  const patient = matches[0]
   const created = []
 
   for (let i = 0; i < attachments.length; i++) {
@@ -80,7 +141,7 @@ export const mailgunInbound = asyncHandler(async (req, res) => {
     action: 'INBOUND_XRAY_EMAIL',
     entityType: 'patient',
     entityId: patient.id,
-    details: { senderEmail, subject, messageId, xrayCount: created.length },
+    details: { senderEmail, subject, messageId, xrayCount: created.length, spf: auth.spf },
     ipAddress: req.ip,
   })
 
