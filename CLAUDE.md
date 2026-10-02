@@ -886,4 +886,5 @@ Build pasado. Nalinis ang lahat ng test data (DB, Cloudinary, audit).
 **Napansin:** kapag pumalya ang Cloudinary habang tumatanggap ng email, 500 ang sagot, kaya magre-retry si Mailgun at
 walang mawawala. **Hindi pa sakop:** pag-file sa patient na wala sa candidates (hal. anak na walang email sa record):
 mag-Dismiss muna at i-upload nang manual, o idagdag muna ang email sa record. Wala pang `role="dialog"` ang shared
-`Modal` (luma, hindi ginalaw). **Hindi pa naka-push.**
+`Modal` (luma, hindi ginalaw). **Naka-push na** (commit `27c27ca`, 2026-10-02). Napatakbo muna ang migration 011
+sa Aiven bago ang push.
