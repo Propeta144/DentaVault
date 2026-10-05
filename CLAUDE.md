@@ -917,5 +917,5 @@ API key/password sa bundle (walang `import.meta.env` sa client; nasa `server/.en
 2D chart, 3D chart (`teeth.glb` galing `assets/models/`), X-rays tab, Print Summary (bagong tab, may logo); 56 na
 na-load na file, lahat nasa tamang folder at hash-only ang pangalan; 0 asset error, 0 console error; service worker
 activated, 58 JS sa precache, at gumagana ang offline reload. Build pasado (may dati nang babala tungkol sa malaking
-3D chunk, hindi bago). **Hindi pa naka-push.** Pagka-deploy, lalabas ang "A new version of DentaVault is ready" sa
+3D chunk, hindi bago). **Naka-push na** (commit `277928b`, 2026-10-05). Pagka-deploy, lalabas ang "A new version of DentaVault is ready" sa
 mga dating bumisita (normal, bagong file paths).
