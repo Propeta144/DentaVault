@@ -107,6 +107,31 @@ export default defineConfig({
       },
     }),
   ],
+  build: {
+    // Never publish source maps: they would hand the original, readable
+    // source to anyone who opens DevTools. (Vite's default is already off;
+    // this keeps it off on purpose.)
+    sourcemap: false,
+    rolldownOptions: {
+      output: {
+        // Hash-only filenames sorted into folders by type, so DevTools shows
+        // `assets/js/a1B2c3D4.js` instead of `assets/LoginPage-a1B2c3D4.js`
+        // and the build doesn't advertise every page/feature by name.
+        // Frontend JS can't be hidden from the browser that runs it; the real
+        // protection stays on the server (auth, role and record access checks).
+        entryFileNames: 'assets/js/[hash].js',
+        chunkFileNames: 'assets/js/[hash].js',
+        assetFileNames: (asset) => {
+          const name = asset.names?.[0] ?? ''
+          if (name.endsWith('.css')) return 'assets/css/[hash][extname]'
+          if (/\.(png|jpe?g|gif|svg|webp|avif|ico)$/i.test(name)) return 'assets/images/[hash][extname]'
+          if (/\.(glb|gltf)$/i.test(name)) return 'assets/models/[hash][extname]'
+          if (/\.(woff2?|ttf|otf)$/i.test(name)) return 'assets/fonts/[hash][extname]'
+          return 'assets/[hash][extname]'
+        },
+      },
+    },
+  },
   server: {
     port: 5173,
     proxy: {

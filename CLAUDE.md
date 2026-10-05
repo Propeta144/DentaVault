@@ -888,3 +888,34 @@ walang mawawala. **Hindi pa sakop:** pag-file sa patient na wala sa candidates (
 mag-Dismiss muna at i-upload nang manual, o idagdag muna ang email sa record. Wala pang `role="dialog"` ang shared
 `Modal` (luma, hindi ginalaw). **Naka-push na** (commit `27c27ca`, 2026-10-02). Napatakbo muna ang migration 011
 sa Aiven bago ang push.
+
+---
+
+## 21. Build Output: Hash-only Filenames, `js/` Folder, Walang Source Maps (puna ng adviser: "exposed code")
+
+**Puna:** sa DevTools → Sources ng live site, kita ang lahat ng JS file na may pangalan ng page (`LoginPage-...js`,
+`AuditLogPage-...js`), halo-halo sa iisang `assets/` folder. Hiling din: "ilagay ang js file sa js folder".
+
+**Paliwanag para sa defense:** hindi maitatago ang frontend JavaScript (kailangan itong i-download ng browser para
+tumakbo; pareho sa Facebook, nasa `static.xx.fbcdn.net/rsrc.php` ang kanila). Ang magagawa: hindi ipakita ang
+pangalan/istruktura, walang source maps, at walang sikreto sa frontend. **Ang tunay na proteksyon ay nasa server**
+(login, `requireRole`, `canAccessPatientRecord`, 401/403/404). Na-check: walang `.map` files, minified, at walang
+API key/password sa bundle (walang `import.meta.env` sa client; nasa `server/.env` lang ang secrets).
+
+- **A. Folders:** `assets/js/`, `assets/css/`, `assets/images/`, `assets/models/` (`teeth.glb`), `assets/fonts/`.
+- **B. Hash-only filenames:** `LoginPage-u6czFOA1.js` → `assets/js/u6czFOA1.js`. Hindi na kita kung anong page ang bawat file.
+- **C. `sourcemap: false`** (explicit, kahit default na ito).
+- **Hindi ginawa (sinadya):** obfuscation (2–3x laki, mas mabagal, nade-decode pa rin) at pag-block ng right-click/F12 (walang silbi).
+  Hindi rin ginawa ang pag-group ng maliliit na file (napag-usapang "D", standby).
+
+| Name | Type | Purpose |
+|---|---|---|
+| `client/vite.config.js` | MODIFIED | `build.sourcemap: false`; `build.rolldownOptions.output` (`entryFileNames`/`chunkFileNames` → `assets/js/[hash].js`, `assetFileNames` → folder ayon sa uri). |
+
+**Na-verify (production build + `vite preview`, Edge via Playwright, local DB):** **20/20**: login (logo galing
+`assets/images/`), Dashboard, Patients, X-ray Inbox, Audit Log, Migration + Bulk Import (lazy), Settings, profile,
+2D chart, 3D chart (`teeth.glb` galing `assets/models/`), X-rays tab, Print Summary (bagong tab, may logo); 56 na
+na-load na file, lahat nasa tamang folder at hash-only ang pangalan; 0 asset error, 0 console error; service worker
+activated, 58 JS sa precache, at gumagana ang offline reload. Build pasado (may dati nang babala tungkol sa malaking
+3D chunk, hindi bago). **Hindi pa naka-push.** Pagka-deploy, lalabas ang "A new version of DentaVault is ready" sa
+mga dating bumisita (normal, bagong file paths).
