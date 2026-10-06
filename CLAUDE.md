@@ -969,7 +969,7 @@ patient account → sariling record (kahit pekein ang handoff); walang patient c
 hindi napuputol ang mga larawan, umuulit ang table header, lumalabas ang kulay. Screenshots ng lahat ng 5 anggulo, sinuri isa-isa
 (naayos: madilim na upper view, siksik at naputol na mga numero). Regression: 3D chart sa screen (may numero, gumagana ang pen,
 Discard), build/navigation test 19/20 (ang 1 ay timing ng service worker check; hiwalay na check: activated + offline OK).
-**Hindi pa naka-push.**
+**Naka-push na** (commit `d202ffd`, 2026-10-06).
 
 **Paalala:** ang font ng mga numero sa 3D (troika Text) ay galing sa CDN (jsdelivr), gaya ng 3D chart sa screen. Kapag offline (hindi pa nasubok; batay sa code),
 hinihintay ito nang hanggang 10 segundo bago kunan ang larawan. Sa test browser (walang GPU), 3–14 segundo bago maging handa;
@@ -1000,4 +1000,4 @@ Hindi sakop ang Bulk Import (legacy data, puwedeng ibang format ang lumang numer
 | `client/src/utils/phone.js` | **NEW** | `sanitizePhoneInput()`: digits/"+" lang, tamang simula, max haba. |
 | `client/src/components/patients/PatientForm.jsx` | MODIFIED | Contact Number at Emergency Contact Phone gumagamit ng `sanitizePhoneInput`; bagong hint at placeholder. (Pareho sa Register at Edit modal.) |
 
-**Na-verify:** 19 na sample input (typing, paste, maling simula, sobrang haba); build pasado. **Hindi pa naka-push.**
+**Na-verify:** 19 na sample input (typing, paste, maling simula, sobrang haba); build pasado. **Naka-push na** (commit `fc9657c`, 2026-10-06).
