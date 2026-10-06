@@ -292,6 +292,9 @@ export default function Tooth3D({
   onPaintStart,
   onPaintEnd,
   highlighted,
+  // false sa 3D print: doon, hiwalay na inilalagay ang mga numero para
+  // mabasa sa bawat anggulo (tingnan Chart3DSnapshots)
+  showLabel = true,
 }) {
   const { nodes } = useGLTF(teethModelUrl)
   // FDI: quadrant digit + position digit (1-8). Upper (Q1/Q2) at lower
@@ -377,7 +380,7 @@ export default function Tooth3D({
       {/* Tooth number: nakadikit sa harap ng gums (facial side, +Z), ~3 mm
           lampas sa leeg ng ngipin. Labas sa tilt/flip/mirror para laging
           tuwid at nababasa. */}
-      {extents && (
+      {showLabel && extents && (
         <Text
           position={[0, labelY, extents.z + 0.22]}
           fontSize={0.2}

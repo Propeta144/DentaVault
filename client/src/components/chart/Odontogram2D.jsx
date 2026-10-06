@@ -4,7 +4,7 @@ import { TOOTH_BOX } from './toothShape'
 import ChartEntryModal from './ChartEntryModal'
 import { ODONTOGRAM_ROWS, CONDITIONS } from '../../constants/dental'
 import { getCurrentChart, createChartEntry } from '../../services/chart'
-
+import { ColorDot } from './ChartFindings'
 
 // Iisang sukat ng ngipin para sa layout at sa hugis (toothShape.js)
 const TOOTH_SIZE = TOOTH_BOX
@@ -171,11 +171,9 @@ export default function Odontogram2D({ patientId, canEdit }) {
         <ul className="flex flex-wrap gap-x-4 gap-y-1.5" aria-label="Legend">
           {CONDITIONS.map((c) => (
             <li key={c.code} className="flex items-center gap-1.5 text-sm text-slate-600">
-              <span
-                className="h-3 w-3 rounded-full border border-black/10"
-                style={{ backgroundColor: c.color }}
-                aria-hidden="true"
-              />
+              {/* SVG, hindi background color: lumalabas pa rin ang kulay
+                  kapag ipinrint (Print Chart) */}
+              <ColorDot color={c.color} className="h-3 w-3" />
               {c.label}
             </li>
           ))}

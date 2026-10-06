@@ -4,7 +4,8 @@ import { OrbitControls } from '@react-three/drei'
 import { PenLine, Undo2, Save, X } from 'lucide-react'
 import Tooth3D, { mostCommon, surfaceForUV } from './Tooth3D'
 import Gingiva from './Gingiva'
-import { ARCHES, toothPlacement } from './archLayout'
+import { ARCHES } from './archLayout'
+import { TOOTH_PLACEMENTS as PLACEMENTS, SceneLights, groupChartEntries } from './chartScene'
 import ChartEntryModal from './ChartEntryModal'
 import { ODONTOGRAM_ROWS, CONDITIONS, conditionColor } from '../../constants/dental'
 import { getCurrentChart, createChartEntry } from '../../services/chart'
@@ -18,7 +19,6 @@ const NO_STROKES = []
 // Stable na "walang entry" — para hindi mag-recompute ang kulay-layer ng
 // bawat ngipin sa bawat render (hal. habang nagdo-drawing)
 const NO_CHART = {}
-const PLACEMENTS = ODONTOGRAM_ROWS.map((row, rowIndex) => row.map((_, i) => toothPlacement(rowIndex, i)))
 
 // This is the module React.lazy() loads for the 3D tab — kept as a
 // standalone component (not split further) so the lazy import boundary in
@@ -60,15 +60,7 @@ export default function Odontogram3D({ patientId, canEdit, onPendingChange }) {
     load()
   }, [load])
 
-  const chartByTooth = useMemo(
-    () =>
-      entries.reduce((acc, entry) => {
-        acc[entry.tooth_number] ??= {}
-        acc[entry.tooth_number][entry.surface] = entry
-        return acc
-      }, {}),
-    [entries],
-  )
+  const chartByTooth = useMemo(() => groupChartEntries(entries), [entries])
 
   const handleStrokeComplete = useCallback((toothNumber, stroke) => {
     setPending((prev) => {
@@ -200,12 +192,7 @@ export default function Odontogram3D({ patientId, canEdit, onPendingChange }) {
           individual tooth surfaces impractical on small screens. */}
       <div className="h-[480px] overflow-hidden rounded-xl border border-slate-200 bg-slate-50 shadow-sm">
         <Canvas shadows camera={{ position: [0, 2.6, 7.6], fov: 45 }}>
-          <ambientLight intensity={0.6} />
-          {/* Fill light mula sa ibaba, para hindi madilim ang gums at
-              upper teeth kapag tiningnan mula sa ilalim */}
-          <hemisphereLight args={['#ffffff', '#f3d6d4', 0.35]} />
-          <directionalLight position={[4, 6, 6]} intensity={0.9} castShadow />
-          <directionalLight position={[-4, 3, -2]} intensity={0.3} />
+          <SceneLights />
           <OrbitControls
             ref={controlsRef}
             target={[0, 0, -2.2]}

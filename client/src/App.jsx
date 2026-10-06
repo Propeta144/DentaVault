@@ -22,6 +22,7 @@ const PatientProfilePage = lazy(() => import('./pages/PatientProfilePage'))
 const AuditLogPage = lazy(() => import('./pages/AuditLogPage'))
 const PatientSummaryPrintPage = lazy(() => import('./pages/PatientSummaryPrintPage'))
 const ChartPrintPage = lazy(() => import('./pages/ChartPrintPage'))
+const Chart3DPrintPage = lazy(() => import('./pages/Chart3DPrintPage'))
 const XrayPrintPage = lazy(() => import('./pages/XrayPrintPage'))
 const ChangePasswordPage = lazy(() => import('./pages/ChangePasswordPage'))
 const XrayInboxPage = lazy(() => import('./pages/XrayInboxPage'))
@@ -61,6 +62,7 @@ function App() {
                   (tignan utils/selectedPatient.js). */}
               <Route path="patients/profile/summary" element={<PatientSummaryPrintPage />} />
               <Route path="patients/profile/chart/print" element={<ChartPrintPage />} />
+              <Route path="patients/profile/chart/print-3d" element={<Chart3DPrintPage />} />
               <Route path="patients/profile/xray/print" element={<XrayPrintPage />} />
 
               <Route element={<AppLayout />}>

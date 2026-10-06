@@ -379,7 +379,10 @@ export default function PatientProfilePage() {
               </div>
               <button
                 type="button"
-                onClick={() => openPrintTab(`${PROFILE_PATH}/chart/print`, profileState(id))}
+                // Sumusunod sa bukas na view: 2D → 2D print, 3D → 3D print (Feature #22)
+                onClick={() =>
+                  openPrintTab(`${PROFILE_PATH}/chart/${chartView === '3d' ? 'print-3d' : 'print'}`, profileState(id))
+                }
                 className="flex min-h-11 items-center gap-1.5 rounded-md px-2 text-base font-medium text-slate-500 transition-colors hover:bg-slate-50 hover:text-sky-700"
               >
                 <Printer className="h-4 w-4" />
