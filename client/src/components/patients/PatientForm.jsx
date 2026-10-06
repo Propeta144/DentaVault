@@ -6,6 +6,7 @@ import { FIELD_LIMITS } from '../../constants/fieldLimits'
 import { formatDate, todayISO } from '../../utils/formatDate'
 import { getEmailUsage } from '../../services/patients'
 import { listName } from '../../utils/patientName'
+import { sanitizePhoneInput } from '../../utils/phone'
 
 // Walang default ang `sex` (dati "male" na agad): kapag nakalimutang
 // palitan, mali ang record nang walang babala. Required na ito.
@@ -345,16 +346,23 @@ export default function PatientForm({
           nagta-type, kaya ayaw nating i-suggest ng browser ang sariling
           pangalan/numero ng dentist. */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="Contact Number" required error={fieldErrors.contactNumber} hint="PH mobile, e.g. 0917 123 4567">
+        {/* Walang maxLength: ang sanitizePhoneInput na ang naglilimita (11 o
+            13 characters). Kapag may maxLength, napuputol ng browser ang
+            na-paste na "+63 917 123 4567" bago pa malinis ang espasyo. */}
+        <Field
+          label="Contact Number"
+          required
+          error={fieldErrors.contactNumber}
+          hint="PH mobile: 09XXXXXXXXX (11 digits) or +639XXXXXXXXX"
+        >
           <input
             type="tel"
             inputMode="tel"
-            placeholder="09XX XXX XXXX"
-            maxLength={FIELD_LIMITS.contactNumber}
+            placeholder="09XXXXXXXXX"
             autoComplete="off"
             className={inputClass(fieldErrors.contactNumber)}
             value={form.contactNumber}
-            onChange={(e) => update('contactNumber', e.target.value)}
+            onChange={(e) => update('contactNumber', sanitizePhoneInput(e.target.value))}
           />
         </Field>
         <Field
@@ -410,12 +418,11 @@ export default function PatientForm({
           <input
             type="tel"
             inputMode="tel"
-            placeholder="09XX XXX XXXX"
-            maxLength={FIELD_LIMITS.emergencyContactPhone}
+            placeholder="09XXXXXXXXX"
             autoComplete="off"
             className={inputClass(fieldErrors.emergencyContactPhone)}
             value={form.emergencyContactPhone}
-            onChange={(e) => update('emergencyContactPhone', e.target.value)}
+            onChange={(e) => update('emergencyContactPhone', sanitizePhoneInput(e.target.value))}
           />
         </Field>
       </div>

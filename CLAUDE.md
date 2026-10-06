@@ -797,7 +797,7 @@ spreadsheet preview sa Map Columns). Na-check din ang screenshots isa-isa. Regre
 ### Mga napansin sa paper na HINDI pa tugma sa system (para sa team)
 1. **Patient upload ng X-ray sa app**: sa Functional Requirements at Patient Dashboard wireframe, may "Upload X-ray Image"
    ang patient; sa system, email lang (Mailgun). Gawin, o linawin sa paper na email ang paraan.
-2. **Print ng 3D chart**: "Print the graphical dental chart (2D or 3D view)"; 2D lang ang Print Chart.
+2. ~~**Print ng 3D chart**: "Print the graphical dental chart (2D or 3D view)"; 2D lang ang Print Chart.~~ Naayos sa #22.
 3. **Excel**: "CSV/Excel templates"; CSV lang (Save As CSV).
 4. **Search by ID**: tinanggal sa #7 (hiling ng adviser); "name or ID" pa rin sa paper.
 5. **Kulay ng Caries**: red sa paper, magenta na (#12, color-blind safe).
@@ -919,3 +919,85 @@ na-load na file, lahat nasa tamang folder at hash-only ang pangalan; 0 asset err
 activated, 58 JS sa precache, at gumagana ang offline reload. Build pasado (may dati nang babala tungkol sa malaking
 3D chunk, hindi bago). **Naka-push na** (commit `277928b`, 2026-10-05). Pagka-deploy, lalabas ang "A new version of DentaVault is ready" sa
 mga dating bumisita (normal, bagong file paths).
+
+---
+
+## 22. Napi-print na ang 3D Chart (5 anggulo + listahan ng findings)
+
+**Problema:** sa paper, "Print the graphical dental chart (2D or 3D view)", pero 2D lang ang lumalabas sa Print Chart, kahit
+nasa 3D Chart ka. Hindi rin puwedeng i-print nang diretso ang 3D canvas (madalas blangko, at isang anggulo lang).
+
+**Ayos:**
+- **Print Chart sumusunod sa bukas na view:** 2D Chart → 2D print (gaya ng dati); 3D Chart → bagong **3D print**.
+- **3D print** (bagong tab, parehong header gaya ng ibang print page): kinukunan ng larawan ang 3D model mula sa **5
+  nakapirming anggulo**: Front, Upper arch (biting surfaces, tingin mula sa ilalim), Lower arch (biting surfaces, tingin mula
+  sa itaas), Patient's right side, Patient's left side. Puting background, 2400×1600 bawat larawan (malinaw sa papel).
+- **Mga numero ng ngipin** sa bawat larawan: laging nakaharap sa camera at hindi natatakpan ng gums. Sa harap/gilid, numero
+  lang ng mga ngiping nakaharap sa camera (iwas siksikan); sa upper/lower, nasa labas ng arch.
+- **Legend** at **Findings** table (Tooth, Surface, Condition, Notes, Recorded), pinakabagong entry bawat ngipin + surface,
+  nakaayos 11→48. "No findings recorded on the chart yet." kapag wala.
+- **Findings table din sa 2D Print Chart** (hiling ng team, para pareho): kita ang notes at petsa na wala sa mismong chart, at
+  nakasulat ang pangalan ng kondisyon (nababasa kahit black-and-white ang printer). Iisang component (`ChartFindings`).
+- Pareho ang oryentasyon sa 2D chart: sa Front/Upper/Lower, ang kanan ng pasyente ay nasa kaliwa ng larawan (may paalala sa page).
+- Print button ay "Preparing..." hanggang handa ang mga larawan. Lazy pa rin: ang 3D files ay dina-download lang pagbukas ng 3D print.
+- **Walang binago sa server, database, o naka-save na drawing.** Walang bagong library.
+
+**Paano (code):** `Chart3DSnapshots` ay may nakatagong `<Canvas>` (nasa labas ng screen, `frameloop="never"`). Pagka-load ng
+model at ng font ng mga numero, bawat view: ipinapakita lang ang kailangang arch, inilalapit ang camera hanggang kasya
+(`fitCamera`), may "headlight" para pantay ang liwanag, `gl.render()`, tapos `toDataURL()` → `<img>` sa print page.
+Pagkatapos, inaalis ang Canvas (walang WebGL na tumatakbo habang nagpi-print). Iisang scene code ang gamit ng screen at print
+(`chartScene.jsx`).
+
+| Name | Type | Purpose |
+|---|---|---|
+| `client/src/components/chart/Chart3DSnapshots.jsx` | **NEW** | 5 views, `fitCamera`, label placement/visibility, headlight, snapshot → `onDone([{ key, title, src }])`. |
+| `client/src/components/chart/chartScene.jsx` | **NEW** | Shared: `TOOTH_PLACEMENTS`, `groupChartEntries()`, `SceneLights` (dati nasa loob ng `Odontogram3D`). |
+| `client/src/pages/Chart3DPrintPage.jsx` | **NEW** | Ang print page: header, patient info, 5 larawan, legend, findings table. |
+| `client/src/components/chart/ChartFindings.jsx` | **NEW** | Shared Findings table (2D at 3D print) + `ColorDot` (SVG, para lumabas ang kulay sa print). |
+| `client/src/pages/ChartPrintPage.jsx` | MODIFIED | 2D print: kinukuha rin ang `getCurrentChart` at may `ChartFindings` sa ilalim ng odontogram. |
+| `client/src/components/chart/Odontogram2D.jsx` | MODIFIED | Legend: `ColorDot` (SVG) imbes na `<span>` na may background color, para may kulay sa print. |
+| `client/src/components/chart/Odontogram3D.jsx` | MODIFIED | Gumagamit na ng `chartScene.jsx` (walang pagbabago sa itsura o drawing). |
+| `client/src/components/chart/Tooth3D.jsx` | MODIFIED | Bagong `showLabel` prop (default `true`; `false` sa print, doon hiwalay ang mga numero). |
+| `client/src/pages/PatientProfilePage.jsx` | MODIFIED | Print Chart → `chart/print-3d` kapag 3D ang bukas. |
+| `client/src/App.jsx` | MODIFIED | Lazy route `patients/profile/chart/print-3d`. |
+
+**Na-verify (Edge via Playwright, local DB):** e2e **28/28** (kasama ang 2D findings: 42 rows, notes, sariling legend pa rin,
+"No findings" sa walang chart; PDF ng 2D: 2 pahina, chart + simula ng listahan sa unang pahina). Dati: 2D view → 2D print pa rin;
+3D view → 3D print; 5 larawan, walang blangko; findings = bilang sa database (Dela Cruz 42, Mendiola 12); patient na walang chart
+→ "No findings"; refresh ng print tab OK; Print button nakatago sa print; direktang URL na walang state → paalala lang;
+patient account → sariling record (kahit pekein ang handoff); walang patient code sa page; 0 console error. PDF (A4): 3 pahina,
+hindi napuputol ang mga larawan, umuulit ang table header, lumalabas ang kulay. Screenshots ng lahat ng 5 anggulo, sinuri isa-isa
+(naayos: madilim na upper view, siksik at naputol na mga numero). Regression: 3D chart sa screen (may numero, gumagana ang pen,
+Discard), build/navigation test 19/20 (ang 1 ay timing ng service worker check; hiwalay na check: activated + offline OK).
+**Hindi pa naka-push.**
+
+**Paalala:** ang font ng mga numero sa 3D (troika Text) ay galing sa CDN (jsdelivr), gaya ng 3D chart sa screen. Kapag offline (hindi pa nasubok; batay sa code),
+hinihintay ito nang hanggang 10 segundo bago kunan ang larawan. Sa test browser (walang GPU), 3–14 segundo bago maging handa;
+mas mabilis sa laptop na may GPU.
+
+**Naayos din (lumang bug):** sa 2D print, walang kulay ang mga bilog sa legend ng odontogram, dahil background color ang
+gamit (tinatanggal ng browser sa print maliban kung naka-check ang "Background graphics"). Ngayon SVG na (`ColorDot`), kaya may
+kulay na sa papel. Na-verify: PDF na naka-off ang background graphics → may kulay ang legend; sa screen, pareho ang itsura.
+
+---
+
+## 23. Contact Number: PH Mobile Lang ang Puwedeng I-type
+
+Dati, kahit anong character ay puwedeng i-type sa Contact Number at Emergency Contact Phone (hanggang 20); sa pag-Save
+lang lumalabas ang error. Ngayon, habang nagta-type pa lang, **digits lang (at "+" sa unahan)** ang tinatanggap, at
+hindi na makakalampas sa:
+- `09XXXXXXXXX`: **11 digits**, kailangang "09" ang simula, o
+- `+639XXXXXXXXX`: "+63" + 10 digits (13 characters).
+
+Maling simula (hal. "1", "08", "+1") ay hindi tinatanggap. Kapag nag-paste: "0917 123 4567" → `09171234567`,
+"+63 917 123 4567" → `+639171234567`, "9171234567" → `09171234567`, "639171234567" → `+639171234567`.
+Tinanggal ang `maxLength` sa dalawang input (napuputol nito ang na-paste na may espasyo bago pa malinis).
+Walang binago sa server: pareho pa rin ang `PH_MOBILE_PATTERN` check sa `patients.routes.js` (huling proteksyon).
+Hindi sakop ang Bulk Import (legacy data, puwedeng ibang format ang lumang numero).
+
+| Name | Type | Purpose |
+|---|---|---|
+| `client/src/utils/phone.js` | **NEW** | `sanitizePhoneInput()`: digits/"+" lang, tamang simula, max haba. |
+| `client/src/components/patients/PatientForm.jsx` | MODIFIED | Contact Number at Emergency Contact Phone gumagamit ng `sanitizePhoneInput`; bagong hint at placeholder. (Pareho sa Register at Edit modal.) |
+
+**Na-verify:** 19 na sample input (typing, paste, maling simula, sobrang haba); build pasado. **Hindi pa naka-push.**
