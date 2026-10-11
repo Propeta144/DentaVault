@@ -3,7 +3,7 @@
 // yung mahabang listahan ng action codes (CREATE_PATIENT, LOGIN_FAILED,
 // DELETE_PATIENT, ...).
 export function actionVariant(action) {
-  if (action.includes('DELETE') || action.includes('FAILED') || action.includes('UNMATCHED')) return 'red'
+  if (action.includes('DELETE') || action.includes('FAILED') || action.includes('UNMATCHED') || action.includes('RATE_LIMITED')) return 'red'
   if (action === 'INBOUND_XRAY_EMAIL_HELD') return 'amber' // naghihintay ng desisyon ng dentist
   if (action.includes('CREATE') || action.includes('SUCCESS') || action.includes('IMPORT')) return 'emerald'
   if (action.includes('UPDATE') || action.includes('RESET') || action.includes('ANNOTATE') || action.includes('INBOUND')) return 'sky'
@@ -28,7 +28,10 @@ export function humanizeAction(action) {
 // Kapag may bagong action code sa server, idagdag din dito.
 const ACTION_LABELS = {
   LOGIN_SUCCESS: { label: 'Signed in' },
+  LOGOUT: { label: 'Signed out' },
   LOGIN_FAILED: { label: 'Failed sign-in attempt', plural: (n) => `${n} failed sign-in attempts` },
+  LOGIN_RATE_LIMITED: { label: 'Sign-in blocked (too many failed attempts)' },
+  CHANGE_PASSWORD_RATE_LIMITED: { label: 'Password change blocked (too many wrong passwords)' },
   VIEW_DASHBOARD: { label: 'Opened the dashboard' },
   VIEW_AUDIT_LOG: { label: 'Opened the audit log' },
   VIEW_PATIENT: { label: 'Viewed patient record' },
@@ -91,6 +94,8 @@ const DETAIL_FORMATTERS = {
   matchCount: (v) => `${v} matching patient${Number(v) === 1 ? '' : 's'}`,
   fileCount: (v) => `${v} file${Number(v) === 1 ? '' : 's'}`,
   spf: (v) => `Sender check (SPF): ${v}`,
+  limitedBy: (v) => `Limit: ${{ ip: 'per IP address', email: 'per account email', user: 'per account' }[v] ?? v}`,
+  windowMinutes: (v) => `Wait: ${v} min`,
 }
 
 export function formatAuditDetails(details) {

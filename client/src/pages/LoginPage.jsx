@@ -15,7 +15,7 @@ const HIGHLIGHTS = [
 // na may official logo ng clinic (LOGOS/teodosio-rufin-logo.png). Sa phone,
 // form at logo lang. Dati: maliit na card sa gitna ng blangkong screen.
 export default function LoginPage() {
-  const { login } = useAuth()
+  const { login, sessionEnded } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const [email, setEmail] = useState('')
@@ -95,6 +95,16 @@ export default function LoginPage() {
           <p className="mb-6 text-base text-slate-500">Use the account provided by the clinic.</p>
 
           <form onSubmit={handleSubmit}>
+            {/* Pinutol ng server ang session (hal. na-reset ang password o nag-sign
+                out sa ibang device), hindi ang user ang nag-sign out dito */}
+            {sessionEnded && !error && (
+              <div
+                role="status"
+                className="mb-4 rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-base text-sky-800"
+              >
+                Your session has ended. Please sign in again.
+              </div>
+            )}
             {error && (
               <div
                 role="alert"

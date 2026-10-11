@@ -11,7 +11,8 @@ const escapeHtml = (s) =>
 
 // "Print slip" — maliit na papel na maibibigay sa pasyente (mas maayos kaysa
 // isulat sa kung saan). Sariling window na may simpleng HTML; escaped ang
-// lahat ng value.
+// lahat ng value. Walang inline <script> (haharangin ng CSP sa vercel.json):
+// dito na tinatawag ang print, pagka-load ng logo.
 function printCredentialsSlip({ fullName, email, password }) {
   const win = window.open('', '_blank', 'width=480,height=640')
   if (!win) return false
@@ -25,8 +26,12 @@ h1{font-size:18px;margin:24px 0 4px}p{margin:4px 0;font-size:14px}.box{border:1p
 <div class="box"><p>Website: ${escapeHtml(window.location.origin)}</p><p>Email: ${escapeHtml(email)}</p><p>Temporary password: ${escapeHtml(password)}</p></div>
 <p>You will be asked to set your own password the first time you sign in.</p>
 <p class="muted">Keep this slip private. Ask the clinic if you need a new password.</p>
-<script>window.onload=function(){window.print()}</script></body></html>`)
+</body></html>`)
   win.document.close()
+  const logo = win.document.querySelector('img')
+  const print = () => win.print()
+  if (!logo || logo.complete) print()
+  else logo.onload = logo.onerror = print
   return true
 }
 

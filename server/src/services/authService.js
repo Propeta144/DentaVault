@@ -1,10 +1,17 @@
+import crypto from 'node:crypto'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
-import { findUserByEmail, findUserById, updatePasswordHash } from '../models/userModel.js'
+import { findUserByEmail, findUserById, updatePasswordHash, bumpTokenVersion } from '../models/userModel.js'
 import { recordAuditLog } from '../models/auditLogModel.js'
 import AppError from '../utils/AppError.js'
 
 const SALT_ROUNDS = 12
+
+// Para sa login na hindi kilala ang email: kinukumpara pa rin sa isang pekeng
+// hash para pareho ang tagal ng sagot (~bcrypt) kahit may account o wala.
+// Dati, 1–5 ms lang kapag walang account vs ~400 ms kapag meron, kaya
+// nalalaman kung aling email ang naka-register (security review, #26).
+const DUMMY_HASH = bcrypt.hashSync(crypto.randomUUID(), SALT_ROUNDS)
 
 export async function hashPassword(plain) {
   return bcrypt.hash(plain, SALT_ROUNDS)
@@ -14,9 +21,12 @@ export async function hashPassword(plain) {
 // middleware para harangin ang lahat ng ibang API (maliban sa /auth/me at
 // /auth/change-password) hangga't hindi pa napapalitan ang temporary
 // password — server-side, hindi lang redirect sa client.
-function signToken({ id, role, patientId, mustChangePassword }) {
+// `tv` = users.token_version noong nag-login; kapag tumaas na ito sa database
+// (password reset, sign out, na-delete ang patient), hindi na tatanggapin
+// ang token (tignan middleware/auth.js).
+function signToken({ id, role, patientId, mustChangePassword, tokenVersion }) {
   return jwt.sign(
-    { userId: id, role, patientId, ...(mustChangePassword ? { mustChangePassword: true } : {}) },
+    { userId: id, role, patientId, tv: Number(tokenVersion), ...(mustChangePassword ? { mustChangePassword: true } : {}) },
     process.env.JWT_SECRET,
     { expiresIn: process.env.JWT_EXPIRES_IN || '8h' },
   )
@@ -31,6 +41,7 @@ export async function login({ email, password, ipAddress }) {
   const invalidCredentials = () => new AppError('Invalid email or password', 401)
 
   if (!user || !user.is_active) {
+    await bcrypt.compare(password, DUMMY_HASH)
     throw invalidCredentials()
   }
 
@@ -47,7 +58,13 @@ export async function login({ email, password, ipAddress }) {
   }
 
   const mustChangePassword = Boolean(user.must_change_password)
-  const token = signToken({ id: user.id, role: user.role, patientId: user.patient_id, mustChangePassword })
+  const token = signToken({
+    id: user.id,
+    role: user.role,
+    patientId: user.patient_id,
+    mustChangePassword,
+    tokenVersion: user.token_version,
+  })
 
   await recordAuditLog({
     userId: user.id,
@@ -97,4 +114,17 @@ export async function changePassword({ userId, currentPassword, newPassword, ipA
 
   const user = await findUserById(userId)
   return { token: signToken(user), user }
+}
+
+// Sign out: hindi na gagana ang lahat ng token ng user na 'to (lahat ng
+// device), hindi lang binubura sa browser.
+export async function logout({ userId, ipAddress }) {
+  await bumpTokenVersion(userId)
+  await recordAuditLog({
+    userId,
+    action: 'LOGOUT',
+    entityType: 'user',
+    entityId: userId,
+    ipAddress,
+  })
 }

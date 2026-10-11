@@ -11,9 +11,22 @@ import crypto from 'node:crypto'
 // HMAC-SHA256 ng (timestamp + token) gamit yung webhook signing key ng
 // account — tignan
 // https://documentation.mailgun.com/en/latest/user_manual.html#securing-webhooks
+//
+// Edad ng timestamp (security review, #26): parehong timestamp/token/signature
+// ang dala ng bawat retry ni Mailgun, at hanggang ~8 oras siyang nagre-retry,
+// kaya 9 na oras ang pinapayagan (hindi 5 minuto, para hindi mawala ang
+// X-ray na nire-retry). Ang pag-uulit ng parehong token ay hinaharang ng
+// webhookTokenModel.js.
+const MAX_SIGNATURE_AGE_SECONDS = 9 * 60 * 60
+const MAX_CLOCK_SKEW_SECONDS = 5 * 60
+
 export function verifyMailgunSignature({ timestamp, token, signature }) {
   const signingKey = process.env.MAILGUN_WEBHOOK_SIGNING_KEY
   if (!signingKey || !timestamp || !token || !signature) return false
+  if (typeof timestamp !== 'string' || typeof token !== 'string' || typeof signature !== 'string') return false
+
+  const age = Math.floor(Date.now() / 1000) - Number(timestamp)
+  if (!Number.isFinite(age) || age > MAX_SIGNATURE_AGE_SECONDS || age < -MAX_CLOCK_SKEW_SECONDS) return false
 
   const expected = crypto.createHmac('sha256', signingKey).update(timestamp + token).digest('hex')
   const expectedBuf = Buffer.from(expected)
@@ -30,19 +43,31 @@ export function verifyMailgunSignature({ timestamp, token, signature }) {
 // Ipinapadala ito bilang sariling field (hal. "X-Mailgun-Spf") at nasa loob
 // din ng `message-headers` (JSON na listahan ng [pangalan, value]). Hindi
 // pare-pareho ang capitalization, kaya case-insensitive ang paghahanap.
-function mailgunHeader(body, name) {
+//
+// LAHAT ng lugar kung saan ito lumalabas ang ibinabalik (security review,
+// #26): puwedeng maglagay ang nagpapadala ng sarili niyang pekeng
+// "X-Mailgun-Spf: Pass" sa email, kaya hindi puwedeng ang una lang ang
+// tingnan. Tignan ang senderAuthentication sa baba.
+function mailgunHeaderValues(body, name) {
   const wanted = name.toLowerCase()
+  const values = []
   for (const [key, value] of Object.entries(body || {})) {
-    if (key.toLowerCase() === wanted && typeof value === 'string') return value.trim()
+    if (key.toLowerCase() !== wanted) continue
+    for (const v of Array.isArray(value) ? value : [value]) {
+      if (typeof v === 'string') values.push(v.trim())
+    }
   }
   try {
     const headers = typeof body?.['message-headers'] === 'string' ? JSON.parse(body['message-headers']) : null
-    const found = Array.isArray(headers) && headers.find((h) => Array.isArray(h) && String(h[0]).toLowerCase() === wanted)
-    if (found) return String(found[1]).trim()
+    if (Array.isArray(headers)) {
+      for (const h of headers) {
+        if (Array.isArray(h) && String(h[0]).toLowerCase() === wanted) values.push(String(h[1]).trim())
+      }
+    }
   } catch {
     // sirang JSON: ituring na walang header
   }
-  return null
+  return values
 }
 
 // Napapatunayan ng verifyMailgunSignature() na galing kay Mailgun ang
@@ -58,11 +83,18 @@ function mailgunHeader(body, name) {
 //
 // MAILGUN_REQUIRE_SPF=false: para lang sa testing/kung hindi nagpapadala si
 // Mailgun ng header. Default true (ligtas): kapag walang result, hindi pasado.
+//
+// Verified lang kapag "Pass" ang LAHAT ng SPF value na nakita. Kung may
+// pekeng "Pass" pero "Fail" ang totoong resulta ni Mailgun, hindi papasa.
+// (Kapag parehong "Pass", walang problema — pareho naman ang sinasabi.)
 export function senderAuthentication(body) {
-  const spf = mailgunHeader(body, 'X-Mailgun-Spf')
-  const dkim = mailgunHeader(body, 'X-Mailgun-Dkim-Check-Result')
+  const spfValues = mailgunHeaderValues(body, 'X-Mailgun-Spf')
+  const dkimValues = mailgunHeaderValues(body, 'X-Mailgun-Dkim-Check-Result')
+  const spf = spfValues.length ? [...new Set(spfValues)].join(', ') : null
+  const dkim = dkimValues[0] ?? null
   const required = String(process.env.MAILGUN_REQUIRE_SPF ?? 'true').toLowerCase() !== 'false'
-  const verified = !required || (spf || '').toLowerCase() === 'pass'
+  const spfPass = spfValues.length > 0 && spfValues.every((v) => v.toLowerCase() === 'pass')
+  const verified = !required || spfPass
   return { spf, dkim, verified }
 }
 

@@ -7,6 +7,7 @@ import { canAccessPatientRecord } from '../middleware/rbac.js'
 import { storeXrayFile, resolveXrayFile, deleteXrayFile } from '../services/xrayStorageService.js'
 import asyncHandler from '../utils/asyncHandler.js'
 import AppError from '../utils/AppError.js'
+import { queryInt } from '../utils/query.js'
 
 function assertValid(req) {
   const errors = validationResult(req)
@@ -49,7 +50,7 @@ export const unreviewedCount = asyncHandler(async (req, res) => {
 // is processed) — dati badge count lang, walang listahan.
 export const inbox = asyncHandler(async (req, res) => {
   const status = req.query.status === 'all' ? 'all' : 'new'
-  const page = Math.max(1, Number(req.query.page) || 1)
+  const page = queryInt(req.query.page, { min: 1, max: 100000, fallback: 1 })
   const limit = 20
   const [{ rows, total }, unreviewed, unmatched, held] = await Promise.all([
     xrayModel.listInboxXrays({ status, limit, offset: (page - 1) * limit }),

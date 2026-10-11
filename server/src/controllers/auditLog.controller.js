@@ -2,19 +2,20 @@ import * as auditLogModel from '../models/auditLogModel.js'
 import { recordAuditLog } from '../models/auditLogModel.js'
 import asyncHandler from '../utils/asyncHandler.js'
 import { getRetentionConfig } from '../services/auditRetentionService.js'
+import { queryText, queryInt } from '../utils/query.js'
 
 export const list = asyncHandler(async (req, res) => {
-  const page = Math.max(1, Number(req.query.page) || 1)
-  const limit = Math.min(100, Number(req.query.limit) || 50)
+  const page = queryInt(req.query.page, { min: 1, max: 100000, fallback: 1 })
+  const limit = queryInt(req.query.limit, { min: 1, max: 100, fallback: 50 })
   const offset = (page - 1) * limit
 
   const { rows, total } = await auditLogModel.listAuditLogs({
     limit,
     offset,
-    search: req.query.search?.trim(),
-    action: req.query.action?.trim(),
-    dateFrom: req.query.dateFrom?.trim(),
-    dateTo: req.query.dateTo?.trim(),
+    search: queryText(req.query.search),
+    action: queryText(req.query.action),
+    dateFrom: queryText(req.query.dateFrom),
+    dateTo: queryText(req.query.dateTo),
   })
 
   // Yung pag-view ng audit trail mismo, kabilang na rin sa klase ng

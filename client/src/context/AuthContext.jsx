@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react'
-import api from '../services/api'
+import api, { SESSION_ENDED_EVENT } from '../services/api'
 
 const AuthContext = createContext(null)
 const TOKEN_KEY = 'dentavault_token'
@@ -7,6 +7,9 @@ const TOKEN_KEY = 'dentavault_token'
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
+  // true kapag pinutol ng server ang session (hindi ang user ang nag-sign
+  // out): ipinapakita ng LoginPage ang "Your session has ended".
+  const [sessionEnded, setSessionEnded] = useState(false)
 
   useEffect(() => {
     const token = localStorage.getItem(TOKEN_KEY)
@@ -21,9 +24,21 @@ export function AuthProvider({ children }) {
       .finally(() => setLoading(false))
   }, [])
 
+  // Galing sa api.js: 401 sa isang naka-login na request = hindi na valid
+  // ang token sa server (password reset, sign out sa ibang device, atbp.)
+  useEffect(() => {
+    function handleSessionEnded() {
+      clearSession()
+      setSessionEnded(true)
+    }
+    window.addEventListener(SESSION_ENDED_EVENT, handleSessionEnded)
+    return () => window.removeEventListener(SESSION_ENDED_EVENT, handleSessionEnded)
+  }, [])
+
   async function login(email, password) {
     const { data } = await api.post('/auth/login', { email, password })
     localStorage.setItem(TOKEN_KEY, data.token)
+    setSessionEnded(false)
     setUser(data.user)
     return data.user
   }
@@ -36,7 +51,7 @@ export function AuthProvider({ children }) {
     return data.user
   }
 
-  function logout() {
+  function clearSession() {
     localStorage.removeItem(TOKEN_KEY)
     setUser(null)
     // Belt-and-suspenders na lang 'to on top ng per-identity cache-key
@@ -49,8 +64,21 @@ export function AuthProvider({ children }) {
     }
   }
 
+  // Sign out: pinapawalang-bisa rin sa server ang token (hindi lang binubura
+  // sa browser). Hindi hinihintay: kahit offline, naka-sign out pa rin dito.
+  // Explicit ang header kasi nabubura na ang token bago tumakbo ang
+  // request interceptor.
+  function logout() {
+    const token = localStorage.getItem(TOKEN_KEY)
+    if (token) {
+      api.post('/auth/logout', null, { headers: { Authorization: `Bearer ${token}` } }).catch(() => {})
+    }
+    setSessionEnded(false)
+    clearSession()
+  }
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, changePassword }}>
+    <AuthContext.Provider value={{ user, loading, sessionEnded, login, logout, changePassword }}>
       {children}
     </AuthContext.Provider>
   )

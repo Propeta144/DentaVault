@@ -31,7 +31,8 @@ function buildPatientListQuery({ search }) {
 
 export async function listPatients({ search, sort, limit, offset }) {
   const { where, params } = buildPatientListQuery({ search })
-  const orderBy = PATIENT_SORTS[sort] || PATIENT_SORTS.name
+  // Object.hasOwn: para hindi tumama ang "__proto__"/"constructor" (500 dati)
+  const orderBy = Object.hasOwn(PATIENT_SORTS, sort ?? '') ? PATIENT_SORTS[sort] : PATIENT_SORTS.name
 
   const [rows] = await pool.execute(
     `SELECT p.id, p.patient_code, p.first_name, p.last_name, p.sex, p.date_of_birth, p.contact_number, p.email,

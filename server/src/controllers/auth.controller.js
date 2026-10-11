@@ -29,6 +29,12 @@ export const changePassword = asyncHandler(async (req, res) => {
   res.json(result)
 })
 
+// Sign out: pinapawalang-bisa sa server ang token (tignan authService.logout).
+export const logout = asyncHandler(async (req, res) => {
+  await authService.logout({ userId: req.user.userId, ipAddress: req.ip })
+  res.status(204).send()
+})
+
 export const me = asyncHandler(async (req, res) => {
   const user = await findUserById(req.user.userId)
   if (!user) throw new AppError('User not found', 404)

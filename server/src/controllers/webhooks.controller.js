@@ -2,6 +2,7 @@ import * as patientModel from '../models/patientModel.js'
 import * as xrayModel from '../models/xrayModel.js'
 import * as xrayHoldModel from '../models/xrayHoldModel.js'
 import { recordAuditLog } from '../models/auditLogModel.js'
+import { isWebhookTokenUsed, markWebhookTokenUsed } from '../models/webhookTokenModel.js'
 import { verifyMailgunSignature, extractSenderEmail, senderAuthentication } from '../services/mailgunService.js'
 import { storeXrayFile } from '../services/xrayStorageService.js'
 import asyncHandler from '../utils/asyncHandler.js'
@@ -25,6 +26,17 @@ export const mailgunInbound = asyncHandler(async (req, res) => {
     throw new AppError('Invalid signature', 401)
   }
 
+  // Replay protection: nagamit na ang token = na-process na (retry ni
+  // Mailgun) o inuulit ng iba. 200 para tumigil si Mailgun; walang ginagawa.
+  if (await isWebhookTokenUsed(token)) {
+    return res.status(200).json({ status: 'duplicate' })
+  }
+  // Lahat ng matagumpay na sagot ay dito dumadaan: itinatala muna ang token.
+  const done = async (body) => {
+    await markWebhookTokenUsed(token)
+    return res.status(200).json(body)
+  }
+
   const senderEmail = extractSenderEmail({ sender, from })
   const matches = senderEmail ? await patientModel.findPatientsByEmail(senderEmail) : []
   const auth = senderAuthentication(req.body)
@@ -37,7 +49,7 @@ export const mailgunInbound = asyncHandler(async (req, res) => {
       details: { senderEmail, subject, messageId, spf: auth.spf },
       ipAddress: req.ip,
     })
-    return res.status(200).json({ status: 'no matching patient' })
+    return done({ status: 'no matching patient' })
   }
 
   const attachments = files.filter((f) => f.fieldname.startsWith('attachment'))
@@ -54,7 +66,7 @@ export const mailgunInbound = asyncHandler(async (req, res) => {
   const holdReason = matches.length > 1 ? 'shared_email' : !auth.verified ? 'unverified_sender' : null
   if (holdReason) {
     if (messageId && (await xrayHoldModel.findHoldByMessageId(messageId))) {
-      return res.status(200).json({ status: 'duplicate' }) // retry ni Mailgun
+      return done({ status: 'duplicate' }) // retry ni Mailgun
     }
     if (allowed.length === 0) {
       await recordAuditLog({
@@ -64,7 +76,7 @@ export const mailgunInbound = asyncHandler(async (req, res) => {
         details: { senderEmail, subject, messageId, reason: holdReason, matchCount: matches.length, spf: auth.spf, dkim: auth.dkim, fileCount: 0 },
         ipAddress: req.ip,
       })
-      return res.status(200).json({ status: 'held', files: 0 })
+      return done({ status: 'held', files: 0 })
     }
 
     const stored = []
@@ -96,7 +108,7 @@ export const mailgunInbound = asyncHandler(async (req, res) => {
       details: { senderEmail, subject, messageId, reason: holdReason, matchCount: matches.length, spf: auth.spf, dkim: auth.dkim, fileCount: stored.length },
       ipAddress: req.ip,
     })
-    return res.status(200).json({ status: 'held', files: stored.length })
+    return done({ status: 'held', files: stored.length })
   }
 
   const patient = matches[0]
@@ -145,5 +157,5 @@ export const mailgunInbound = asyncHandler(async (req, res) => {
     ipAddress: req.ip,
   })
 
-  res.status(200).json({ status: 'ok', created: created.length })
+  return done({ status: 'ok', created: created.length })
 })

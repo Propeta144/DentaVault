@@ -2,11 +2,14 @@ import { Router } from 'express'
 import { body } from 'express-validator'
 import * as authController from '../controllers/auth.controller.js'
 import { authenticate } from '../middleware/auth.js'
+import { loginLimiterByIp, loginLimiterByEmail, changePasswordLimiter } from '../middleware/rateLimit.js'
 
 const router = Router()
 
 router.post(
   '/login',
+  loginLimiterByIp,
+  loginLimiterByEmail,
   [
     body('email').isEmail().withMessage('A valid email is required'),
     body('password').isLength({ min: 1 }).withMessage('Password is required'),
@@ -15,11 +18,13 @@ router.post(
 )
 
 router.get('/me', authenticate, authController.me)
+router.post('/logout', authenticate, authController.logout)
 
 // Sariling password (lahat ng role). Tignan ang authService.changePassword.
 router.post(
   '/change-password',
   authenticate,
+  changePasswordLimiter,
   [
     body('currentPassword').isLength({ min: 1 }).withMessage('Enter your current password'),
     body('newPassword')

@@ -1001,3 +1001,164 @@ Hindi sakop ang Bulk Import (legacy data, puwedeng ibang format ang lumang numer
 | `client/src/components/patients/PatientForm.jsx` | MODIFIED | Contact Number at Emergency Contact Phone gumagamit ng `sanitizePhoneInput`; bagong hint at placeholder. (Pareho sa Register at Edit modal.) |
 
 **Na-verify:** 19 na sample input (typing, paste, maling simula, sobrang haba); build pasado. **Naka-push na** (commit `fc9657c`, 2026-10-06).
+
+---
+
+## 24. Obfuscation ng Frontend Code (puna ng teacher: kita ang code, imports, at paths sa F12)
+
+**Puna:** sa DevTools → Sources, nababasa pa rin ang logic, ang mga API path (`/patients/export`), routes, at mensahe,
+kahit hash-only na ang filenames (#21). Hiling: "layers" at "encrypt".
+
+**Paliwanag para sa defense:** hindi puwedeng tunay na i-encrypt ang frontend JS (kailangang patakbuhin ito ng browser,
+kaya nasa browser din ang susi). Ang ginawa ay **obfuscation na may 4 na layer**, at ang strings ay naka-**RC4 encode**
+(pinakamalapit sa "encrypt"; dine-decode lang habang tumatakbo). Ang tunay na proteksyon ay nasa **server layer** pa rin
+(auth, `requireRole`, `canAccessPatientRecord`, walang secrets sa frontend). Defense in depth.
+
+| Layer | Epekto |
+|---|---|
+| 1. Identifier renaming | Lahat ng local na pangalan ay pinalitan |
+| 2. String array + RC4 | Walang nababasang API path, route, o mensahe (hal. `n(324,'MxE&')`) |
+| 3. Control flow flattening (0.25) | Ginulo ang daloy ng logic |
+| 4. Dead code injection (0.05) | Kaunting pekeng code |
+| 5. Domain lock (#25) | Tumatakbo lang sa `dentavault.vercel.app` (at localhost); kapag kinopya sa ibang site → blangkong page |
+
+- **Sariling code lang (`client/src`)**, bawat file bago i-bundle. Hindi ginalaw ang React, Three.js, at lucide icons
+  (public libraries; kung isasama, sobrang lalaki ang 3D chunk). Kaya kita pa rin ang mga icon name/SVG path nila.
+- **Chart files (`components/chart/`)**: layers 1–2 lang, para hindi bumagal ang 3D/2D chart.
+- **Lazy loading buo pa rin (#9):** hindi ine-encode ang `import('./pages/...')` (`reservedStrings`).
+- **Production build lang** (`apply: 'build'`). Walang epekto sa `npm run dev`.
+- **Sinadyang off:** `selfDefending` (nasisira kapag minify ulit ng bundler) at `debugProtection` (F12 trap; nakakainis, nalulusutan).
+- **Kita pa rin (hindi maiiwasan):** ang `import{...}from"./DmWTtIqA.js"` sa simula ng bawat file. Ito ang paraan ng
+  browser para pagdugtungin ang mga file; hash lang ang pangalan. Mawawala lang kung iisang malaking file ang buong app,
+  pero masisira ang lazy loading (#9).
+
+**Laki at bilis (sinukat):**
+| | Bago | Pagkatapos |
+|---|---|---|
+| Main file (gzip, unang download) | 77 KB | 103.7 KB (kasama ang domain lock) |
+| Lahat ng JS (gzip) | 482 KB | 743 KB |
+| Login / Dashboard / Patients | ~0.65 / 0.9 / 0.92 s | ~0.63 / 0.89 / 1.03 s |
+| Pagbukas ng patient profile | ~0.13 s | ~0.32 s |
+
+| Name | Type | Purpose |
+|---|---|---|
+| `client/vite.config.js` | MODIFIED | Bagong `obfuscateSource()` plugin (transform, `enforce: 'post'`, `client/src` lang). |
+| `client/package.json`, `package-lock.json` | MODIFIED | devDependency `javascript-obfuscator`. |
+
+**Na-verify (production build + `vite preview`, Edge via Playwright, local DB):** e2e **26/26** (pareho sa build na walang
+obfuscation): login (tama/mali), lahat ng page (Dashboard, Patients, X-ray Inbox, Audit Log, Migration + Bulk Import,
+Settings), Ctrl+K + Escape, profile, Add Treatment modal, 2D chart tooth click → modal, 3D chart, 3D print (5 larawan),
+2D print (findings), Print Summary, X-rays tab, patient account (sariling record, blocked sa Audit Log), 57 lazy JS files
+hash-only, 0 console error, offline reload (service worker). **0** file na may nababasang `/patients`, `/auth`, `/xrays`,
+`/audit-logs`, `/dashboard`, `/settings`. **Hindi pa naka-push.**
+
+---
+
+## 25. Security Hardening: Login Rate Limiting, Library Updates, Domain Lock
+
+Galing sa mabilisang security check pagkatapos ng #24 (hindi pa ito buong security review; iyon ang susunod, kapag may go signal).
+
+### A. Login rate limiting (brute force protection)
+**Problema:** walang limit ang maling login, kaya puwedeng hulaan nang walang tigil ang password.
+- **10 maling subok bawat 15 minuto**, hiwalay ang bilang **bawat IP** at **bawat email** (case-insensitive). Pagkalampas: 429
+  "Too many failed sign-in attempts. Please try again in N minutes." (lumalabas sa login page).
+- **Bawat email** dahil napepeke ang IP sa likod ng Vercel (Gotcha #7): kahit magpalit-palit ng IP, naha-harang pa rin ang
+  paghula sa iisang account. **Kapalit:** kapag may nanghuhula, pansamantalang hindi rin makakapag-login ang may-ari ng account
+  (hanggang 15 minuto, kusang nawawala).
+- **Maling subok lang ang binibilang** (`skipSuccessfulRequests`); hindi naaapektuhan ang normal na pag-login.
+- **Change password** (maling current password): parehong limit, bawat account.
+- **Audit log:** `LOGIN_RATE_LIMITED` / `CHANGE_PASSWORD_RATE_LIMITED` (pula), **isang entry lang bawat lock** (hindi bawat naharang
+  na request, para hindi mapuno ang log). Details: "Limit: per IP address · Wait: 15 min".
+- Nasa memory ng server ang bilang (isang instance lang sa Render): nare-reset kapag nag-restart ang server.
+- Settings sa `.env`: `LOGIN_RATE_LIMIT_MAX` (default 10), `LOGIN_RATE_LIMIT_WINDOW_MINUTES` (default 15). Hindi kailangang i-set sa Render.
+
+### B. Library updates (`npm audit fix`, walang `--force`, patch/minor lang)
+| Saan | Library | Dati → Ngayon | Bigat ng butas |
+|---|---|---|---|
+| server | `proxy-addr` (galing sa Express) | 2.0.7 → 2.0.8 | critical |
+| server | `multer` (X-ray at import upload) | 2.2.0 → 2.4.0 | high |
+| server | `qs`, `morgan`, `csv-parse` | 6.15 → 6.16, 1.11 → 1.12.1, 7.0.1 → 7.0.3 | moderate |
+| client | `axios` | 1.18.1 → 1.20.0 | high |
+| client | `react-router-dom` | 7.18.1 → 7.18.4 | high |
+Resulta: **0 vulnerabilities** sa server at client.
+
+### C. Domain lock (Layer 5 ng obfuscation, #24)
+- Ang build ay tumatakbo lang sa `dentavault.vercel.app`, `localhost`, `127.0.0.1`. Kapag kinopya ang files sa ibang site → `about:blank`.
+- Nasa **`main.jsx` lang** ang check (dito nagsisimula ang lahat ng file). Kung sa bawat file, 102 → 122 KB ang main file; ngayon 103.7 KB.
+- ⚠️ **Kapag nagpalit ng domain** (custom domain, ibang hosting, Vercel preview URL, o pag-test sa phone gamit ang LAN IP):
+  idagdag sa `ALLOWED_DOMAINS` sa `vite.config.js` o i-set ang `OBFUSCATE_DOMAINS` (comma-separated) bago mag-build.
+  Kung hindi, **blangko ang app** sa bagong address.
+
+| Name | Type | Purpose |
+|---|---|---|
+| `server/src/middleware/rateLimit.js` | **NEW** | `loginLimiterByIp`, `loginLimiterByEmail`, `changePasswordLimiter` (express-rate-limit), 429 message, isang audit entry bawat lock. |
+| `server/src/routes/auth.routes.js` | MODIFIED | Limiters sa `/login` at `/change-password`. |
+| `server/.env.example` | MODIFIED | `LOGIN_RATE_LIMIT_MAX`, `LOGIN_RATE_LIMIT_WINDOW_MINUTES`. |
+| `server/package.json`, `package-lock.json` | MODIFIED | `express-rate-limit`; audit fix. |
+| `client/package-lock.json` | MODIFIED | audit fix (axios, react-router). |
+| `client/vite.config.js` | MODIFIED | `ENTRY_MODULE`, `ALLOWED_DOMAINS` / `OBFUSCATE_DOMAINS`, `domainLock`. |
+| `client/src/utils/auditAction.js` | MODIFIED | Labels at kulay ng 2 bagong action; readable `limitedBy`/`windowMinutes`. |
+
+**Na-verify (local):** rate limit API **16/16** (pansamantalang limit 3 / 1 min: per IP, per email kahit iba-ibang IP, case-insensitive,
+ibang IP/account hindi apektado, successful logins hindi binibilang, change password, isang audit entry lang, bumabalik pagkatapos
+ng window); login page nagpapakita ng 429 message (screenshot) at Audit Log row readable. Pagkatapos ng library updates: API
+**12/12** (X-ray upload + fetch, 413 sa sobrang laki, 415 sa hindi image, import preview + dry run, CSV export, query params,
+helmet headers, 403/401); browser e2e **26/26**. Domain lock **3/3** (localhost at 127.0.0.1 gumagana; LAN IP → `about:blank`).
+Nilinis ang lahat ng test data (test X-ray sa Cloudinary at DB, audit rows). **Hindi pa naka-push.**
+
+---
+
+## 26. Security Review at mga Ayos (A–H)
+
+Buong review ng server, client, database, at config. **Walang kritikal na butas** (access control, SQL injection, XSS,
+password hashing, secrets: pasado). Ayon sa Aiven docs, naka-encrypt ang disk ng database (LUKS, AES-XTS), kaya
+masasagot na ang item #7 sa listahan ng paper. Inayos ang 4 na katamtaman at 4 na mababang isyu:
+
+| | Problema (bago) | Ayos |
+|---|---|---|
+| **A** | Walang security headers ang live app sa Vercel (HSTS lang): puwedeng i-iframe (clickjacking), walang CSP | `vercel.json` `headers`: CSP, `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy`, `Permissions-Policy`. Ginagamit din ng `vite preview` (para masubok nang lokal) |
+| **B** | Mailgun webhook (walang login): hanggang 150 MB ang binabasa bago i-check ang signature, walang limit | Body > 30 MB = 413 agad; 60 request/15 min bawat IP at 300 sa kabuuan (429: nagre-retry si Mailgun) |
+| **C** | Webhook replay: timestamp + token lang ang pinipirmahan, hindi ang laman | Timestamp hanggang 9 oras lang (retry window ni Mailgun ~8 oras; **pareho ang token sa retry**, kaya hindi 5 min); bawat token isang beses lang (`mailgun_webhook_tokens`, itinatala pagkatapos ng matagumpay na proseso) |
+| **D** | Gumagana pa ang token nang hanggang 8 oras kahit na-reset ang password, nag-sign out, o na-delete ang patient; nakakapag-login pa ang portal account ng na-delete na patient | `users.token_version` (nasa JWT bilang `tv`), tinitingnan sa bawat request. Tumataas sa password change/reset, Sign out (lahat ng device), delete ng patient (+ `is_active = 0`), at `seed.js` reset |
+| **E** | Nalalaman kung may account ang email: 1–5 ms (wala) vs ~400 ms (meron) | Pekeng bcrypt compare kapag walang account: ~300 ms pareho |
+| **F** | CSV export: `=`, `+`, `-`, `@` sa simula = Excel formula | `'` sa unahan (maliban sa purong numero gaya ng `+639...`) |
+| **G** | SPF: ang unang `X-Mailgun-Spf` lang ang tinitingnan (puwedeng magdagdag ng pekeng "Pass" ang nagpadala) | Verified lang kapag "Pass" ang LAHAT ng nakitang SPF value |
+| **H** | `?search[]=x`, `?sort=__proto__`, atbp. = 500 | `queryText`/`queryInt` (`utils/query.js`), `Object.hasOwn` sa sort; 200 na |
+
+**Para gumana ang 3D chart sa CSP** (nahuli sa lokal na test, masisira sana sa live): pinatay ang hindi ginagamit na
+Draco/Meshopt (WebAssembly) sa `useGLTF` (`KHR_mesh_quantization` lang ang `teeth.glb`), at sa main thread na ang
+troika text (dati worker na naglo-load ng `blob:` script). Print slip: walang inline `<script>` na; ang app ang tumatawag ng print.
+Client: kapag 401 sa gitna ng paggamit, awtomatikong sign out at "Your session has ended. Please sign in again." sa login.
+
+> ⚠️ **Bago/kasabay ng push:**
+> 1. **Migration 012 sa Aiven** (`$env:DOTENV_CONFIG_PATH=".env.aiven"; npm run migrate` sa `server/`). Kung hindi, **pumapalya ang lahat ng login**.
+> 2. Pagka-deploy, **masa-sign out ang lahat ng naka-login** (walang `tv` ang lumang token). Normal ito, isang beses lang.
+> 3. **Bagong external resource** (font, CDN, image host) = idagdag sa CSP sa `client/vercel.json`, kung hindi ma-ba-block.
+> 4. Bagong 3D model na may Draco/Meshopt = i-on sa `Tooth3D.jsx` AT luwagan ang CSP.
+
+| Name | Type | Purpose |
+|---|---|---|
+| `server/db/migrations/012_security_hardening.sql` | **NEW** | `users.token_version`, deactivate portal accounts ng deleted patients, `mailgun_webhook_tokens`. Napatakbo na sa local. |
+| `server/src/middleware/auth.js` | MODIFIED | Async; tinitingnan ang `is_active`, deleted patient, at `tv` sa database. `/auth/logout` pinapayagan kahit may temporary password. |
+| `server/src/models/userModel.js` | MODIFIED | `findUserAuthState`, `bumpTokenVersion`, `deactivateUserForPatient`; `updatePasswordHash` nagba-bump. |
+| `server/src/services/authService.js`, `controllers/auth.controller.js`, `routes/auth.routes.js` | MODIFIED | `tv` sa token, `DUMMY_HASH`, `logout` + `POST /auth/logout` (audit `LOGOUT`). |
+| `server/src/controllers/patients.controller.js` | MODIFIED | Delete → deactivate portal account; `queryText`/`queryInt`. |
+| `server/src/models/webhookTokenModel.js` | **NEW** | One-time Mailgun tokens (+ paglilinis > 2 araw). |
+| `server/src/services/mailgunService.js`, `controllers/webhooks.controller.js` | MODIFIED | Edad ng timestamp; `done()` nagtatala ng token; lahat ng SPF value. |
+| `server/src/middleware/rateLimit.js`, `routes/webhooks.routes.js` | MODIFIED | `webhookLimiterByIp`, `webhookLimiterGlobal`, `rejectLargeWebhookBody`. |
+| `server/src/utils/csv.js` | MODIFIED | Formula injection. |
+| `server/src/utils/query.js` | **NEW** | `queryText`, `queryInt`. |
+| `server/src/controllers/{auditLog,xrays,dashboard}.controller.js`, `models/patientModel.js` | MODIFIED | Query params; `LOGOUT` wala sa Recent Activity; `Object.hasOwn`. |
+| `server/db/seed.js`, `seedPatientUser.js` | MODIFIED | Password reset nagba-bump ng `token_version`. |
+| `client/vercel.json` | MODIFIED | Security headers. |
+| `client/vite.config.js` | MODIFIED | `preview.headers` galing `vercel.json` (walang `upgrade-insecure-requests` sa http). |
+| `client/src/services/api.js`, `context/AuthContext.jsx`, `pages/LoginPage.jsx` | MODIFIED | 401 → session ended; Sign out tumatawag sa server; notice sa login. |
+| `client/src/components/chart/Tooth3D.jsx`, `client/package.json` | MODIFIED | `configureTextBuilder({ useWorker: false })`, walang Draco/Meshopt; direktang dependency `troika-three-text` (parehong 0.52.5 ng drei). |
+| `client/src/components/patients/PortalCredentials.jsx` | MODIFIED | Print slip walang inline script. |
+| `client/src/utils/auditAction.js` | MODIFIED | Label ng `LOGOUT`. |
+
+**Na-verify (local):** security API **33/33** (D: change/reset/sign out/delete/lumang token; E: 299 vs 298 ms; C: replay, 10 oras,
+future, 8-oras na retry, maling signature; G: 5 kaso; F: 8 kaso + totoong export; H: 9 URL; B: 31 MB = 413 sa 32 ms, 429 sa limit).
+UI **7/7** (Sign out sa server, "session ended" sa ibang device, print slip sa CSP, iframe naharang). E2E sa ilalim ng CSP **27/27**
+(kasama ang 3D chart, 3D print, 6 na X-ray kasama ang Cloudinary, 0 console error). API regression **12/12**. Build pasado.
+Nilinis ang lahat ng test data. **Hindi pa naka-push.**

@@ -9,6 +9,7 @@ import asyncHandler from '../utils/asyncHandler.js'
 import AppError from '../utils/AppError.js'
 import { csvField } from '../utils/csv.js'
 import { FIELD_LIMITS, clinicToday } from '../utils/validators.js'
+import { queryText, queryInt } from '../utils/query.js'
 
 function assertValid(req) {
   const errors = validationResult(req)
@@ -18,13 +19,13 @@ function assertValid(req) {
 }
 
 export const list = asyncHandler(async (req, res) => {
-  const page = Math.max(1, Number(req.query.page) || 1)
-  const limit = Math.min(50, Number(req.query.limit) || 20)
+  const page = queryInt(req.query.page, { min: 1, max: 100000, fallback: 1 })
+  const limit = queryInt(req.query.limit, { min: 1, max: 50, fallback: 20 })
   const offset = (page - 1) * limit
 
   const { rows, total } = await patientModel.listPatients({
-    search: req.query.search?.trim(),
-    sort: req.query.sort,
+    search: queryText(req.query.search),
+    sort: queryText(req.query.sort),
     limit,
     offset,
   })
@@ -33,7 +34,7 @@ export const list = asyncHandler(async (req, res) => {
 })
 
 export const exportCsv = asyncHandler(async (req, res) => {
-  const patients = await patientModel.listPatientsForExport({ search: req.query.search?.trim() })
+  const patients = await patientModel.listPatientsForExport({ search: queryText(req.query.search) })
 
   const headers = [
     'Last Name', 'First Name', 'Sex', 'Date of Birth', 'Contact Number', 'Email',
@@ -108,9 +109,10 @@ export const create = asyncHandler(async (req, res) => {
 // hindi na awtomatikong mafa-file — siya ang pipili sa X-ray Inbox.
 // `exceptCode`: ang patient na ine-edit (hindi kasama ang sarili).
 export const emailUsage = asyncHandler(async (req, res) => {
-  const email = String(req.query.email || '').trim()
+  const email = queryText(req.query.email) || ''
   if (!email) return res.json({ patients: [] })
-  const except = req.query.exceptCode ? await patientModel.findPatientByCode(req.query.exceptCode) : null
+  const exceptCode = queryText(req.query.exceptCode)
+  const except = exceptCode ? await patientModel.findPatientByCode(exceptCode) : null
   const rows = await patientModel.findPatientsByEmail(email, { exceptId: except?.id ?? null })
   res.json({ patients: rows.map((p) => ({ first_name: p.first_name, last_name: p.last_name })) })
 })
@@ -157,6 +159,8 @@ export const remove = asyncHandler(async (req, res) => {
   if (!patient) throw new AppError('Patient not found', 404)
 
   await patientModel.softDeletePatient(patient.id)
+  // Portal account: hindi na makakapag-login, at hinto agad ang bukas na session
+  await userModel.deactivateUserForPatient(patient.id)
 
   await recordAuditLog({
     userId: req.user.userId,

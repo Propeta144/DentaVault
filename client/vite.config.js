@@ -2,12 +2,85 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
+import JavaScriptObfuscator from 'javascript-obfuscator'
+import fs from 'node:fs'
+
+// Production-only obfuscation of OUR source files (client/src), so DevTools
+// shows `n(324,'MxE&')` instead of readable logic, API paths, routes
+// and messages. Runs per module before bundling, so React, Three.js and other
+// libraries are left untouched (they're public code anyway, and obfuscating
+// them would balloon the 3D chunk). This is NOT encryption: the browser must
+// be able to run the code, so a determined reader can still undo it. The real
+// protection stays on the server (auth, role and record access checks).
+const OBFUSCATE_SRC = /[\\/]client[\\/]src[\\/].*\.jsx?$/
+// 3D/2D chart geometry runs every frame or for every tooth; control-flow
+// flattening there would cost real smoothness, so those files get the
+// string/identifier layers only.
+const HOT_PATH = /[\\/]src[\\/]components[\\/]chart[\\/]/
+// Layer 5 (domain lock): the built code only runs on these hosts. Copied to
+// another site, it redirects to a blank page instead. Only the entry module
+// (main.jsx) carries the check: every other file is loaded from it, so if it
+// stops, the whole app stops, without paying the check's size in all ~85
+// files. localhost/127.0.0.1 keep `vite preview` working. A new host (custom
+// domain, Vercel preview URL, phone testing over LAN) must be added here or
+// via OBFUSCATE_DOMAINS at build time.
+const ENTRY_MODULE = /[\\/]src[\\/]main\.jsx$/
+const ALLOWED_DOMAINS = (process.env.OBFUSCATE_DOMAINS || 'dentavault.vercel.app,localhost,127.0.0.1')
+  .split(',')
+  .map((d) => d.trim())
+  .filter(Boolean)
+
+function obfuscateSource() {
+  return {
+    name: 'dentavault-obfuscate',
+    apply: 'build',
+    enforce: 'post', // after JSX is compiled to plain JS
+    transform(code, id) {
+      if (!OBFUSCATE_SRC.test(id) || id.includes('node_modules')) return null
+      const hot = HOT_PATH.test(id)
+      const entry = ENTRY_MODULE.test(id)
+      const result = JavaScriptObfuscator.obfuscate(code, {
+        target: 'browser',
+        sourceMap: false,
+        // Layer 1: rename every local identifier to _0x… hex names.
+        identifierNamesGenerator: 'hexadecimal',
+        renameGlobals: false, // imports/exports must keep their names for the bundler
+        // Layer 2: move strings (API paths, routes, messages) into an
+        // RC4-encoded array, decoded only at run time.
+        stringArray: true,
+        stringArrayEncoding: ['rc4'],
+        stringArrayThreshold: 1,
+        stringArrayRotate: true,
+        stringArrayShuffle: true,
+        stringArrayWrappersCount: 1,
+        // Lazy pages: `import('./pages/X')` must stay a plain string or the
+        // bundler can't split the page into its own file (Feature #9).
+        reservedStrings: ['^\\.{1,2}/'],
+        // Layer 3: scramble the order of the logic (skipped on chart hot paths).
+        controlFlowFlattening: !hot,
+        controlFlowFlatteningThreshold: 0.25,
+        // Layer 4: a little fake code to mislead readers.
+        deadCodeInjection: !hot,
+        deadCodeInjectionThreshold: 0.05,
+        // Layer 5: only runs on our own domain (see ALLOWED_DOMAINS).
+        domainLock: entry ? ALLOWED_DOMAINS : [],
+        domainLockRedirectUrl: 'about:blank',
+        // Off on purpose: selfDefending breaks once the bundler re-minifies,
+        // and debugProtection (DevTools traps) only annoys real users.
+        selfDefending: false,
+        debugProtection: false,
+      })
+      return { code: result.getObfuscatedCode(), map: null }
+    },
+  }
+}
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    obfuscateSource(),
     VitePWA({
       registerType: 'prompt', // never swap app code out from under an in-progress form — see src/pwa.js
       devOptions: { enabled: true }, // lets the service worker run under `npm run dev` too, not just a build
@@ -138,4 +211,23 @@ export default defineConfig({
       '/api': 'http://localhost:5000',
     },
   },
+  // `vite preview` (production build sa local) ay gumagamit ng PAREHONG
+  // security headers ng live site (vercel.json), para masubok ang CSP bago
+  // i-deploy. Hindi sa `npm run dev`: kailangan ng dev server ang inline
+  // scripts para sa hot reload.
+  preview: {
+    headers: previewSecurityHeaders(),
+  },
 })
+
+function previewSecurityHeaders() {
+  const vercel = JSON.parse(fs.readFileSync(new URL('./vercel.json', import.meta.url), 'utf8'))
+  const rule = vercel.headers?.find((h) => h.source === '/(.*)')
+  return Object.fromEntries(
+    (rule?.headers ?? []).map(({ key, value }) => [
+      key,
+      // http://localhost: walang https na mapag-a-upgrade-an
+      key === 'Content-Security-Policy' ? value.replace(/;\s*upgrade-insecure-requests/, '') : value,
+    ]),
+  )
+}

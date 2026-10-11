@@ -36,7 +36,7 @@ export const get = asyncHandler(async (req, res) => {
     auditLogModel.listAuditLogs({
       limit: 20,
       offset: 0,
-      excludeActions: ['VIEW_DASHBOARD', 'VIEW_AUDIT_LOG', 'LOGIN_SUCCESS'],
+      excludeActions: ['VIEW_DASHBOARD', 'VIEW_AUDIT_LOG', 'LOGIN_SUCCESS', 'LOGOUT'],
     }),
   ])
 

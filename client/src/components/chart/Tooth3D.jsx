@@ -1,9 +1,23 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { Text, useGLTF } from '@react-three/drei'
+import { configureTextBuilder } from 'troika-three-text'
 import { conditionColor } from '../../constants/dental'
 import teethModelUrl from '../../assets/models/teeth.glb?url'
 import TEETH_EXTENTS from '../../assets/models/teethExtents.json'
+
+// Content-Security-Policy (client/vercel.json, security review #26):
+// - Tooth numbers (troika Text): sa main thread na ang typesetting. Ang
+//   default na web worker nito ay naglo-load ng `blob:` script, na haharangin
+//   ng `script-src 'self'`. 32 maikling numero lang, kaya walang mapapansing
+//   bagal. Kailangang tawagin bago ang unang Text (kaya nandito sa module).
+// - teeth.glb: KHR_mesh_quantization lang ang gamit, kaya pinapatay ang Draco
+//   (decoder galing sa gstatic.com) at Meshopt (WebAssembly) na awtomatikong
+//   inihahanda ng useGLTF. Kapag pinalitan ang model at gumamit ng alinman sa
+//   dalawa, kailangang i-on ulit dito AT luwagan ang CSP.
+configureTextBuilder({ useWorker: false })
+const USE_DRACO = false
+const USE_MESHOPT = false
 
 // 16 crown shapes mula sa procedural generator ng team (scripts/teeth-
 // source/, inihanda ng scripts/prep-procedural-teeth.cjs): Tooth1..8 =
@@ -11,7 +25,7 @@ import TEETH_EXTENTS from '../../assets/models/teethExtents.json'
 // Dati: 8 hugis lang (~236 triangles) mula sa "Teeth by Poly by Google",
 // iisa sa itaas at ibaba. Preloading avoids a pop-in flash the first time
 // a tooth scrolls into view.
-useGLTF.preload(teethModelUrl)
+useGLTF.preload(teethModelUrl, USE_DRACO, USE_MESHOPT)
 
 const INK_CANVAS_SIZE = 256
 // Consecutive drag points further apart than this (in 0..1 UV space)
@@ -296,7 +310,7 @@ export default function Tooth3D({
   // mabasa sa bawat anggulo (tingnan Chart3DSnapshots)
   showLabel = true,
 }) {
-  const { nodes } = useGLTF(teethModelUrl)
+  const { nodes } = useGLTF(teethModelUrl, USE_DRACO, USE_MESHOPT)
   // FDI: quadrant digit + position digit (1-8). Upper (Q1/Q2) at lower
   // (Q3/Q4) ay may kani-kaniyang hugis na.
   const nodeName = toothNodeName(toothNumber)
