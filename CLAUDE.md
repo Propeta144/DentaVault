@@ -1191,7 +1191,7 @@ system, dentist lang ang makakapag-upload; email (Mailgun) lang ang paraan ng pa
 - Audit: `PATIENT_UPLOAD_XRAY`; pagbura ng patient = `DELETE_XRAY` na may "Removed by the patient (before review)".
 
 > ⚠️ **Kailangang patakbuhin ang migration 013 sa Aiven bago/kasabay ng push.** Kung hindi, pumapalya ang upload ng patient
-> (`source` ENUM).
+> (`source` ENUM). ✅ Napatakbo na (2026-10-11, bago ang push).
 
 | Name | Type | Purpose |
 |---|---|---|
@@ -1215,4 +1215,4 @@ pagbura bago review 204 / pagkatapos 403, upload ng clinic hindi mabubura ng pat
 email: pekeng attachment nilaktawan at tamang `mime_type`, audit, limit 10 bawat araw at hindi binibilang ang pumalya). UI **22/22**
 (form, toast, "Waiting for review", viewer Delete, Remove modal, Settings link, 360px walang patong at walang overflow, inbox
 "via Patient portal" sa laptop at phone, pagkatapos ng review wala nang strip at Delete; 0 console error). Regression e2e
-**27/27** (sa ilalim ng CSP). Build pasado. Nilinis ang lahat ng test data (kasama ang mga file sa Cloudinary). **Hindi pa naka-push.**
+**27/27** (sa ilalim ng CSP). Build pasado. Nilinis ang lahat ng test data (kasama ang mga file sa Cloudinary). **Naka-push na** (commit `ebc830d`, 2026-10-11). Live sa `dentavault.vercel.app` (Settings card, Inbox wording, 0 console error).
