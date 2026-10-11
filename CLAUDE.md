@@ -1050,7 +1050,7 @@ obfuscation): login (tama/mali), lahat ng page (Dashboard, Patients, X-ray Inbox
 Settings), Ctrl+K + Escape, profile, Add Treatment modal, 2D chart tooth click → modal, 3D chart, 3D print (5 larawan),
 2D print (findings), Print Summary, X-rays tab, patient account (sariling record, blocked sa Audit Log), 57 lazy JS files
 hash-only, 0 console error, offline reload (service worker). **0** file na may nababasang `/patients`, `/auth`, `/xrays`,
-`/audit-logs`, `/dashboard`, `/settings`. **Hindi pa naka-push.**
+`/audit-logs`, `/dashboard`, `/settings`. **Naka-push na** (commit `3670ae9`, 2026-10-11). Live-tested sa `dentavault.vercel.app`.
 
 ---
 
@@ -1104,7 +1104,7 @@ ibang IP/account hindi apektado, successful logins hindi binibilang, change pass
 ng window); login page nagpapakita ng 429 message (screenshot) at Audit Log row readable. Pagkatapos ng library updates: API
 **12/12** (X-ray upload + fetch, 413 sa sobrang laki, 415 sa hindi image, import preview + dry run, CSV export, query params,
 helmet headers, 403/401); browser e2e **26/26**. Domain lock **3/3** (localhost at 127.0.0.1 gumagana; LAN IP → `about:blank`).
-Nilinis ang lahat ng test data (test X-ray sa Cloudinary at DB, audit rows). **Hindi pa naka-push.**
+Nilinis ang lahat ng test data (test X-ray sa Cloudinary at DB, audit rows). **Naka-push na** (commit `3670ae9`, 2026-10-11). Live-tested sa `dentavault.vercel.app`.
 
 ---
 
@@ -1131,7 +1131,7 @@ troika text (dati worker na naglo-load ng `blob:` script). Print slip: walang in
 Client: kapag 401 sa gitna ng paggamit, awtomatikong sign out at "Your session has ended. Please sign in again." sa login.
 
 > ⚠️ **Bago/kasabay ng push:**
-> 1. **Migration 012 sa Aiven** (`$env:DOTENV_CONFIG_PATH=".env.aiven"; npm run migrate` sa `server/`). Kung hindi, **pumapalya ang lahat ng login**.
+> 1. **Migration 012 sa Aiven** (`$env:DOTENV_CONFIG_PATH=".env.aiven"; npm run migrate` sa `server/`). Kung hindi, **pumapalya ang lahat ng login**. ✅ Napatakbo na (2026-10-11, bago ang push).
 > 2. Pagka-deploy, **masa-sign out ang lahat ng naka-login** (walang `tv` ang lumang token). Normal ito, isang beses lang.
 > 3. **Bagong external resource** (font, CDN, image host) = idagdag sa CSP sa `client/vercel.json`, kung hindi ma-ba-block.
 > 4. Bagong 3D model na may Draco/Meshopt = i-on sa `Tooth3D.jsx` AT luwagan ang CSP.
@@ -1161,4 +1161,4 @@ Client: kapag 401 sa gitna ng paggamit, awtomatikong sign out at "Your session h
 future, 8-oras na retry, maling signature; G: 5 kaso; F: 8 kaso + totoong export; H: 9 URL; B: 31 MB = 413 sa 32 ms, 429 sa limit).
 UI **7/7** (Sign out sa server, "session ended" sa ibang device, print slip sa CSP, iframe naharang). E2E sa ilalim ng CSP **27/27**
 (kasama ang 3D chart, 3D print, 6 na X-ray kasama ang Cloudinary, 0 console error). API regression **12/12**. Build pasado.
-Nilinis ang lahat ng test data. **Hindi pa naka-push.**
+Nilinis ang lahat ng test data. **Naka-push na** (commit `3670ae9`, 2026-10-11). Live-tested sa `dentavault.vercel.app`.
