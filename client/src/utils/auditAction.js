@@ -42,6 +42,7 @@ const ACTION_LABELS = {
   CREATE_TREATMENT: { label: 'Added a treatment' },
   CREATE_CHART_ENTRY: { label: 'Updated the dental chart', plural: (n) => `Updated the dental chart (${n} entries)` },
   UPLOAD_XRAY: { label: 'Uploaded an X-ray' },
+  PATIENT_UPLOAD_XRAY: { label: 'Patient uploaded an X-ray (patient portal)' },
   ANNOTATE_XRAY: { label: 'Annotated an X-ray', plural: (n) => `Annotated X-rays (${n} saves)` },
   DELETE_XRAY: { label: 'Deleted an X-ray' },
   GENERATE_TREATMENT_SUMMARY: { label: 'Printed treatment summary' },
@@ -96,6 +97,7 @@ const DETAIL_FORMATTERS = {
   spf: (v) => `Sender check (SPF): ${v}`,
   limitedBy: (v) => `Limit: ${{ ip: 'per IP address', email: 'per account email', user: 'per account' }[v] ?? v}`,
   windowMinutes: (v) => `Wait: ${v} min`,
+  byPatient: () => 'Removed by the patient (before review)',
 }
 
 export function formatAuditDetails(details) {

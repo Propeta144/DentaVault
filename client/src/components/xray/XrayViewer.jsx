@@ -32,7 +32,9 @@ function pointerToFraction(e, canvas) {
   return [(e.clientX - rect.left) / rect.width, (e.clientY - rect.top) / rect.height]
 }
 
-export default function XrayViewer({ xray, patientCode, canAnnotate, onClose }) {
+// canDelete: dentist palagi; patient (#27) sa sariling upload lang na hindi
+// pa nare-review (tignan PatientXraysSection; server ang tunay na check).
+export default function XrayViewer({ xray, patientCode, canAnnotate, canDelete = canAnnotate, onClose }) {
   const { showToast } = useToast()
   const [imageUrl, setImageUrl] = useState(null)
   const [naturalSize, setNaturalSize] = useState(null) // { width, height } in real pixels
@@ -266,18 +268,20 @@ export default function XrayViewer({ xray, patientCode, canAnnotate, onClose }) 
                 <Save className="h-4 w-4" />
                 {saving ? 'Saving...' : 'Save Annotations'}
               </button>
-              <button
-                type="button"
-                title="Delete X-ray"
-                onClick={() => setDeleting(true)}
-                className="flex min-h-11 items-center gap-1.5 rounded bg-red-600 px-3 text-sm font-medium transition-colors hover:bg-red-500"
-              >
-                <Trash2 className="h-4 w-4" />
-                Delete
-              </button>
-              <span className="mx-1 hidden h-6 w-px bg-slate-700 sm:block" />
             </>
           )}
+          {canDelete && (
+            <button
+              type="button"
+              title="Delete X-ray"
+              onClick={() => setDeleting(true)}
+              className="flex min-h-11 items-center gap-1.5 rounded bg-red-600 px-3 text-sm font-medium transition-colors hover:bg-red-500"
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete
+            </button>
+          )}
+          {(canAnnotate || canDelete) && <span className="mx-1 hidden h-6 w-px bg-slate-700 sm:block" />}
           <button
             type="button"
             title="Print"
@@ -370,7 +374,7 @@ export default function XrayViewer({ xray, patientCode, canAnnotate, onClose }) 
       </div>
 
       {deleting && (
-        <DeleteXrayModal xray={xray} onClose={() => setDeleting(false)} onDeleted={onClose} />
+        <DeleteXrayModal xray={xray} byPatient={!canAnnotate} onClose={() => setDeleting(false)} onDeleted={onClose} />
       )}
 
       {confirmingClose && (

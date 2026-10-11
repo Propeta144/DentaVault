@@ -124,3 +124,21 @@ export function rejectLargeWebhookBody(req, res, next) {
   }
   next()
 }
+
+// --- X-ray upload ng patient (#27) ---
+// Hanggang 10 upload bawat 24 oras bawat patient account, para hindi
+// mapuno ang storage (Cloudinary) kahit may bug o pang-aabuso. Patient lang:
+// walang limit sa dentist. Nauuna ito sa pagbasa ng file (multer).
+export const patientXrayUploadLimiter = rateLimit({
+  windowMs: 24 * 60 * 60 * 1000,
+  limit: Number(process.env.PATIENT_XRAY_UPLOADS_PER_DAY) || 10,
+  skipFailedRequests: true, // matagumpay na upload lang ang binibilang
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  skip: (req) => req.user?.role !== 'patient',
+  keyGenerator: (req) => `patient-upload:${req.user.userId}`,
+  handler: (req, res, next, options) =>
+    res.status(options.statusCode).json({
+      error: 'You have reached today’s upload limit. Please try again tomorrow, or bring the X-ray to the clinic.',
+    }),
+})

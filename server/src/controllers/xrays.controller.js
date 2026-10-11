@@ -8,6 +8,7 @@ import { storeXrayFile, resolveXrayFile, deleteXrayFile } from '../services/xray
 import asyncHandler from '../utils/asyncHandler.js'
 import AppError from '../utils/AppError.js'
 import { queryInt } from '../utils/query.js'
+import { detectXrayMimeType } from '../utils/fileSignature.js'
 
 function assertValid(req) {
   const errors = validationResult(req)
@@ -156,6 +157,10 @@ export const dismissHeld = asyncHandler(async (req, res) => {
   res.status(204).send()
 })
 
+// Dentist: kahit kaninong patient ('manual_upload'). Patient (#27): sariling
+// record lang ('patient_upload'); lalabas sa X-ray Inbox ng dentist bilang
+// "New" (reviewed_at = NULL), at "Waiting for review" sa patient hanggang
+// mabuksan ng dentist.
 export const upload = asyncHandler(async (req, res) => {
   const patient = await assertPatientAccess(req, req.params.patientCode)
 
@@ -164,15 +169,22 @@ export const upload = asyncHandler(async (req, res) => {
   }
   assertValid(req)
 
+  // Mismong laman ng file ang batayan, hindi ang Content-Type ng nagpadala
+  const mimeType = detectXrayMimeType(req.file.buffer)
+  if (!mimeType) {
+    throw new AppError('That file is not a valid JPEG, PNG, WebP, or PDF.', 415)
+  }
+
+  const byPatient = req.user.role === 'patient'
   const fileUrl = await storeXrayFile(req.file.buffer, req.file.originalname)
 
   const xray = await xrayModel.createXray({
     patientId: patient.id,
     fileUrl,
     originalFilename: req.file.originalname,
-    mimeType: req.file.mimetype,
+    mimeType,
     fileSizeBytes: req.file.size,
-    source: 'manual_upload',
+    source: byPatient ? 'patient_upload' : 'manual_upload',
     takenDate: req.body.takenDate || null,
     notes: req.body.notes,
     uploadedBy: req.user.userId,
@@ -180,7 +192,7 @@ export const upload = asyncHandler(async (req, res) => {
 
   await recordAuditLog({
     userId: req.user.userId,
-    action: 'UPLOAD_XRAY',
+    action: byPatient ? 'PATIENT_UPLOAD_XRAY' : 'UPLOAD_XRAY',
     entityType: 'xray_image',
     entityId: xray.id,
     details: { patientId: patient.id },
@@ -189,6 +201,10 @@ export const upload = asyncHandler(async (req, res) => {
 
   res.status(201).json({ xray })
 })
+
+// Mga X-ray na hindi ang dentist ang nag-upload: kailangang makita/ma-review
+// niya (X-ray Inbox, badge). Tignan xrayModel.REVIEWABLE_SOURCES_SQL.
+const REVIEWABLE_SOURCES = new Set(['email_inbound', 'patient_upload'])
 
 export const getFile = asyncHandler(async (req, res) => {
   const xray = await xrayModel.findXrayById(req.params.id)
@@ -203,7 +219,7 @@ export const getFile = asyncHandler(async (req, res) => {
   // X-ray — 'yon ang nagliclear sa sidebar badge. Walang mangyayari sa
   // manual uploads at yung mga already-reviewed rows (tignan
   // markXrayReviewed).
-  if (req.user.role === 'dentist' && xray.source === 'email_inbound' && !xray.reviewed_at) {
+  if (req.user.role === 'dentist' && REVIEWABLE_SOURCES.has(xray.source) && !xray.reviewed_at) {
     await xrayModel.markXrayReviewed(xray.id)
   }
 
@@ -236,9 +252,25 @@ export const getFile = asyncHandler(async (req, res) => {
 // hindi tinatanggal yung row o yung file mismo, minamarkahan lang na
 // deleted_at para itago sa app, pero manatiling buo sa DB para sa
 // retention/audit purposes.
+//
+// Patient (#27): puwedeng burahin ang SARILING upload, pero hangga't hindi pa
+// ito nabubuksan ng dentist (hal. maling file ang naipadala). Pagkatapos ng
+// review, dentist na lang ang makakapagbura (bahagi na ng clinical record).
 export const remove = asyncHandler(async (req, res) => {
   const xray = await xrayModel.findXrayById(req.params.id)
   if (!xray) throw new AppError('X-ray not found', 404)
+
+  const byPatient = req.user.role === 'patient'
+  if (byPatient) {
+    const ownPendingUpload =
+      canAccessPatientRecord(req.user, xray.patient_id) &&
+      xray.source === 'patient_upload' &&
+      Number(xray.uploaded_by) === Number(req.user.userId) &&
+      !xray.reviewed_at
+    if (!ownPendingUpload) {
+      throw new AppError('You can only remove X-rays you uploaded that the dentist has not reviewed yet', 403)
+    }
+  }
 
   await xrayModel.softDeleteXray(xray.id)
 
@@ -247,7 +279,7 @@ export const remove = asyncHandler(async (req, res) => {
     action: 'DELETE_XRAY',
     entityType: 'xray_image',
     entityId: xray.id,
-    details: { patientId: xray.patient_id, filename: xray.original_filename },
+    details: { patientId: xray.patient_id, filename: xray.original_filename, ...(byPatient ? { byPatient: true } : {}) },
     ipAddress: req.ip,
   })
 

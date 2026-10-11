@@ -795,8 +795,8 @@ spreadsheet preview sa Map Columns). Na-check din ang screenshots isa-isa. Regre
 | `.claude/skills/dentavault-ui/SKILL.md` | MODIFIED | Dense tables → cards below `xl`; secondary columns `xl:table-cell`. |
 
 ### Mga napansin sa paper na HINDI pa tugma sa system (para sa team)
-1. **Patient upload ng X-ray sa app**: sa Functional Requirements at Patient Dashboard wireframe, may "Upload X-ray Image"
-   ang patient; sa system, email lang (Mailgun). Gawin, o linawin sa paper na email ang paraan.
+1. ~~**Patient upload ng X-ray sa app**: sa Functional Requirements at Patient Dashboard wireframe, may "Upload X-ray Image"
+   ang patient; sa system, email lang (Mailgun). Gawin, o linawin sa paper na email ang paraan.~~ Naayos sa #27.
 2. ~~**Print ng 3D chart**: "Print the graphical dental chart (2D or 3D view)"; 2D lang ang Print Chart.~~ Naayos sa #22.
 3. **Excel**: "CSV/Excel templates"; CSV lang (Save As CSV).
 4. **Search by ID**: tinanggal sa #7 (hiling ng adviser); "name or ID" pa rin sa paper.
@@ -1162,3 +1162,57 @@ future, 8-oras na retry, maling signature; G: 5 kaso; F: 8 kaso + totoong export
 UI **7/7** (Sign out sa server, "session ended" sa ibang device, print slip sa CSP, iframe naharang). E2E sa ilalim ng CSP **27/27**
 (kasama ang 3D chart, 3D print, 6 na X-ray kasama ang Cloudinary, 0 console error). API regression **12/12**. Build pasado.
 Nilinis ang lahat ng test data. **Naka-push na** (commit `3670ae9`, 2026-10-11). Live-tested sa `dentavault.vercel.app`.
+
+---
+
+## 27. Pag-upload ng X-ray ng Patient sa Patient Portal (ayon sa paper)
+
+**Problema:** sa Functional Requirements at Patient Dashboard wireframe ng paper, may "Upload X-ray Image" ang patient. Sa
+system, dentist lang ang makakapag-upload; email (Mailgun) lang ang paraan ng patient (puwang #1 sa listahan ng #18).
+
+**Ayos (mga desisyon ng team):**
+- **My Record → X-rays:** may "Send an X-ray to the clinic" na form (parehong form ng dentist: preview, drag-and-drop, check
+  ng uri at laki, Date taken at Notes na optional).
+- **Lumalabas agad sa record** na may strip na **"Waiting for review"** hanggang mabuksan ng dentist. (Strip na buong lapad,
+  hindi badge, para hindi tumama sa compare checkbox sa phone.)
+- **Puwedeng burahin ng patient** ang sariling upload, pero **bago lang ma-review** (hal. maling file). Pagkatapos, dentist na lang.
+- **Dentist:** sa **X-ray Inbox** bilang "New" (kasama sa badge at sa "Unreviewed X-rays" tile), may "via Patient portal" / "via
+  Email". Nagiging reviewed pagbukas ng X-rays tab ng patient, gaya ng email X-rays. Source sa thumbnail: Email / Patient / Clinic
+  (dati "Manual"; icon lang sa phone para buo ang petsa).
+- **Settings:** bagong card "Uploading X-rays in the app" (patient: link diretso sa X-rays tab; dentist: link sa X-ray Inbox).
+
+**Seguridad:**
+- **Sariling record lang** (`canAccessPatientRecord`); sa ibang record = 403. Annotate at X-ray Inbox: dentist pa rin.
+- **Tinitingnan ang mismong laman ng file** (magic bytes: JPEG/PNG/WebP/PDF), hindi ang Content-Type na sinabi ng nagpadala.
+  Ang text/HTML na nagpapanggap na larawan = 415. Ganito na rin sa upload ng dentist at sa **email attachments** (nilalaktawan
+  ang pekeng attachment; ang naka-save na `mime_type` ay galing sa laman).
+- **10 matagumpay na upload bawat 24 oras** bawat patient (`PATIENT_XRAY_UPLOADS_PER_DAY`); hindi binibilang ang pumalya.
+  Nauuna ito sa pagbasa ng file.
+- Audit: `PATIENT_UPLOAD_XRAY`; pagbura ng patient = `DELETE_XRAY` na may "Removed by the patient (before review)".
+
+> ⚠️ **Kailangang patakbuhin ang migration 013 sa Aiven bago/kasabay ng push.** Kung hindi, pumapalya ang upload ng patient
+> (`source` ENUM).
+
+| Name | Type | Purpose |
+|---|---|---|
+| `server/db/migrations/013_add_patient_upload_source.sql` | **NEW** | `xray_images.source` + `'patient_upload'`. Napatakbo na sa local. |
+| `server/src/utils/fileSignature.js` | **NEW** | `detectXrayMimeType(buffer)` (magic bytes). |
+| `server/src/routes/xrays.routes.js` | MODIFIED | Upload at delete: `requireRole('dentist', 'patient')`; `patientXrayUploadLimiter` bago ang multer. |
+| `server/src/middleware/rateLimit.js`, `server/.env.example` | MODIFIED | `patientXrayUploadLimiter` (patient lang, `skipFailedRequests`); `PATIENT_XRAY_UPLOADS_PER_DAY`. |
+| `server/src/controllers/xrays.controller.js` | MODIFIED | `upload`: magic bytes, `source` ayon sa role, audit; `remove`: patient = sariling hindi pa nare-review lang; `getFile`: `REVIEWABLE_SOURCES`. |
+| `server/src/models/xrayModel.js` | MODIFIED | `REVIEWABLE_SOURCES_SQL` sa badge count at inbox; `x.source` sa inbox. |
+| `server/src/controllers/webhooks.controller.js` | MODIFIED | Attachment type mula sa laman ng file. |
+| `client/src/components/xray/PatientXraysSection.jsx` | MODIFIED | Upload form para sa patient; `canDelete`. |
+| `client/src/components/xray/UploadXrayForm.jsx` | MODIFIED | `title`, `description`, `successMessage` props. |
+| `client/src/components/xray/XrayGallery.jsx` | MODIFIED | `viewerRole`; "New" (dentist) / "Waiting for review" strip (patient); `SourceLabel` (Email/Patient/Clinic). |
+| `client/src/components/xray/XrayViewer.jsx`, `DeleteXrayModal.jsx` | MODIFIED | `canDelete` hiwalay sa `canAnnotate`; "Remove X-ray" na wording para sa patient. |
+| `client/src/pages/XrayInboxPage.jsx` | MODIFIED | Wording (email o patient portal), "All received", "via ...". |
+| `client/src/pages/SettingsPage.jsx` | MODIFIED | Card "Uploading X-rays in the app". |
+| `client/src/utils/auditAction.js` | MODIFIED | Label ng `PATIENT_UPLOAD_XRAY`, `byPatient` detail. |
+
+**Na-verify (local):** API **17/17** (sariling record 201 / ibang record 403, text at HTML na nagpapanggap = 415, inbox + badge,
+pagbura bago review 204 / pagkatapos 403, upload ng clinic hindi mabubura ng patient, walang annotate/inbox ang patient,
+email: pekeng attachment nilaktawan at tamang `mime_type`, audit, limit 10 bawat araw at hindi binibilang ang pumalya). UI **22/22**
+(form, toast, "Waiting for review", viewer Delete, Remove modal, Settings link, 360px walang patong at walang overflow, inbox
+"via Patient portal" sa laptop at phone, pagkatapos ng review wala nang strip at Delete; 0 console error). Regression e2e
+**27/27** (sa ilalim ng CSP). Build pasado. Nilinis ang lahat ng test data (kasama ang mga file sa Cloudinary). **Hindi pa naka-push.**

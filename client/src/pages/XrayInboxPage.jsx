@@ -25,8 +25,14 @@ import { formatActivityTime, formatDate } from '../utils/formatDate'
 //   naiimbak, kaya dito lang makikita para maidagdag ang email sa patient.
 const FILTERS = [
   { value: 'new', label: 'New' },
-  { value: 'all', label: 'All from email' },
+  { value: 'all', label: 'All received' },
 ]
+
+// #27: bukod sa email, puwede nang mag-upload ang patient sa sariling record
+// (patient portal). Parehong lumalabas dito; ipinapakita kung saan galing.
+function viaLabel(xray) {
+  return xray.source === 'patient_upload' ? 'Patient portal' : 'Email'
+}
 
 function StatusCell({ xray }) {
   if (!xray.reviewed_at) return <StatusBadge variant="amber">New</StatusBadge>
@@ -95,7 +101,7 @@ export default function XrayInboxPage() {
             <Inbox className="h-6 w-6 text-sky-600" />
             X-ray Inbox
           </h1>
-          <p className="text-base text-slate-500">X-rays patients sent by email. Open one to review it in their record.</p>
+          <p className="text-base text-slate-500">X-rays patients sent by email or uploaded in the patient portal. Open one to review it in their record.</p>
         </div>
       </div>
 
@@ -136,22 +142,22 @@ export default function XrayInboxPage() {
             <EmptyState
               icon={MailCheck}
               title="All caught up"
-              description="No new X-rays from email. New ones show up here as soon as a patient sends them."
+              description="No new X-rays from patients. New ones show up here as soon as a patient emails or uploads one."
               action={
                 <button
                   type="button"
                   onClick={() => changeFilter('all')}
                   className="flex min-h-11 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-4 text-base font-medium text-slate-700 transition-colors hover:bg-slate-50"
                 >
-                  Show all from email
+                  Show all received
                 </button>
               }
             />
           ) : (
             <EmptyState
               icon={ScanLine}
-              title="No X-rays received by email yet"
-              description="When a patient emails an X-ray from the address on their record, it is filed automatically and listed here."
+              title="No X-rays received from patients yet"
+              description="When a patient emails an X-ray from the address on their record, or uploads one in the patient portal, it is filed to their record and listed here."
             />
           )}
         </div>
@@ -168,7 +174,9 @@ export default function XrayInboxPage() {
                   </div>
                   <StatusCell xray={x} />
                 </div>
-                <p className="mb-3 text-sm text-slate-500">Received {formatActivityTime(x.created_at)}</p>
+                <p className="mb-3 text-sm text-slate-500">
+                  Received {formatActivityTime(x.created_at)} · via {viaLabel(x)}
+                </p>
                 <div className="flex gap-2">
                   <button
                     type="button"
@@ -210,7 +218,10 @@ export default function XrayInboxPage() {
               <tbody className="divide-y divide-slate-100">
                 {xrays.map((x) => (
                   <tr key={x.id} className="hover:bg-slate-50">
-                    <td className="whitespace-nowrap px-4 py-3 text-slate-600">{formatActivityTime(x.created_at)}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-slate-600">
+                      {formatActivityTime(x.created_at)}
+                      <span className="block text-sm text-slate-500">via {viaLabel(x)}</span>
+                    </td>
                     <td className="whitespace-nowrap px-4 py-3">
                       <Link
                         to={PROFILE_PATH}

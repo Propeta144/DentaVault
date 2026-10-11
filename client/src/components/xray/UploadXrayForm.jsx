@@ -17,7 +17,14 @@ function formatSize(bytes) {
 // - Check ng uri at laki ng file BAGO i-upload (dati sa server lang, at
 //   "Internal server error" pa ang lumalabas kapag sobrang laki)
 // - Naka-link ang mga label, text-base, at bawal ang future na "Date taken"
-export default function UploadXrayForm({ onUpload }) {
+// Ginagamit ng dentist at (#27) ng patient sa sariling record; iba lang ang
+// title/paliwanag/mensahe (tignan PatientXraysSection).
+export default function UploadXrayForm({
+  onUpload,
+  title = 'Upload X-ray',
+  description = null,
+  successMessage = 'X-ray uploaded successfully.',
+}) {
   const { showToast } = useToast()
   const ids = { file: useId(), date: useId(), notes: useId() }
   const [file, setFile] = useState(null)
@@ -69,7 +76,7 @@ export default function UploadXrayForm({ onUpload }) {
     setSubmitting(true)
     try {
       await onUpload({ file, notes, takenDate })
-      showToast('X-ray uploaded successfully.', { type: 'success' })
+      showToast(successMessage, { type: 'success' })
       setFile(null)
       setNotes('')
       setTakenDate('')
@@ -93,8 +100,9 @@ export default function UploadXrayForm({ onUpload }) {
     <form onSubmit={handleSubmit} className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm" noValidate>
       <h3 className="flex items-center gap-2 text-base font-semibold text-slate-800">
         <ScanLine className="h-4 w-4 text-sky-600" />
-        Upload X-ray
+        {title}
       </h3>
+      {description && <p className="text-base text-slate-600">{description}</p>}
 
       <div>
         <input

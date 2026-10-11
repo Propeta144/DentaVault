@@ -103,28 +103,34 @@ export async function markXrayReviewed(id) {
   )
 }
 
+// Mga X-ray na hindi ang dentist ang nag-upload, kaya kailangan niyang
+// makita: galing email, at (#27) in-upload ng patient sa patient portal.
+// Ligtas i-interpolate: sariling constant, hindi galing sa user.
+const REVIEWABLE_SOURCES_SQL = `('email_inbound', 'patient_upload')`
+
 // 'To yung nagpapagana sa sidebar "new X-ray from email" badge — count
 // lang, walang list, para hindi na kailangan maghanap-hanap ng dentist sa
 // bawat patient para lang malaman na may naghihintay.
 export async function countUnreviewedEmailXrays() {
   const [[{ count }]] = await pool.execute(
     `SELECT COUNT(*) AS count FROM xray_images
-     WHERE source = 'email_inbound' AND reviewed_at IS NULL AND deleted_at IS NULL`,
+     WHERE source IN ${REVIEWABLE_SOURCES_SQL} AND reviewed_at IS NULL AND deleted_at IS NULL`,
   )
   return count
 }
 
-// X-ray inbox (dentist): lahat ng X-ray na dumating sa email, sa buong
+// X-ray inbox (dentist): lahat ng X-ray na dumating sa email (at, #27, na
+// in-upload ng patient sa portal), sa buong
 // clinic, pinakabago muna — para hindi na kailangang buksan isa-isa ang
 // bawat patient para malaman kung sino ang may bagong X-ray. `status`:
 // 'new' = hindi pa nabubuksan (reviewed_at IS NULL), 'all' = lahat.
 // Hindi kasama ang X-ray ng na-delete na patient.
 export async function listInboxXrays({ status = 'new', limit, offset }) {
-  const where = `x.source = 'email_inbound' AND x.deleted_at IS NULL AND p.deleted_at IS NULL${
+  const where = `x.source IN ${REVIEWABLE_SOURCES_SQL} AND x.deleted_at IS NULL AND p.deleted_at IS NULL${
     status === 'new' ? ' AND x.reviewed_at IS NULL' : ''
   }`
   const [rows] = await pool.execute(
-    `SELECT x.id, x.original_filename, x.mime_type, x.taken_date, x.reviewed_at, x.created_at,
+    `SELECT x.id, x.original_filename, x.mime_type, x.source, x.taken_date, x.reviewed_at, x.created_at,
             p.patient_code, p.first_name, p.last_name
      FROM xray_images x
      JOIN patients p ON p.id = x.patient_id

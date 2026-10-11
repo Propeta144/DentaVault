@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Columns2, Mail, UploadCloud, ScanLine } from 'lucide-react'
+import { Columns2, Mail, UploadCloud, ScanLine, UserRound } from 'lucide-react'
 import XrayThumbnail from './XrayThumbnail'
 import StatusBadge from '../common/StatusBadge'
 import EmptyState from '../common/EmptyState'
@@ -10,7 +10,17 @@ function xrayDate(xray) {
   return formatDate(xray.taken_date || xray.created_at)
 }
 
-export default function XrayGallery({ xrays, onOpen, onCompare, canUpload = false }) {
+// Mga X-ray na hindi ang dentist ang nag-upload: may "New" hanggang mabuksan
+// niya. Sa patient, "Waiting for review" ang lumalabas (#27).
+const REVIEWABLE_SOURCES = ['email_inbound', 'patient_upload']
+
+const SOURCE_LABELS = {
+  email_inbound: { icon: Mail, label: 'Email' },
+  patient_upload: { icon: UserRound, label: 'Patient' },
+  manual_upload: { icon: UploadCloud, label: 'Clinic' },
+}
+
+export default function XrayGallery({ xrays, onOpen, onCompare, canUpload = false, viewerRole = 'dentist' }) {
   const [selected, setSelected] = useState([])
 
   function toggleSelect(id) {
@@ -28,9 +38,11 @@ export default function XrayGallery({ xrays, onOpen, onCompare, canUpload = fals
         icon={ScanLine}
         title="No X-rays yet"
         description={
-          canUpload
-            ? 'Upload the first X-ray with the form below. X-rays the patient emails to the clinic also appear here automatically.'
-            : 'X-rays taken at the clinic will appear here.'
+          !canUpload
+            ? 'X-rays taken at the clinic will appear here.'
+            : viewerRole === 'patient'
+              ? 'X-rays from the clinic will appear here. You can also send one with the form below.'
+              : 'Upload the first X-ray with the form below. X-rays the patient emails or uploads also appear here automatically.'
         }
       />
     )
@@ -77,28 +89,38 @@ export default function XrayGallery({ xrays, onOpen, onCompare, canUpload = fals
                 className="h-5 w-5 cursor-pointer accent-sky-600"
               />
             </label>
-            {xray.source === 'email_inbound' && !xray.reviewed_at && (
+            {REVIEWABLE_SOURCES.includes(xray.source) && !xray.reviewed_at && viewerRole !== 'patient' && (
               <div className="absolute right-1 top-1">
                 <StatusBadge variant="amber">New</StatusBadge>
               </div>
             )}
+            {/* Patient: buong-lapad na strip (hindi badge sa itaas-kanan) para hindi
+                tumama sa compare checkbox sa makitid na thumbnail sa phone */}
+            {REVIEWABLE_SOURCES.includes(xray.source) && !xray.reviewed_at && viewerRole === 'patient' && (
+              <div className="absolute inset-x-0 bottom-6 bg-sky-600/90 px-2 py-0.5 text-center text-xs font-medium text-white">
+                Waiting for review
+              </div>
+            )}
             <div className="absolute bottom-0 flex w-full items-center justify-between gap-1 bg-slate-900/75 px-2 py-1 text-xs text-white">
               <span className="truncate">{xrayDate(xray)}</span>
-              <span className="flex shrink-0 items-center gap-1 text-slate-200">
-                {xray.source === 'email_inbound' ? (
-                  <>
-                    <Mail className="h-3 w-3" /> Email
-                  </>
-                ) : (
-                  <>
-                    <UploadCloud className="h-3 w-3" /> Manual
-                  </>
-                )}
-              </span>
+              <SourceLabel source={xray.source} />
             </div>
           </div>
         ))}
       </div>
     </div>
+  )
+}
+
+// Saan galing ang X-ray (bottom bar ng thumbnail). Dati "Manual" ang tawag sa
+// upload ng clinic; "Clinic" na, para malinaw kumpara sa "Patient".
+function SourceLabel({ source }) {
+  const { icon: Icon, label } = SOURCE_LABELS[source] ?? SOURCE_LABELS.manual_upload
+  return (
+    // Phone: icon lang (makitid ang thumbnail, para buo ang petsa); sm pataas: may salita
+    <span className="flex shrink-0 items-center gap-1 text-slate-200" title={`From: ${label}`}>
+      <Icon className="h-3 w-3" aria-hidden="true" />
+      <span className="sr-only sm:not-sr-only">{label}</span>
+    </span>
   )
 }

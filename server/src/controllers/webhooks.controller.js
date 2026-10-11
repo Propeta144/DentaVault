@@ -5,10 +5,12 @@ import { recordAuditLog } from '../models/auditLogModel.js'
 import { isWebhookTokenUsed, markWebhookTokenUsed } from '../models/webhookTokenModel.js'
 import { verifyMailgunSignature, extractSenderEmail, senderAuthentication } from '../services/mailgunService.js'
 import { storeXrayFile } from '../services/xrayStorageService.js'
+import { detectXrayMimeType } from '../utils/fileSignature.js'
 import asyncHandler from '../utils/asyncHandler.js'
 import AppError from '../utils/AppError.js'
 
-const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'application/pdf'])
+// Uri ng attachment: mula sa mismong laman ng file (JPEG/PNG/WebP/PDF), hindi
+// sa Content-Type ng email, na kayang pekein ng nagpadala (#27).
 
 // Public, unauthenticated endpoint 'to — wala namang paraan si Mailgun na
 // magpadala ng Bearer token, kaya si verifyMailgunSignature() na mismo ang
@@ -53,7 +55,7 @@ export const mailgunInbound = asyncHandler(async (req, res) => {
   }
 
   const attachments = files.filter((f) => f.fieldname.startsWith('attachment'))
-  const allowed = attachments.filter((f) => ALLOWED_MIME_TYPES.has(f.mimetype))
+  const allowed = attachments.filter((f) => detectXrayMimeType(f.buffer))
 
   // Hindi awtomatikong ifa-file kapag:
   // - 2+ patient ang may ganitong email (hal. iisang email ng magulang para
@@ -85,7 +87,7 @@ export const mailgunInbound = asyncHandler(async (req, res) => {
       stored.push({
         fileUrl: await storeXrayFile(file.buffer, file.originalname),
         originalFilename: file.originalname,
-        mimeType: file.mimetype,
+        mimeType: detectXrayMimeType(file.buffer),
         fileSizeBytes: file.size,
         // parehong patakaran ng dedupeId sa baba
         dedupeId: messageId ? (allowed.length > 1 ? `${messageId}#${i}` : messageId) : null,
@@ -117,7 +119,8 @@ export const mailgunInbound = asyncHandler(async (req, res) => {
   for (let i = 0; i < attachments.length; i++) {
     const file = attachments[i]
 
-    if (!ALLOWED_MIME_TYPES.has(file.mimetype)) continue
+    const mimeType = detectXrayMimeType(file.buffer)
+    if (!mimeType) continue
 
     // UNIQUE per row yung mailgun_message_id, pero isang email lang,
     // pwede na siyang magdala ng ilang attachments — sufix na lang natin
@@ -139,7 +142,7 @@ export const mailgunInbound = asyncHandler(async (req, res) => {
       patientId: patient.id,
       fileUrl,
       originalFilename: file.originalname,
-      mimeType: file.mimetype,
+      mimeType,
       fileSizeBytes: file.size,
       source: 'email_inbound',
       mailgunMessageId: dedupeId,

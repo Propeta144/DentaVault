@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Settings, KeyRound, Mail, ShieldCheck, Copy, Check, Inbox, ScrollText } from 'lucide-react'
+import { Settings, KeyRound, Mail, ShieldCheck, Copy, Check, Inbox, ScrollText, Upload } from 'lucide-react'
 import { getSettings } from '../services/settings'
 import { useAuth } from '../context/AuthContext'
+import { PROFILE_PATH, profileState } from '../utils/selectedPatient'
 import PageLoader from '../components/common/PageLoader'
 import Avatar from '../components/common/Avatar'
 import StatusBadge from '../components/common/StatusBadge'
@@ -104,6 +105,26 @@ export default function SettingsPage() {
               Change password
             </Link>
           </div>
+        </Card>
+
+        {/* #27: puwede nang mag-upload ang patient sa sariling record, bukod sa email */}
+        <Card icon={Upload} title="Uploading X-rays in the app">
+          <p className="text-base text-slate-600">
+            {isDentist
+              ? 'Patients can upload X-rays from outside clinics in their own record (My Record → X-rays). The dentist sees them in the X-ray Inbox, and the patient can remove one until it has been reviewed.'
+              : 'The easiest way to send the clinic an X-ray from another clinic or laboratory: open My Record → X-rays and upload it there. You can remove it until the dentist has reviewed it.'}
+          </p>
+          {isDentist ? (
+            <Link to="/xrays" className="mt-2 inline-flex min-h-11 items-center gap-1.5 text-base font-medium text-sky-700 hover:underline">
+              <Inbox className="h-4 w-4" />
+              Open X-ray Inbox
+            </Link>
+          ) : (
+            <Link to={PROFILE_PATH} state={profileState(user.patientCode, { tab: 'xrays' })} className="mt-2 inline-flex min-h-11 items-center gap-1.5 text-base font-medium text-sky-700 hover:underline">
+              <Upload className="h-4 w-4" />
+              Upload an X-ray
+            </Link>
+          )}
         </Card>
 
         <Card icon={Mail} title="Sending X-rays by email">

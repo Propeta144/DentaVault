@@ -3,6 +3,7 @@ import { body } from 'express-validator'
 import * as xraysController from '../controllers/xrays.controller.js'
 import { authenticate } from '../middleware/auth.js'
 import { requireRole } from '../middleware/rbac.js'
+import { patientXrayUploadLimiter } from '../middleware/rateLimit.js'
 import { uploadXray } from '../config/upload.js'
 import { FIELD_LIMITS, notInFuture } from '../utils/validators.js'
 
@@ -12,9 +13,13 @@ router.use(authenticate)
 
 // Patient-scoped 'to: listahan/pag-upload ng X-rays para sa isang partikular na patient.
 router.get('/patients/:patientCode/xrays', xraysController.list)
+// Dentist: kahit kaninong patient. Patient (#27): sariling record lang
+// (tinitingnan sa controller gamit ang canAccessPatientRecord), may limit
+// bawat araw na nauuna sa pagbasa ng file.
 router.post(
   '/patients/:patientCode/xrays',
-  requireRole('dentist'),
+  requireRole('dentist', 'patient'),
+  patientXrayUploadLimiter,
   uploadXray.single('file'),
   [
     body('takenDate')
@@ -53,6 +58,7 @@ router.post('/xrays/holds/:holdId/dismiss', requireRole('dentist'), xraysControl
 // X-ray-scoped 'to: gumagana sa isang image, base sa sarili niyang id.
 router.get('/xrays/:id/file', xraysController.getFile)
 router.put('/xrays/:id/annotations', requireRole('dentist'), xraysController.updateAnnotations)
-router.delete('/xrays/:id', requireRole('dentist'), xraysController.remove)
+// Patient: sariling upload lang na hindi pa nare-review (tignan controller)
+router.delete('/xrays/:id', requireRole('dentist', 'patient'), xraysController.remove)
 
 export default router
