@@ -108,6 +108,8 @@ Destructive modals follow `DeletePatientModal.jsx`: red alert box with `AlertTri
 - Dates: default/`max` with `todayISO()` (local date). Never `new Date().toISOString()` (UTC).
 - Choices with few options (sex, procedure, condition) = big buttons with `role="radio"` in a
   `role="radiogroup"`, no silent default for clinically important fields.
+- Multi-value medical fields (Medical History, Allergies): `components/common/ComboboxListInput.jsx` with
+  `groups` from `constants/medicalOptions.js`. Value stays a comma-separated string; free text allowed.
 - Unsaved changes: `hooks/useDiscardGuard` + `components/common/DiscardChangesBar` (modal X/Escape
   and Cancel ask first). Report dirty with `useLayoutEffect`.
 - Server errors and 409 warnings render in the form footer (visible even when scrolled down).

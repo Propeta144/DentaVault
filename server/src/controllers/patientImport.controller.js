@@ -54,54 +54,34 @@ export const importFile = asyncHandler(async (req, res) => {
   res.json(result)
 })
 
+// Mga header ng template: madaling basahin sa Excel, may * sa required at
+// may halimbawang format sa loob ng ( ). Kusa pa rin silang nakikilala ng
+// auto-match (normalizeHeader sa patientImportService ay hindi pinapansin
+// ang * at ang nasa loob ng panaklong).
+const TEMPLATE_COLUMN_TITLES = {
+  first_name: 'First Name *',
+  last_name: 'Last Name *',
+  sex: 'Sex * (male/female)',
+  date_of_birth: 'Date of Birth * (MM/DD/YYYY)',
+  contact_number: 'Contact Number (09XXXXXXXXX)',
+  email: 'Email',
+  address: 'Address',
+  medical_history: 'Medical History',
+  allergies: 'Allergies (or None)',
+  emergency_contact_name: 'Emergency Contact Name',
+  emergency_contact_phone: 'Emergency Contact Phone',
+  procedure_name: 'Procedure (past visit)',
+  treatment_date: 'Treatment Date (MM/DD/YYYY)',
+  tooth_number: 'Tooth Number (e.g. 26 or ALL)',
+  treatment_notes: 'Treatment Notes',
+}
+
+// Blangkong template (header row lang). Dati may 2 halimbawang row
+// ("Juan Dela Cruz"), kaya kailangan pang burahin bago mag-encode, at
+// kapag nakalimutan, naiimport ang pekeng patient. Ang paliwanag kung paano
+// punan ay nasa Upload step ng Migration page.
 export const downloadTemplate = (req, res) => {
-  // Isang patient, dalawang rows: ganito ipinapakita kung paano isasama
-  // yung buong treatment history sa parehong file — ulitin lang yung
-  // first_name/last_name/sex/date_of_birth (kailangan magkatugma, dahil
-  // dito nakikilala kung parehong tao), tapos palitan na lang yung
-  // procedure_name/treatment_date/tooth_number bawat past visit. Yung
-  // demographic columns sa 2nd row, pwede nang iwan blangko maliban sa
-  // required 4 — hindi na basahin kung meron nang existing patient match.
-  const exampleRows = [
-    [
-      'Juan',
-      'Dela Cruz',
-      'male',
-      '1985-03-14',
-      '09171234567',
-      'juan@example.com',
-      'Bacoor City, Cavite',
-      'None',
-      'Penicillin',
-      'Maria Dela Cruz',
-      '09179876543',
-      'Oral Prophylaxis / Cleaning',
-      '2023-06-10',
-      'ALL',
-      'Routine cleaning, no issues noted',
-    ],
-    [
-      'Juan',
-      'Dela Cruz',
-      'male',
-      '1985-03-14',
-      '',
-      '',
-      '',
-      '',
-      '',
-      '',
-      '',
-      'Composite Restoration / Filling',
-      '2024-01-22',
-      '26',
-      'Small cavity, resin filling',
-    ],
-  ]
-  const csv = [
-    IMPORT_TEMPLATE_HEADERS.map(csvField).join(','),
-    ...exampleRows.map((row) => row.map(csvField).join(',')),
-  ].join('\n')
+  const csv = IMPORT_TEMPLATE_HEADERS.map((field) => csvField(TEMPLATE_COLUMN_TITLES[field])).join(',') + '\n'
 
   res.setHeader('Content-Type', 'text/csv')
   res.setHeader('Content-Disposition', 'attachment; filename="dentavault-patient-import-template.csv"')

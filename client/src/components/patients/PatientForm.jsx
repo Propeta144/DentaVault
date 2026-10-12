@@ -1,6 +1,7 @@
 import { cloneElement, isValidElement, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { User, Phone, ShieldAlert, ClipboardList, Users, ExternalLink } from 'lucide-react'
-import QuickInputTextarea from '../common/QuickInputTextarea'
+import ComboboxListInput from '../common/ComboboxListInput'
+import { MEDICAL_HISTORY_OPTIONS, ALLERGY_OPTIONS } from '../../constants/medicalOptions'
 import DiscardChangesBar from '../common/DiscardChangesBar'
 import { FIELD_LIMITS } from '../../constants/fieldLimits'
 import { formatDate, todayISO } from '../../utils/formatDate'
@@ -427,27 +428,27 @@ export default function PatientForm({
         </Field>
       </div>
 
-      <SectionHeading icon={ClipboardList}>Medical & Dental History</SectionHeading>
+      <SectionHeading icon={ClipboardList}>Medical</SectionHeading>
 
-      {/* Dati nakabalot ito sa <Field> na walang label, kaya may bakanteng
-          <label> sa page. May sariling label/id na ang QuickInputTextarea. */}
-      <QuickInputTextarea
+      {/* Dropdown na may listahan (constants/medicalOptions.js) at puwede ring
+          mag-type ng wala sa listahan. May sariling label/id ang component. */}
+      <ComboboxListInput
         label="Medical History"
         value={form.medicalHistory}
         onChange={(val) => update('medicalHistory', val)}
-        presets={['None', 'Hypertension', 'Diabetes', 'Asthma']}
-        placeholder="Enter medical history or tap an option above"
+        groups={MEDICAL_HISTORY_OPTIONS}
+        hint="Pick from the list or type your own and press Enter. You can add more than one."
         maxLength={FIELD_LIMITS.medicalHistory}
       />
 
-      <QuickInputTextarea
+      <ComboboxListInput
         label="Allergies"
         required
         error={fieldErrors.allergies}
         value={form.allergies}
         onChange={(val) => update('allergies', val)}
-        presets={['None', 'Penicillin', 'Latex', 'Aspirin']}
-        placeholder="List known allergies, or tap None"
+        groups={ALLERGY_OPTIONS}
+        hint='Pick from the list or type your own. Tap "None" if the patient has no known allergies.'
         maxLength={FIELD_LIMITS.allergies}
       />
 

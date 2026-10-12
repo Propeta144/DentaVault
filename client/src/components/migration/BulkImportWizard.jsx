@@ -210,8 +210,33 @@ export default function BulkImportWizard() {
             className="flex min-h-11 items-center gap-1.5 text-base font-medium text-sky-700 hover:underline"
           >
             <Download className="h-4 w-4" />
-            Download a sample template
+            Download a blank template
           </button>
+          {/* Blangko na ang template (header row lang), kaya dito ang paliwanag
+              kung paano punan. Nasa header mismo ang * at ang format. */}
+          <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+            <p className="mb-1.5 font-semibold text-slate-700">Filling in the template</p>
+            <ul className="list-disc space-y-1 pl-5">
+              <li>
+                Columns marked <span className="font-semibold text-red-600">*</span> are required: First Name, Last Name,
+                Sex, and Date of Birth.
+              </li>
+              <li>Write dates as MM/DD/YYYY (e.g. 03/14/1985). Leave a cell blank if you don't know it.</li>
+              <li>
+                One row per patient. For past visits, add one row per visit and repeat the patient's name, sex, and date
+                of birth.
+              </li>
+              <li>
+                Separate several medical conditions or allergies with a comma. Write <span className="font-medium">None</span>{' '}
+                if the patient has no allergies.
+              </li>
+              <li>Procedure must be one of: {PROCEDURES.map((p) => p.value).join(', ')}.</li>
+              <li>
+                In Excel, select all and double-click the line between two column letters to widen the columns so every
+                header is readable.
+              </li>
+            </ul>
+          </div>
         </div>
       )}
 

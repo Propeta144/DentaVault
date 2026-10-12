@@ -2,7 +2,7 @@ import { parse as parseCsv } from 'csv-parse/sync'
 import * as patientModel from '../models/patientModel.js'
 import * as treatmentModel from '../models/treatmentModel.js'
 import AppError from '../utils/AppError.js'
-import { FIELD_LIMITS } from '../utils/validators.js'
+import { FIELD_LIMITS, stripPhoneFormatting } from '../utils/validators.js'
 
 const REQUIRED_COLUMNS = ['first_name', 'last_name', 'sex', 'date_of_birth']
 const OPTIONAL_COLUMNS = [
@@ -94,7 +94,13 @@ function parseFile(buffer, originalname) {
 // Hindi na kailangang eksaktong "first_name" ang header ng file ng clinic:
 // ina-auto-match ang karaniwang pangalan ("First Name", "Birthdate",
 // "Gender", "Contact"...), at puwedeng baguhin ng dentist bago mag-import.
-const normalizeHeader = (h) => String(h || '').toLowerCase().replace(/[^a-z0-9]/g, '')
+// Hindi pinapansin ang nasa loob ng ( ) at ang *, para tugma pa rin ang
+// header ng template gaya ng "Sex * (male/female)" → "sex".
+const normalizeHeader = (h) =>
+  String(h || '')
+    .replace(/\([^)]*\)/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '')
 
 const HEADER_ALIASES = {
   first_name: ['firstname', 'fname', 'givenname', 'first', 'pangalan'],
@@ -205,6 +211,18 @@ function isValidCalendarDate(isoString) {
   return true
 }
 
+// Excel: kapag tinype ang 09171234567, nagiging numero (9171234567) at
+// nawawala ang 0; ang +639... ay nagiging 639.... Ibinabalik dito ang
+// tamang PH mobile format. Ang ibang format (hal. landline) ay iniiwan lang.
+function normalizeImportPhone(value) {
+  if (value == null || String(value).trim() === '') return null
+  const original = String(value).trim()
+  const v = stripPhoneFormatting(original)
+  if (/^0?9\d{9}$/.test(v)) return v.startsWith('0') ? v : `0${v}`
+  if (/^\+?639\d{9}$/.test(v)) return v.startsWith('+') ? v : `+${v}`
+  return original
+}
+
 function validateAndNormalizeRow(raw) {
   const errors = []
   const firstName = String(raw.first_name || '').trim()
@@ -235,13 +253,13 @@ function validateAndNormalizeRow(raw) {
       lastName,
       sex,
       dateOfBirth,
-      contactNumber: raw.contact_number ? String(raw.contact_number).trim() : null,
+      contactNumber: normalizeImportPhone(raw.contact_number),
       email: raw.email ? String(raw.email).trim() : null,
       address: raw.address ? String(raw.address).trim() : null,
       medicalHistory: raw.medical_history ? String(raw.medical_history).trim() : null,
       allergies: raw.allergies ? String(raw.allergies).trim() : null,
       emergencyContactName: raw.emergency_contact_name ? String(raw.emergency_contact_name).trim() : null,
-      emergencyContactPhone: raw.emergency_contact_phone ? String(raw.emergency_contact_phone).trim() : null,
+      emergencyContactPhone: normalizeImportPhone(raw.emergency_contact_phone),
       isLegacyMigrated: true,
     },
   }

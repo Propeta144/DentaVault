@@ -1216,3 +1216,56 @@ email: pekeng attachment nilaktawan at tamang `mime_type`, audit, limit 10 bawat
 (form, toast, "Waiting for review", viewer Delete, Remove modal, Settings link, 360px walang patong at walang overflow, inbox
 "via Patient portal" sa laptop at phone, pagkatapos ng review wala nang strip at Delete; 0 console error). Regression e2e
 **27/27** (sa ilalim ng CSP). Build pasado. Nilinis ang lahat ng test data (kasama ang mga file sa Cloudinary). **Naka-push na** (commit `ebc830d`, 2026-10-11). Live sa `dentavault.vercel.app` (Settings card, Inbox wording, 0 console error).
+
+
+---
+
+## 28. Blangkong CSV Template + Dropdown sa Medical History at Allergies
+
+Galing sa paghahanda para sa client visit (pagkuha ng lumang records).
+
+### A. CSV template (Migration → Bulk Import)
+- **Blangko na** (header row lang). Dati may 2 halimbawang row ("Juan Dela Cruz"), kaya kailangan pang burahin bago
+  mag-encode, at kapag nakalimutan, naiimport ang pekeng patient.
+- **Madaling basahin ang header** (palatandaan): `First Name *`, `Sex * (male/female)`, `Date of Birth * (MM/DD/YYYY)`,
+  `Contact Number (09XXXXXXXXX)`, `Allergies (or None)`, `Tooth Number (e.g. 26 or ALL)`... `*` = required.
+- Kusa pa ring nakikilala sa Map Columns: hindi na pinapansin ng `normalizeHeader` ang `*` at ang nasa loob ng `( )`.
+  Gumagana pa rin ang lumang format (`first_name`, ...).
+- **Gabay sa Upload step** ("Filling in the template"): required columns, petsa, isang row bawat visit, comma sa
+  maraming kondisyon, listahan ng procedures, at paano palaparin ang column sa Excel.
+- **Excel phone fix:** kapag tinype ang `09171234567` sa Excel, nagiging `9171234567` (nawawala ang 0). Ibinabalik na ito
+  sa import (`9XXXXXXXXX` → `09...`, `639...` → `+639...`). Mobile lang ang ginagalaw; ang landline ay iniiwan.
+
+### B. Medical History at Allergies = dropdown na puwede ring mag-type
+- Pinalitan ang 3 preset chips + textarea ng **`ComboboxListInput`**: listahang naka-group, maraming mapipili (chips na may X),
+  at puwedeng mag-type ng wala sa listahan (Enter, comma, o "Add ...").
+- **Listahan** (`constants/medicalOptions.js`): Medical History **52** (11 grupo, batay sa PDA-style na medical history form:
+  puso/BP, pagdurugo at blood thinners, diabetes/thyroid, baga, hepatitis/HIV/TB, bato, epilepsy, bisphosphonates/joint
+  implant, cancer/radiation, pagbubuntis, atbp.); Allergies **28** (antibiotics, pain relievers, anesthesia, dental
+  materials gaya ng latex/nickel/acrylic, pagkain). May Filipino keywords sa paghahanap (hal. "hika" → Asthma,
+  "altapresyon" → Hypertension, "lido" → Lidocaine).
+- **Kaligtasan:** kapag may na-type pero hindi na-Enter at umalis sa field, idinadagdag pa rin (hindi mawawala ang allergy).
+  "None" nagtatanong pa rin bago palitan ang listahan. Enter = unang tugma (hal. "pen" → Penicillin), nasa dulo ang "Add ...".
+- **Walang binago sa database/server:** comma-separated text pa rin ang naka-save, kaya buo ang lumang data (hal.
+  "Hypertension" ay lumalabas bilang chip).
+- **Kusang nagsasara ang listahan pagkapili** (click, Enter, o comma), para hindi na kailangang mag-click sa labas.
+  Nananatili ang cursor sa field: click, type, o ↓ para magdagdag pa.
+- Section heading sa form: "Medical & Dental History" → **"Medical"**.
+- Lumulutang (overlay) ang listahan: kung nasa daloy ng page, umaakyat ang Register button pagsara ng listahan at
+  hindi gumagana ang unang pindot (nahuli sa test).
+
+| Name | Type | Purpose |
+|---|---|---|
+| `server/src/controllers/patientImport.controller.js` | MODIFIED | `TEMPLATE_COLUMN_TITLES`; blangkong template. |
+| `server/src/services/patientImportService.js` | MODIFIED | `normalizeHeader` (hindi pinapansin ang `*`/`( )`), `normalizeImportPhone()`. |
+| `client/src/components/migration/BulkImportWizard.jsx` | MODIFIED | "Download a blank template" + gabay sa pagpuno. |
+| `client/src/constants/medicalOptions.js` | **NEW** | `MEDICAL_HISTORY_OPTIONS`, `ALLERGY_OPTIONS` (group, label, keywords). |
+| `client/src/components/common/ComboboxListInput.jsx` | **NEW** | Multi-select combobox na may free text, None toggle, keyboard (↑↓ Enter Esc Backspace). |
+| `client/src/components/patients/PatientForm.jsx` | MODIFIED | Gumagamit ng `ComboboxListInput` (Register at Edit modal); heading "Medical". |
+| `client/src/components/common/QuickInputTextarea.jsx` | **BINURA** | Pinalitan ng `ComboboxListInput`. |
+
+**Na-verify (local, Edge via Playwright + API):** UI **31/31** (grouped list, nagsasara pagkapili at bumubukas ulit, keyword search, Filipino keywords, custom item,
+blur nagdadagdag ng na-type, Backspace/X, comma paste, Escape sa list lang (hindi sa Edit modal), "pen" → Penicillin,
+None confirm, eksaktong value na ipinapadala sa server, 360px walang overflow, 0 console error); template: 15/15 header
+auto-match, lumang format OK, dry-run import OK, phone fix 8 kaso. Build pasado. Walang test data na naisulat (naka-stub
+ang Register request). **Hindi pa naka-push.**
