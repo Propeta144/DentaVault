@@ -1268,4 +1268,4 @@ Galing sa paghahanda para sa client visit (pagkuha ng lumang records).
 blur nagdadagdag ng na-type, Backspace/X, comma paste, Escape sa list lang (hindi sa Edit modal), "pen" → Penicillin,
 None confirm, eksaktong value na ipinapadala sa server, 360px walang overflow, 0 console error); template: 15/15 header
 auto-match, lumang format OK, dry-run import OK, phone fix 8 kaso. Build pasado. Walang test data na naisulat (naka-stub
-ang Register request). **Hindi pa naka-push.**
+ang Register request). **Naka-push na** (commit `b1f5c2d`, 2026-10-12). Walang migration (walang binago sa database).
