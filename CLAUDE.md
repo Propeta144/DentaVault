@@ -1373,4 +1373,4 @@ Save kita sa 1366×768, print header); Phase 2 **29/29** (bagong codes, whole-to
 tooth number 59/99/19/abc = 422, letter codes, toggle, grouped modal 23, print + findings dedupe, 3D pen 8); Phase 3 **30/30**
 (create/update/export/import ng bagong field, Oo/Hindi, male → binubura ang pang-babae, guardian para sa minor, Edit prefill,
 Print Summary; 2 sa test script ay timing, nakumpirma sa screenshot); Phase 5 **13/13** (intraoral API 422/403, card, Save, print, 360px); patient view 4/4; responsive sweep **45 screens** (320–1366px), 0 overflow, 0 page errors (bago tanggalin ang Appointments; pagkatapos: build at 3 tab sa 320–1024px muling sinuri). Build pasado.
-Nilinis ang lahat ng test data. **Hindi pa naka-commit o naka-push.**
+Nilinis ang lahat ng test data. **Naka-push na** (commit `5cd533d`, 2026-10-14). Napatakbo muna ang migrations 014–016 sa Aiven bago ang push.
