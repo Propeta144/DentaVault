@@ -2,7 +2,8 @@ import { parse as parseCsv } from 'csv-parse/sync'
 import * as patientModel from '../models/patientModel.js'
 import * as treatmentModel from '../models/treatmentModel.js'
 import AppError from '../utils/AppError.js'
-import { FIELD_LIMITS, stripPhoneFormatting } from '../utils/validators.js'
+import { FIELD_LIMITS, stripPhoneFormatting, isValidToothNumber } from '../utils/validators.js'
+import { EXTRA_PATIENT_FIELDS, parseYesNo } from '../utils/patientFields.js'
 
 const REQUIRED_COLUMNS = ['first_name', 'last_name', 'sex', 'date_of_birth']
 const OPTIONAL_COLUMNS = [
@@ -23,6 +24,11 @@ const OPTIONAL_COLUMNS = [
 // is treated as patient-info-only.
 const TREATMENT_COLUMNS = ['procedure_name', 'treatment_date', 'tooth_number', 'treatment_notes']
 
+// Patient Information Record (migration 015): optional din. Ang column name
+// sa file = DB column (hal. "middle_name"), o ang label (hal. "Middle name").
+const INFO_FIELDS_BY_COLUMN = Object.fromEntries(EXTRA_PATIENT_FIELDS.map((f) => [f.column, f]))
+export const INFO_COLUMNS = EXTRA_PATIENT_FIELDS.map((f) => f.column)
+
 // Mirrors client/src/constants/dental.js's PROCEDURES — kept as a separate
 // copy here (server and client are separate npm packages, no shared
 // package between them) rather than free text, so imported treatments
@@ -30,22 +36,53 @@ const TREATMENT_COLUMNS = ['procedure_name', 'treatment_date', 'tooth_number', '
 // "Most Common Procedures" breakdown and pick up the same whole-mouth
 // tooth-selector behavior AddTreatmentForm.jsx applies on the client.
 // Keep the two lists in sync if procedures are ever added/renamed.
+//
+// `aliases`: karaniwang tawag na isinusulat ng nag-e-encode mula sa papel
+// (hal. "Cleaning", "Pasta", "Bunot"). Pinapalitan ito ng tamang `value`
+// bago i-save, kaya pareho pa rin ang grupo sa dashboard.
 const STANDARD_PROCEDURES = [
-  { value: 'Oral Prophylaxis / Cleaning', wholeMouth: true },
-  { value: 'Composite Restoration / Filling', wholeMouth: false },
-  { value: 'Tooth Extraction', wholeMouth: false },
-  { value: 'Root Canal Treatment', wholeMouth: false },
-  { value: 'Crown / Bridge', wholeMouth: false },
-  { value: 'Orthodontic Adjustment', wholeMouth: false },
-  { value: 'Fluoride Treatment', wholeMouth: true },
+  { value: 'Consultation', wholeMouth: true, aliases: ['check-up', 'checkup', 'konsulta'] },
+  { value: 'Oral Prophylaxis / Cleaning', wholeMouth: true, aliases: ['cleaning', 'oral prophylaxis', 'prophylaxis', 'linis'] },
+  { value: 'Deep Scaling', wholeMouth: false, aliases: ['scaling', 'scaling and root planing'] },
+  { value: 'Fluoride Treatment', wholeMouth: true, aliases: ['fluoride'] },
+  { value: 'Pit & Fissure Sealant', wholeMouth: false, aliases: ['sealant', 'sealants', 'pit and fissure sealant'] },
+  {
+    value: 'Composite Restoration / Filling',
+    wholeMouth: false,
+    aliases: ['filling', 'composite', 'composite filling', 'composite restoration', 'pasta'],
+  },
+  { value: 'Amalgam Filling', wholeMouth: false, aliases: ['amalgam'] },
+  { value: 'Inlay / Onlay', wholeMouth: false, aliases: ['inlay', 'onlay'] },
+  { value: 'Tooth Extraction', wholeMouth: false, aliases: ['extraction', 'bunot'] },
+  { value: 'Root Canal Treatment', wholeMouth: false, aliases: ['root canal', 'rct'] },
+  { value: 'Braces Installation', wholeMouth: true, aliases: ['braces', 'braces installation'] },
+  { value: 'Orthodontic Adjustment', wholeMouth: false, aliases: ['adjustment', 'braces adjustment'] },
+  { value: 'Crown', wholeMouth: false, aliases: ['jacket crown', 'jacket'] },
+  { value: 'Bridge', wholeMouth: false, aliases: ['fixed bridge'] },
+  { value: 'Denture', wholeMouth: false, aliases: ['dentures', 'removable denture', 'pustiso'] },
+  { value: 'Veneers', wholeMouth: false, aliases: ['veneer'] },
+  { value: 'Teeth Whitening', wholeMouth: true, aliases: ['whitening', 'bleaching'] },
 ]
 
 function matchStandardProcedure(value) {
   const v = String(value || '').trim().toLowerCase()
-  return STANDARD_PROCEDURES.find((p) => p.value.toLowerCase() === v) || null
+  return (
+    STANDARD_PROCEDURES.find((p) => p.value.toLowerCase() === v) ||
+    STANDARD_PROCEDURES.find((p) => p.aliases.includes(v)) ||
+    null
+  )
 }
 
-export const IMPORT_TEMPLATE_HEADERS = [...REQUIRED_COLUMNS, ...OPTIONAL_COLUMNS, ...TREATMENT_COLUMNS]
+// Pagkakasunod sa template: middle name katabi ng pangalan, tapos ang iba
+// pang field ng Patient Information Record bago ang treatment columns
+export const IMPORT_TEMPLATE_HEADERS = [
+  'first_name',
+  'middle_name',
+  ...REQUIRED_COLUMNS.filter((c) => c !== 'first_name'),
+  ...OPTIONAL_COLUMNS,
+  ...INFO_COLUMNS.filter((c) => c !== 'middle_name'),
+  ...TREATMENT_COLUMNS,
+]
 
 // [CSV column, FIELD_LIMITS key]
 const IMPORT_LENGTH_CHECKS = [
@@ -118,6 +155,27 @@ const HEADER_ALIASES = {
   treatment_date: ['treatmentdate', 'visitdate', 'dateoftreatment', 'dateofvisit'],
   tooth_number: ['toothnumber', 'tooth', 'toothno'],
   treatment_notes: ['treatmentnotes', 'notes', 'remarks'],
+  // Patient Information Record: dagdag sa column name at label (awtomatiko)
+  middle_name: ['middlename', 'mname', 'middle', 'middleinitial', 'mi', 'gitnangpangalan'],
+  occupation: ['occupation', 'trabaho', 'work', 'job'],
+  nationality: ['nationality', 'citizenship'],
+  religion: ['religion', 'relihiyon'],
+  guardian_name: ['guardian', 'parentguardian', 'parentguardiansname', 'parentsname', 'parent', 'magulang'],
+  previous_dentist: ['previousdentist', 'formerdentist'],
+  last_dental_visit: ['lastdentalvisit', 'lastvisit'],
+  physician_name: ['physician', 'nameofphysician', 'doctor'],
+  physician_specialty: ['specialty'],
+  physician_office_address: ['officeaddress'],
+  physician_office_number: ['officenumber', 'officeno'],
+  in_good_health: ['goodhealth', 'areyouingoodhealth'],
+  is_pregnant: ['pregnant', 'buntis'],
+  is_nursing: ['nursing', 'breastfeeding'],
+  taking_birth_control: ['birthcontrol', 'birthcontrolpills'],
+  blood_type: ['bloodtype', 'bloodgroup'],
+  blood_pressure: ['bloodpressure', 'bp'],
+}
+for (const f of EXTRA_PATIENT_FIELDS) {
+  HEADER_ALIASES[f.column] = [...new Set([normalizeHeader(f.label), ...(HEADER_ALIASES[f.column] || [])])]
 }
 
 export const IMPORT_FIELDS = IMPORT_TEMPLATE_HEADERS
@@ -174,6 +232,9 @@ export function previewImport(buffer, originalname) {
     suggestedMapping: suggestMapping(headers),
     fields: IMPORT_FIELDS,
     requiredFields: REQUIRED_COLUMNS,
+    // Para sa Map Columns step: hiwalay na grupo at label ng mga bagong field
+    infoFields: INFO_COLUMNS,
+    fieldLabels: Object.fromEntries(EXTRA_PATIENT_FIELDS.map((f) => [f.column, f.label])),
   }
 }
 
@@ -245,10 +306,27 @@ function validateAndNormalizeRow(raw) {
     }
   }
 
+  // Patient Information Record: haba ng text, at Yes/No na sagot
+  const info = {}
+  for (const column of INFO_COLUMNS) {
+    const field = INFO_FIELDS_BY_COLUMN[column]
+    const rawValue = raw[column]
+    if (field.type === 'bool') {
+      const parsed = parseYesNo(rawValue)
+      if (parsed.error) errors.push(`${column} must be Yes or No (got "${rawValue}")`)
+      else if (parsed.value !== null) info[field.key] = parsed.value === 1
+    } else {
+      const value = rawValue == null ? '' : String(rawValue).trim()
+      if (value.length > field.max) errors.push(`${column} must be ${field.max} characters or fewer (got ${value.length})`)
+      else if (value) info[field.key] = value
+    }
+  }
+
   if (errors.length > 0) return { errors }
 
   return {
     data: {
+      ...info,
       firstName,
       lastName,
       sex,
@@ -276,7 +354,10 @@ function validateAndNormalizeTreatmentRow(raw) {
   const errors = []
 
   const procedure = matchStandardProcedure(rawProcedureName)
-  if (!procedure) {
+  if (!procedure && rawProcedureName.toLowerCase() === 'crown / bridge') {
+    // Dating iisang procedure; hiwalay na ngayon (hiling ng clinic)
+    errors.push('procedure_name "Crown / Bridge" is now two procedures. Write Crown or Bridge')
+  } else if (!procedure) {
     const valid = STANDARD_PROCEDURES.map((p) => p.value).join(', ')
     errors.push(`procedure_name "${rawProcedureName}" doesn't match a standard procedure. Valid values: ${valid}`)
   }
@@ -298,10 +379,10 @@ function validateAndNormalizeTreatmentRow(raw) {
     if (rawTooth) {
       if (rawTooth.toUpperCase() === 'ALL') {
         toothNumber = 'ALL'
-      } else if (/^[1-4][1-8]$/.test(rawTooth)) {
+      } else if (isValidToothNumber(rawTooth)) {
         toothNumber = rawTooth
       } else {
-        errors.push(`tooth_number must be a valid FDI tooth number (11-48) or "ALL" (got "${raw.tooth_number}")`)
+        errors.push(`tooth_number must be a valid FDI tooth number (11-48, or 51-85 for baby teeth) or "ALL" (got "${raw.tooth_number}")`)
       }
     }
   }

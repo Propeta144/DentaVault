@@ -10,7 +10,8 @@ import PageLoader from '../components/common/PageLoader'
 import { useAuth } from '../context/AuthContext'
 import { actionVariant, actionLabel, auditPatientName, groupAuditLogs } from '../utils/auditAction'
 import { formatActivityTime, greetingForNow } from '../utils/formatDate'
-import { PROCEDURE_CHART_ORDER, PROCEDURE_OTHER, CONDITION_CHART_ORDER } from '../constants/dashboardColors'
+import { PROCEDURE_CATEGORY_COLORS, PROCEDURE_OTHER, CONDITION_CHART_ORDER, CONDITION_LEGEND } from '../constants/dashboardColors'
+import { PROCEDURES, PROCEDURE_CATEGORIES, RETIRED_PROCEDURES, procedureShortLabel } from '../constants/dental'
 
 // Kulay ng tuldok sa Recent Activity: parehong grupo ng actionVariant
 // (status colors). Hindi kulay lang ang nagdadala ng kahulugan: laging may
@@ -24,6 +25,7 @@ const DOT = {
 }
 
 const RECENT_LIMIT = 8
+
 
 // "Dr. Nolita Reloj Teodosio-Rufin" → "Dr. Teodosio-Rufin" (huling salita =
 // apelyido; may gitling ang compound na apelyido, tignan migration 009).
@@ -57,21 +59,24 @@ export default function DashboardPage() {
 
   const { stats, procedureBreakdown, conditionBreakdown, monthlyTrend } = data
 
-  // Iba-ibang kulay bawat procedure, sa FIXED na pagkakasunod (hindi sorted
-  // by count) — tignan PROCEDURE_CHART_ORDER sa dashboardColors.js kung
-  // bakit. Laging kita lahat ng 7 standard procedures (kahit 0), para hindi
-  // gumagalaw ang pwesto/kulay nila. Ang mga hindi-standard na pangalan,
-  // pinagsasama sa "Other" (nasa tooltip kung ano-ano sila).
+  // Kulay ayon sa GRUPO ng procedure, sa FIXED na pagkakasunod (hindi sorted
+  // by count) — tignan PROCEDURE_CATEGORY_COLORS sa dashboardColors.js kung
+  // bakit. Laging kita lahat ng standard procedures (kahit 0), para hindi
+  // gumagalaw ang pwesto/kulay nila. Ang lumang "Crown / Bridge" ay lumalabas
+  // lang kapag may record pa. Ang hindi-standard na pangalan ay "Other".
   const procedureCounts = Object.fromEntries(procedureBreakdown.map((p) => [p.procedure_name, p.count]))
-  const procedureData = PROCEDURE_CHART_ORDER.map((p) => ({
-    label: p.label,
+  const knownProcedures = PROCEDURE_CATEGORIES.flatMap((cat) => [
+    ...PROCEDURES.filter((p) => p.category === cat.code),
+    ...RETIRED_PROCEDURES.filter((p) => p.category === cat.code && procedureCounts[p.value]),
+  ])
+  const procedureData = knownProcedures.map((p) => ({
+    label: procedureShortLabel(p.value),
     value: procedureCounts[p.value] || 0,
-    color: p.color,
+    color: PROCEDURE_CATEGORY_COLORS[p.category],
     tooltip: `${p.value}: ${procedureCounts[p.value] || 0}`,
   }))
-  const otherProcedures = procedureBreakdown.filter(
-    (p) => !PROCEDURE_CHART_ORDER.some((known) => known.value === p.procedure_name),
-  )
+  const procedureLegend = PROCEDURE_CATEGORIES.map((c) => ({ label: c.label, color: PROCEDURE_CATEGORY_COLORS[c.code] }))
+  const otherProcedures = procedureBreakdown.filter((p) => !knownProcedures.some((known) => known.value === p.procedure_name))
   if (otherProcedures.length > 0) {
     procedureData.push({
       label: PROCEDURE_OTHER.label,
@@ -79,15 +84,17 @@ export default function DashboardPage() {
       color: PROCEDURE_OTHER.color,
       tooltip: `Other: ${otherProcedures.map((p) => `${p.procedure_name} (${p.count})`).join(', ')}`,
     })
+    procedureLegend.push(PROCEDURE_OTHER)
   }
 
   // Fixed display order (hindi sorted by count) para manatili sa loob ng
   // validated adjacency yung categorical color assignment — tignan yung
   // dashboardColors.js.
   const conditionCounts = Object.fromEntries(conditionBreakdown.map((c) => [c.condition_code, c.count]))
-  const conditionData = CONDITION_CHART_ORDER.map((c) => ({
+  // 23 na ang kondisyon, kaya ang may naitala lang ang ipinapakita
+  const conditionData = CONDITION_CHART_ORDER.filter((c) => conditionCounts[c.code]).map((c) => ({
     label: c.label,
-    value: conditionCounts[c.code] || 0,
+    value: conditionCounts[c.code],
     color: c.color,
   }))
 
@@ -133,14 +140,14 @@ export default function DashboardPage() {
         <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
           <h2 className="mb-1 text-base font-semibold text-slate-900">Procedures Performed</h2>
           <p className="mb-4 text-sm text-slate-400">All treatments on record, by procedure.</p>
-          <HorizontalBarChart data={procedureData} />
+          <HorizontalBarChart data={procedureData} legend={procedureLegend} />
         </section>
         <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
           <h2 className="mb-1 text-base font-semibold text-slate-900">Tooth Condition Breakdown</h2>
           <p className="mb-4 text-sm text-slate-400">
             Current state across all patients' dental charts (latest entry per tooth surface).
           </p>
-          <HorizontalBarChart data={conditionData} showLegend />
+          <HorizontalBarChart data={conditionData} legend={CONDITION_LEGEND} />
         </section>
       </div>
 

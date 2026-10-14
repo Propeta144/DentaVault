@@ -31,9 +31,12 @@ const TYPES = {
 }
 
 export function toothType(toothNumber) {
+  const quadrant = Number(String(toothNumber)[0])
   const position = Number(String(toothNumber)[1])
   if (position <= 2) return 'incisor'
   if (position === 3) return 'canine'
+  // Baby teeth (Q5–8): ang 4 at 5 ay primary MOLARS (walang premolar ang bata)
+  if (quadrant >= 5) return 'molar'
   if (position <= 5) return 'premolar'
   return 'molar'
 }

@@ -5,7 +5,8 @@ import * as patientImportController from '../controllers/patientImport.controlle
 import { authenticate } from '../middleware/auth.js'
 import { requireRole } from '../middleware/rbac.js'
 import { uploadImportFile } from '../config/importUpload.js'
-import { FIELD_LIMITS, notInFuture, stripPhoneFormatting } from '../utils/validators.js'
+import { FIELD_LIMITS, notInFuture, stripPhoneFormatting, isValidToothNumber } from '../utils/validators.js'
+import { EXTRA_PATIENT_FIELDS } from '../utils/patientFields.js'
 
 const router = Router()
 
@@ -60,11 +61,31 @@ const patientValidation = [
     .notEmpty()
     .withMessage('Allergies is required. Choose "None" if the patient has no known allergies.'),
   maxLength('allergies', 'Allergies'),
+  // Patient Information Record (migration 015): haba ng text, at Yes/No na
+  // true / false / null lang
+  ...EXTRA_PATIENT_FIELDS.map((f) =>
+    f.type === 'bool'
+      ? body(f.key)
+          .optional({ values: 'null' })
+          .isBoolean({ strict: true })
+          .withMessage(`${f.label}: answer Yes or No`)
+      : body(f.key)
+          .optional({ values: 'falsy' })
+          .isString()
+          .bail()
+          .isLength({ max: f.max })
+          .withMessage(`${f.label} must be ${f.max} characters or fewer`),
+  ),
 ]
 
 const treatmentValidation = [
   body('procedureName').trim().notEmpty().withMessage('Procedure name is required'),
   maxLength('procedureName', 'Procedure name'),
+  // Opsyonal ang ngipin; kapag meron: "ALL" (buong bibig) o FDI number
+  body('toothNumber')
+    .optional({ values: 'falsy' })
+    .custom((v) => v === 'ALL' || isValidToothNumber(v))
+    .withMessage('Tooth must be an FDI number (11–48, or 51–85 for baby teeth) or ALL'),
   body('treatmentDate')
     .isISO8601()
     .withMessage('A valid treatment date is required')

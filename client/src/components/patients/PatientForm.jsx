@@ -1,13 +1,14 @@
 import { cloneElement, isValidElement, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
-import { User, Phone, ShieldAlert, ClipboardList, Users, ExternalLink } from 'lucide-react'
+import { User, Phone, ShieldAlert, ClipboardList, Users, ExternalLink, History, Stethoscope, HeartPulse } from 'lucide-react'
 import ComboboxListInput from '../common/ComboboxListInput'
 import { MEDICAL_HISTORY_OPTIONS, ALLERGY_OPTIONS } from '../../constants/medicalOptions'
 import DiscardChangesBar from '../common/DiscardChangesBar'
 import { FIELD_LIMITS } from '../../constants/fieldLimits'
-import { formatDate, todayISO } from '../../utils/formatDate'
+import { calculateAge, formatDate, todayISO } from '../../utils/formatDate'
 import { getEmailUsage } from '../../services/patients'
 import { listName } from '../../utils/patientName'
 import { sanitizePhoneInput } from '../../utils/phone'
+import { EMPTY_INFO_FORM, HEALTH_QUESTIONS, BLOOD_TYPES } from '../../constants/patientInfo'
 
 // Walang default ang `sex` (dati "male" na agad): kapag nakalimutang
 // palitan, mali ang record nang walang babala. Required na ito.
@@ -23,6 +24,8 @@ const EMPTY_FORM = {
   allergies: '',
   emergencyContactName: '',
   emergencyContactPhone: '',
+  // Buong Patient Information Record ng clinic (constants/patientInfo.js)
+  ...EMPTY_INFO_FORM,
 }
 
 // PH mobile format lang: 09XXXXXXXXX (11 digits) o +639XXXXXXXXX. Tugma 'to
@@ -180,6 +183,49 @@ function SexPicker({ value, onChange, error }) {
   )
 }
 
+// Isang Yes/No na tanong mula sa papel na form ng clinic. Tatlong estado:
+// Yes, No, o hindi pa sinasagot (null). Pindutin ulit ang napili para
+// bumalik sa "hindi sinasagot" (iba ang "hindi natanong" sa "No").
+// `children`: ang "If so, ..." na field, lalabas lang kapag Yes.
+function YesNoQuestion({ number, question, value, onChange, children }) {
+  const labelId = useId()
+  return (
+    <div className="rounded-lg border border-slate-200 px-3 py-2.5">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <p id={labelId} className="text-base text-slate-700">
+          <span className="mr-1 text-slate-400">{number}.</span>
+          {question}
+        </p>
+        <div role="radiogroup" aria-labelledby={labelId} className="grid shrink-0 grid-cols-2 gap-2 sm:w-44">
+          {[
+            [true, 'Yes'],
+            [false, 'No'],
+          ].map(([optionValue, optionLabel]) => {
+            const checked = value === optionValue
+            return (
+              <button
+                key={optionLabel}
+                type="button"
+                role="radio"
+                aria-checked={checked}
+                onClick={() => onChange(checked ? null : optionValue)}
+                className={`min-h-11 rounded-md border px-3 text-base font-medium transition-colors ${
+                  checked
+                    ? 'border-sky-500 bg-sky-50 text-sky-800 ring-1 ring-sky-500'
+                    : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                {optionLabel}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+      {value === true && children && <div className="mt-2">{children}</div>}
+    </div>
+  )
+}
+
 // Props:
 // - guard: galing useDiscardGuard (babala bago mawala ang binago). Kapag
 //   meron, ito ang tinatawag ng Cancel at dito nanggagaling ang dirty.
@@ -273,6 +319,11 @@ export default function PatientForm({
       contactNumber: cleanPhone(form.contactNumber),
       emergencyContactPhone: cleanPhone(form.emergencyContactPhone),
     }
+    for (const q of HEALTH_QUESTIONS) {
+      // "If so, ..." ay para lang sa Yes; ang pang-babae lang ay null kapag Male
+      if (q.detailsKey && cleaned[q.key] !== true) cleaned[q.detailsKey] = ''
+      if (q.womenOnly && cleaned.sex !== 'female') cleaned[q.key] = null
+    }
 
     setSubmitting(true)
     try {
@@ -300,12 +351,14 @@ export default function PatientForm({
     }`
 
   const cancel = guard ? guard.requestClose : onCancel
+  const age = form.dateOfBirth ? calculateAge(form.dateOfBirth) : null
+  const isMinor = age !== null && age < 18
 
   return (
     <form ref={formRef} onSubmit={handleSubmit} className="space-y-5" noValidate>
       <SectionHeading icon={User}>Personal Information</SectionHeading>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Field label="First Name" required error={fieldErrors.firstName}>
           <input
             className={inputClass(fieldErrors.firstName)}
@@ -314,6 +367,16 @@ export default function PatientForm({
             autoComplete="off"
             autoCapitalize="words"
             onChange={(e) => update('firstName', e.target.value)}
+          />
+        </Field>
+        <Field label="Middle Name">
+          <input
+            className={inputClass(false)}
+            value={form.middleName}
+            maxLength={FIELD_LIMITS.middleName}
+            autoComplete="off"
+            autoCapitalize="words"
+            onChange={(e) => update('middleName', e.target.value)}
           />
         </Field>
         <Field label="Last Name" required error={fieldErrors.lastName}>
@@ -340,6 +403,39 @@ export default function PatientForm({
           />
         </Field>
       </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        {[
+          ['occupation', 'Occupation'],
+          ['nationality', 'Nationality'],
+          ['religion', 'Religion'],
+        ].map(([key, label]) => (
+          <Field key={key} label={label}>
+            <input
+              className={inputClass(false)}
+              value={form[key]}
+              maxLength={FIELD_LIMITS[key]}
+              autoComplete="off"
+              autoCapitalize="words"
+              onChange={(e) => update(key, e.target.value)}
+            />
+          </Field>
+        ))}
+      </div>
+
+      {/* "For Minors" sa papel: lumalabas kapag wala pang 18 (o may laman na) */}
+      {(isMinor || form.guardianName) && (
+        <Field label="Parent / Guardian's Name" hint="For patients under 18">
+          <input
+            className={inputClass(false)}
+            value={form.guardianName}
+            maxLength={FIELD_LIMITS.guardianName}
+            autoComplete="off"
+            autoCapitalize="words"
+            onChange={(e) => update('guardianName', e.target.value)}
+          />
+        </Field>
+      )}
 
       <SectionHeading icon={Phone}>Contact Details</SectionHeading>
 
@@ -424,6 +520,124 @@ export default function PatientForm({
             className={inputClass(fieldErrors.emergencyContactPhone)}
             value={form.emergencyContactPhone}
             onChange={(e) => update('emergencyContactPhone', sanitizePhoneInput(e.target.value))}
+          />
+        </Field>
+      </div>
+
+      <SectionHeading icon={History}>Dental History</SectionHeading>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <Field label="Previous Dentist">
+          <input
+            className={inputClass(false)}
+            value={form.previousDentist}
+            maxLength={FIELD_LIMITS.previousDentist}
+            autoComplete="off"
+            autoCapitalize="words"
+            placeholder="Dr."
+            onChange={(e) => update('previousDentist', e.target.value)}
+          />
+        </Field>
+        <Field label="Last Dental Visit" hint="A date, a year, or e.g. 2 years ago">
+          <input
+            className={inputClass(false)}
+            value={form.lastDentalVisit}
+            maxLength={FIELD_LIMITS.lastDentalVisit}
+            autoComplete="off"
+            onChange={(e) => update('lastDentalVisit', e.target.value)}
+          />
+        </Field>
+      </div>
+
+      <SectionHeading icon={Stethoscope}>Physician</SectionHeading>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {[
+          ['physicianName', 'Name of Physician', 'words', 'Dr.'],
+          ['physicianSpecialty', 'Specialty, if applicable', 'words'],
+          ['physicianOfficeAddress', 'Office Address', 'words'],
+          ['physicianOfficeNumber', 'Office Number', 'none'],
+        ].map(([key, label, capitalize, placeholder]) => (
+          <Field key={key} label={label}>
+            <input
+              className={inputClass(false)}
+              value={form[key]}
+              maxLength={FIELD_LIMITS[key]}
+              autoComplete="off"
+              autoCapitalize={capitalize}
+              placeholder={placeholder}
+              type={key === 'physicianOfficeNumber' ? 'tel' : 'text'}
+              inputMode={key === 'physicianOfficeNumber' ? 'tel' : undefined}
+              onChange={(e) => update(key, e.target.value)}
+            />
+          </Field>
+        ))}
+      </div>
+
+      <SectionHeading icon={HeartPulse}>Health Questions</SectionHeading>
+
+      {/* Mga tanong ng papel na form (1–7, 10). "For women only" ay lumalabas
+          kapag Female ang napili. */}
+      <div className="space-y-2">
+        {HEALTH_QUESTIONS.filter((q) => !q.womenOnly || form.sex === 'female').map((q) => (
+          <YesNoQuestion
+            key={q.key}
+            number={q.womenOnly ? '10' : q.number}
+            question={q.womenOnly ? `For women: ${q.question}` : q.question}
+            value={form[q.key]}
+            onChange={(v) => update(q.key, v)}
+          >
+            {q.detailsKey && (
+              <Field label={q.detailsLabel}>
+                <input
+                  className={inputClass(false)}
+                  value={form[q.detailsKey]}
+                  maxLength={FIELD_LIMITS[q.detailsKey]}
+                  autoComplete="off"
+                  onChange={(e) => update(q.detailsKey, e.target.value)}
+                />
+              </Field>
+            )}
+          </YesNoQuestion>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <Field label="Bleeding Time">
+          <input
+            className={inputClass(false)}
+            value={form.bleedingTime}
+            maxLength={FIELD_LIMITS.bleedingTime}
+            autoComplete="off"
+            onChange={(e) => update('bleedingTime', e.target.value)}
+          />
+        </Field>
+        <Field label="Blood Type">
+          <select
+            className={inputClass(false)}
+            value={form.bloodType}
+            onChange={(e) => update('bloodType', e.target.value)}
+          >
+            <option value="">Not recorded</option>
+            {BLOOD_TYPES.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+            {/* Lumang halaga na wala sa listahan: ipakita pa rin para hindi mabura */}
+            {form.bloodType && !BLOOD_TYPES.includes(form.bloodType) && (
+              <option value={form.bloodType}>{form.bloodType}</option>
+            )}
+          </select>
+        </Field>
+        <Field label="Blood Pressure" hint="e.g. 120/80">
+          <input
+            className={inputClass(false)}
+            value={form.bloodPressure}
+            maxLength={FIELD_LIMITS.bloodPressure}
+            autoComplete="off"
+            inputMode="numeric"
+            onChange={(e) => update('bloodPressure', e.target.value)}
           />
         </Field>
       </div>

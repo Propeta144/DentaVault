@@ -1,18 +1,20 @@
 import { useId, useState } from 'react'
 import { AlertTriangle, Clock, History, Loader2 } from 'lucide-react'
 import Modal from '../common/Modal'
-import { CONDITIONS, SURFACES, conditionColor, toothOrientation } from '../../constants/dental'
+import {
+  CONDITIONS,
+  CONDITION_GROUPS,
+  SURFACES,
+  conditionColor,
+  conditionLabel,
+  isWholeToothCondition,
+  toothOrientation,
+} from '../../constants/dental'
 import { getToothHistory } from '../../services/chart'
 import { useToast } from '../../context/ToastContext'
 import { formatDate } from '../../utils/formatDate'
 import { FIELD_LIMITS } from '../../constants/fieldLimits'
 import { TOOTH_BOX, toothShape } from './toothShape'
-
-// "root_canal" → "Root Canal" (dati raw code ang lumalabas sa "Currently ..."
-// at sa history)
-function conditionLabel(code) {
-  return CONDITIONS.find((c) => c.code === code)?.label || code
-}
 
 // Maliit na version ng parehong hugis-ngipin na iginuguhit ng Tooth.jsx
 // (toothShape.js), para paalalahanan ang dentist kung anong parte ng ngipin
@@ -82,21 +84,16 @@ export default function ChartEntryModal({
   const { showToast } = useToast()
   const formId = useId()
   const isWholeTooth = surface === 'whole'
-  // Yung whole-tooth entry point, dalawang whole-tooth-level facts lang
-  // ang ino-offer niya (present vs. missing) — hindi yung mga surface-specific
-  // conditions gaya ng "Crown" o "Caries", kasi baka ma-overwrite lang
-  // nang tuluyan yung individual settings ng bawat isa sa 5 surfaces.
+  // Whole-tooth entry point (pinindot ang numero): ang mga kondisyon lang na
+  // para sa buong ngipin (scope 'whole' o 'any', hal. Missing, Jacket Crown,
+  // Present). Ang mga pang-surface (Decayed, Filled...) ay hindi, para hindi
+  // ma-overwrite ang 5 surface ng iisang "Decayed".
   //
-  // Laging andiyan yung "Extracted / Missing" option, kahit sa single-surface
-  // click galing — dahil either missing yung ngipin o hindi, wala namang
-  // "medyo missing lang" sa mesial surface — kaya kapag pinili 'to, kahit
-  // saan galing, mag-a-apply pa rin sa lahat ng 5 surfaces pag nag-submit
-  // (tignan yung `applyToWholeTooth` sa handleSubmit) — para hindi na
-  // kailangan malaman ng dentist na kailangan pa niya i-click yung
-  // tooth-number label para lang makarating sa whole-tooth view.
-  const availableConditions = isWholeTooth
-    ? CONDITIONS.filter((c) => c.code === 'healthy' || c.code === 'extracted')
-    : CONDITIONS
+  // Sa isang surface naman: LAHAT, pero ang pang-buong-ngipin (hal. Missing)
+  // ay sine-save pa rin sa buong ngipin (tignan `applyToWholeTooth`): walang
+  // "medyo nawawala sa mesial lang", kaya hindi na kailangang alamin ng
+  // dentist na kailangan pang pindutin ang numero ng ngipin.
+  const availableConditions = isWholeTooth ? CONDITIONS.filter((c) => c.scope !== 'surface') : CONDITIONS
 
   // Priority: what the dentist just painted with (3D pen), then the
   // surface's existing condition (2D click-to-edit), then healthy.
@@ -113,10 +110,10 @@ export default function ChartEntryModal({
   const [loadingHistory, setLoadingHistory] = useState(false)
 
   const surfaceLabel = surfaceLabelFor(surface)
-  const selectedLabel = CONDITIONS.find((c) => c.code === conditionCode)?.label
-  // Whole-tooth fact talaga yung "Extracted", kahit saan pa galing na entry
-  // point papunta dito — tignan yung comment sa availableConditions sa taas.
-  const applyToWholeTooth = isWholeTooth || conditionCode === 'extracted'
+  const selectedLabel = conditionLabel(conditionCode)
+  // Pang-buong-ngipin na kondisyon (hal. Missing, Jacket Crown), kahit saan
+  // pa galing na entry point — tignan ang comment sa availableConditions.
+  const applyToWholeTooth = isWholeTooth || isWholeToothCondition(conditionCode)
 
   function toggleHistory() {
     if (showHistory) {
@@ -170,13 +167,13 @@ export default function ChartEntryModal({
   }
 
   return (
-    <Modal title={`Tooth ${toothNumber} — ${surfaceLabel}`} onClose={onClose}>
+    <Modal title={`Tooth ${toothNumber} — ${surfaceLabel}`} onClose={onClose} maxWidth="max-w-2xl">
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-3">
           <SurfaceIndicator surface={surface} toothNumber={toothNumber} />
           <div className="text-base text-slate-500">
             {isWholeTooth ? (
-              <p>Whether the tooth is present or extracted — applies to all 5 surfaces at once.</p>
+              <p>Conditions for the whole tooth (such as missing, crown, or root canal). Applies to all 5 surfaces at once.</p>
             ) : (
               <p>
                 Marking just the <span className="font-medium text-slate-700">{surfaceLabel}</span>{' '}
@@ -250,28 +247,42 @@ export default function ChartEntryModal({
           <p id={`${formId}-condition`} className="mb-2 block text-base font-medium text-slate-700">
             Condition
           </p>
-          {/* radiogroup: para malaman ng screen reader kung alin ang napili */}
-          <div role="radiogroup" aria-labelledby={`${formId}-condition`} className="grid grid-cols-2 gap-2.5">
-            {availableConditions.map((c) => (
-              <button
-                key={c.code}
-                type="button"
-                role="radio"
-                aria-checked={conditionCode === c.code}
-                onClick={() => setConditionCode(c.code)}
-                className={`flex min-h-12 items-center gap-2.5 rounded-md border px-4 py-3 text-base transition-all duration-150 ${
-                  conditionCode === c.code
-                    ? 'border-sky-500 bg-sky-50 text-sky-900 shadow-sm ring-1 ring-sky-500'
-                    : 'border-slate-200 text-slate-700 hover:-translate-y-px hover:border-slate-300 hover:bg-slate-50 hover:shadow-sm'
-                }`}
-              >
-                <span
-                  className="h-3.5 w-3.5 shrink-0 rounded-full border border-black/10"
-                  style={{ backgroundColor: c.color }}
-                />
-                {c.label}
-              </button>
-            ))}
+          {/* radiogroup: para malaman ng screen reader kung alin ang napili.
+              Naka-grupo (gaya ng legend ng papel na chart ng clinic), at may
+              letter code bawat isa (ito ang nakasulat sa ngipin). */}
+          <div role="radiogroup" aria-labelledby={`${formId}-condition`} className="space-y-3">
+            {CONDITION_GROUPS.map((group) => {
+              const items = availableConditions.filter((c) => c.group === group.code)
+              if (items.length === 0) return null
+              return (
+                <div key={group.code}>
+                  <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">{group.label}</p>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    {items.map((c) => (
+                      <button
+                        key={c.code}
+                        type="button"
+                        role="radio"
+                        aria-checked={conditionCode === c.code}
+                        onClick={() => setConditionCode(c.code)}
+                        className={`flex min-h-11 items-center gap-2.5 rounded-md border px-3 py-2 text-left text-base transition-all duration-150 ${
+                          conditionCode === c.code
+                            ? 'border-sky-500 bg-sky-50 text-sky-900 shadow-sm ring-1 ring-sky-500'
+                            : 'border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50'
+                        }`}
+                      >
+                        <span
+                          className="h-3.5 w-3.5 shrink-0 rounded-full border border-black/10"
+                          style={{ backgroundColor: c.color }}
+                        />
+                        <span className="w-6 shrink-0 font-semibold">{c.letter}</span>
+                        {c.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
           </div>
         </div>
 

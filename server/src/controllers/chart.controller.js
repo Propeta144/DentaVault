@@ -5,6 +5,7 @@ import { recordAuditLog } from '../models/auditLogModel.js'
 import { canAccessPatientRecord } from '../middleware/rbac.js'
 import asyncHandler from '../utils/asyncHandler.js'
 import AppError from '../utils/AppError.js'
+import { WHOLE_TOOTH_CONDITIONS, INTRAORAL_ITEMS, MOLAR_CLASSES } from '../utils/validators.js'
 
 async function assertPatientAccess(req, patientCode) {
   const patient = await patientModel.findPatientByCode(patientCode)
@@ -41,7 +42,10 @@ export const createEntry = asyncHandler(async (req, res) => {
   // yung comment ng createWholeToothEntry kung bakit. Kaya rin hindi natin
   // isinasama ang strokeData dito — isang lugar lang ginuhit yun, hindi
   // naman kumakatawan sa lahat ng 5 surfaces kung i-replicate.
-  const isWholeTooth = surface === 'whole'
+  // Pati ang mga kondisyon na para sa buong ngipin (WHOLE_TOOTH_CONDITIONS,
+  // hal. Missing, Jacket Crown) kahit sa isang surface pinindot: walang
+  // "medyo nawawala" sa mesial lang.
+  const isWholeTooth = surface === 'whole' || WHOLE_TOOTH_CONDITIONS.includes(conditionCode)
   const entry = isWholeTooth
     ? await chartModel.createWholeToothEntry({
         patientId: patient.id,
@@ -76,4 +80,45 @@ export const createEntry = asyncHandler(async (req, res) => {
   })
 
   res.status(201).json({ entry })
+})
+
+// Intraoral Examination (Periodontal, Occlusion, Appliances, TMD) — para sa
+// buong bibig. Dentist: basahin at baguhin; patient: sariling record, basa lang.
+export const getIntraoral = asyncHandler(async (req, res) => {
+  const patient = await assertPatientAccess(req, req.params.patientCode)
+  const exam = await chartModel.getIntraoralExam(patient.id)
+  res.json({ exam })
+})
+
+export const saveIntraoral = asyncHandler(async (req, res) => {
+  const patient = await assertPatientAccess(req, req.params.patientCode)
+  const { items, molarClass, appliancesOther } = req.body || {}
+
+  if (!Array.isArray(items) || items.some((i) => !INTRAORAL_ITEMS.includes(i))) {
+    throw new AppError('Invalid examination findings', 422)
+  }
+  if (molarClass != null && molarClass !== '' && !MOLAR_CLASSES.includes(molarClass)) {
+    throw new AppError('Molar class must be I, II, or III', 422)
+  }
+  const other = typeof appliancesOther === 'string' ? appliancesOther.trim() : ''
+  if (other.length > 150) throw new AppError('Other appliance must be 150 characters or fewer', 422)
+
+  const findings = {
+    items: [...new Set(items)],
+    molarClass: molarClass || null,
+    appliancesOther: other || null,
+  }
+  const before = await chartModel.getIntraoralExam(patient.id)
+  const exam = await chartModel.saveIntraoralExam(patient.id, findings, req.user.userId)
+
+  await recordAuditLog({
+    userId: req.user.userId,
+    action: 'UPDATE_INTRAORAL_EXAM',
+    entityType: 'patient',
+    entityId: patient.id,
+    details: { patientId: patient.id, findingCount: findings.items.length, previous: before?.findings ?? null },
+    ipAddress: req.ip,
+  })
+
+  res.json({ exam })
 })

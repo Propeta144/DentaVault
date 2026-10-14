@@ -134,6 +134,16 @@ Destructive modals follow `DeletePatientModal.jsx`: red alert box with `AlertTri
 source text, so write the full class (`n === 5 ? 'xl:grid-cols-5' : 'xl:grid-cols-4'`). Don't put
 a display class (`grid`/`flex`) and `hidden` on the same element; wrap it instead.
 
+**Clinic data (client visit, Feature #29)**
+- Procedures: `PROCEDURES` (17, may `category` at `short`) at `PROCEDURE_CATEGORIES` sa `constants/dental.js`. Masikip na
+  lugar → `procedureShortLabel()` / `p.short` + buong pangalan sa `title`.
+- Chart conditions: `CONDITIONS` (23, may `letter`, `group`, `scope`) + `CONDITION_GROUPS` (7 kulay). Kulay = grupo; ipakita
+  laging kasama ang letter code. Legend → `components/chart/ConditionLegend.jsx` (`expanded` sa print).
+- Tooth dropdown → `TOOTH_SELECT_GROUPS` (may baby teeth). Tooth number checks: 11–48, 51–85, "ALL".
+- Patient record fields → `constants/patientInfo.js` (`INFO_TEXT_FIELDS`, `HEALTH_QUESTIONS`). Yes/No na tanong = Yes / No /
+  hindi natanong (null), hindi checkbox.
+- Clinic contact → `constants/clinic.js` (`CLINIC_INFO`). Huwag i-hardcode sa page.
+
 ## 5. Tables
 ```
 wrapper: hidden overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm md:block

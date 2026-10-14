@@ -3,25 +3,12 @@ import { Link } from 'react-router-dom'
 import { Search, Plus, Trash2, UserPlus, Check, ArrowRight, RotateCcw, X } from 'lucide-react'
 import { listPatients, addTreatmentsBatch } from '../../services/patients'
 import { useToast } from '../../context/ToastContext'
-import { PROCEDURES, FDI_TEETH, ALL_TEETH, isWholeMouthProcedure } from '../../constants/dental'
+import { PROCEDURES, PROCEDURE_CATEGORIES, ALL_TEETH, TOOTH_SELECT_GROUPS, isWholeMouthProcedure } from '../../constants/dental'
 import { FIELD_LIMITS } from '../../constants/fieldLimits'
 import { PROFILE_PATH, profileState } from '../../utils/selectedPatient'
 import { listName } from '../../utils/patientName'
 import { calculateAge, formatDate, todayISO } from '../../utils/formatDate'
 import Avatar from '../common/Avatar'
-
-// Manual Entry (Legacy Record Migration): "guided manual entry for treatment
-// histories" ayon sa proposal. Para sa mga lumang papel na record: pumili ng
-// patient (o i-register muna), tapos i-encode ang LAHAT ng lumang visit sa
-// iisang listahan at isang Save lang — hindi na isa-isang bubuksan ang Add
-// Treatment para sa bawat visit. Sinusuri ng server ang buong listahan bago
-// mag-save (kapag may mali, walang mase-save; sinasabi kung aling row).
-const TOOTH_GROUPS = [
-  { label: 'Upper Right', teeth: FDI_TEETH.filter((t) => t[0] === '1') },
-  { label: 'Upper Left', teeth: FDI_TEETH.filter((t) => t[0] === '2') },
-  { label: 'Lower Left', teeth: FDI_TEETH.filter((t) => t[0] === '3') },
-  { label: 'Lower Right', teeth: FDI_TEETH.filter((t) => t[0] === '4') },
-]
 
 let nextKey = 1
 const emptyRow = () => ({ key: nextKey++, treatmentDate: '', procedureName: '', toothNumber: '', notes: '' })
@@ -265,10 +252,14 @@ export default function LegacyTreatmentEntry() {
                         className={inputClass(e.procedureName)}
                       >
                         <option value="">Choose...</option>
-                        {PROCEDURES.map((p) => (
-                          <option key={p.value} value={p.value}>
-                            {p.value}
-                          </option>
+                        {PROCEDURE_CATEGORIES.map((cat) => (
+                          <optgroup key={cat.code} label={cat.label}>
+                            {PROCEDURES.filter((p) => p.category === cat.code).map((p) => (
+                              <option key={p.value} value={p.value}>
+                                {p.value}
+                              </option>
+                            ))}
+                          </optgroup>
                         ))}
                       </select>
                       {e.procedureName && <p className="mt-1 text-sm text-red-600">{e.procedureName}</p>}
@@ -286,7 +277,7 @@ export default function LegacyTreatmentEntry() {
                       >
                         <option value="">Choose...</option>
                         <option value={ALL_TEETH}>All teeth</option>
-                        {TOOTH_GROUPS.map((g) => (
+                        {TOOTH_SELECT_GROUPS.map((g) => (
                           <optgroup key={g.label} label={g.label}>
                             {g.teeth.map((t) => (
                               <option key={t} value={t}>

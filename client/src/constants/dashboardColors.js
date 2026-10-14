@@ -1,4 +1,4 @@
-import { CONDITIONS } from './dental'
+import { CONDITIONS, CONDITION_GROUPS } from './dental'
 
 // Validated na categorical palette (light mode) — galing sa dataviz skill's
 // reference palette (palette.md / validate_palette.js). Pinangalanan ayon
@@ -18,47 +18,37 @@ const HUE = {
 // identity slot.
 const MUTED = '#94a3b8'
 
-const conditionColor = (code) => CONDITIONS.find((c) => c.code === code).color
-
 // Tooth Condition chart: PAREHONG kulay ng odontogram (galing mismo sa
-// CONDITIONS ng dental.js, hindi kinopya) — kaya ang "Caries" ay iisang
-// kulay sa chart ng patient at sa dashboard. Fixed display order (hindi
-// sorted by count); dahil pumasa ang set na 'to sa --pairs all, ligtas
-// kahit anong magkatabi.
-export const CONDITION_CHART_ORDER = [
-  'healthy',
-  'filling',
-  'root_canal',
-  'crown',
-  'caries',
-  'extracted',
-].map((code) => ({
-  code,
-  label: CONDITIONS.find((c) => c.code === code).label,
-  color: conditionColor(code),
+// CONDITIONS / CONDITION_GROUPS ng dental.js, hindi kinopya): kulay bawat
+// GRUPO, at nakasulat ang letter code + pangalan ng bawat kondisyon. Fixed
+// display order (ayon sa grupo, hindi sorted by count); dahil pumasa ang mga
+// kulay ng grupo sa --pairs all, ligtas kahit itago ang mga walang bilang.
+export const CONDITION_CHART_ORDER = CONDITIONS.map((c) => ({
+  code: c.code,
+  label: `${c.letter} · ${c.label}`,
+  color: c.color,
 }))
+export const CONDITION_LEGEND = CONDITION_GROUPS.map((g) => ({ label: g.label, color: g.color }))
 
-// Procedure chart: iba-ibang kulay bawat procedure (hiling ng adviser). Ang
-// kulay ay nakakabit sa PROCEDURE mismo, hindi sa ranggo, at FIXED ang
-// pagkakasunod (hindi sorted by count) para manatili sa validated na
-// adjacency. Tugma sa katabing Tooth Condition chart: Filling = yellow,
-// Root Canal = blue, Crown / Bridge = violet (kapareho ng kondisyon), at
-// ang magenta ay para sa Caries lang kaya hindi ginamit dito.
-// Iba pa: Cleaning = green (preventive), Orthodontic = orange, Fluoride =
-// aqua, Extraction = red. validate_palette.js (adjacent, sa order na 'to):
-// PASS, worst CVD ΔE 6.9 (6–8 = pinapayagan lang KUNG may secondary
-// encoding — mayroon: nakasulat na label at numero sa bawat bar),
-// normal-vision ΔE 16.3. Ang value ay kapareho ng PROCEDURES sa dental.js;
-// ang hindi-standard na pangalan (legacy import) ay pinagsasama sa "Other".
-export const PROCEDURE_CHART_ORDER = [
-  { value: 'Oral Prophylaxis / Cleaning', label: 'Cleaning', color: HUE.green },
-  { value: 'Composite Restoration / Filling', label: 'Filling', color: conditionColor('filling') },
-  { value: 'Root Canal Treatment', label: 'Root Canal', color: conditionColor('root_canal') },
-  { value: 'Crown / Bridge', label: 'Crown / Bridge', color: conditionColor('crown') },
-  { value: 'Orthodontic Adjustment', label: 'Orthodontic Adj.', color: HUE.orange },
-  { value: 'Fluoride Treatment', label: 'Fluoride', color: HUE.aqua },
-  { value: 'Tooth Extraction', label: 'Extraction', color: HUE.red },
-]
+// Procedure chart: kulay bawat GRUPO ng procedure (PROCEDURE_CATEGORIES sa
+// dental.js), hindi bawat procedure. 17 na ang procedures (client visit,
+// Oct 2026), pero 8 lang ang ligtas na categorical na kulay (dataviz rule:
+// walang ika-9 na generated hue). Nakasulat pa rin ang pangalan ng bawat
+// procedure sa bar, kaya hindi kailangang hulaan sa kulay.
+// Fixed ang pagkakasunod ng grupo; validate_palette.js (adjacent, sa order
+// na 'to): PASS, worst CVD ΔE 15.2, normal-vision ΔE 15.6.
+// Tugma pa rin sa Tooth Condition chart: Restorative = yellow (Filling),
+// Endodontic = blue (Root Canal), Prosthodontic = violet (Crown).
+export const PROCEDURE_CATEGORY_COLORS = {
+  diagnostic: HUE.aqua,
+  preventive: HUE.green,
+  restorative: HUE.yellow,
+  surgery: HUE.red,
+  endodontic: HUE.blue,
+  orthodontic: HUE.orange,
+  prosthodontic: HUE.violet,
+  cosmetic: HUE.magenta,
+}
 export const PROCEDURE_OTHER = { label: 'Other', color: MUTED }
 
 // Yung two-series chart (monthly trend): blue at orange, ang unang

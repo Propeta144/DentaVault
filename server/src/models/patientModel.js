@@ -1,4 +1,5 @@
 import pool from '../config/db.js'
+import { EXTRA_PATIENT_FIELDS, toDbValue } from '../utils/patientFields.js'
 import { limitOffset } from '../utils/sqlLimit.js'
 import { generatePatientCode, normalizePatientCode } from '../utils/patientCode.js'
 
@@ -145,13 +146,28 @@ export async function createPatient(data) {
   }
 }
 
+// Mga field ng Patient Information Record (migration 015) bilang
+// { key: value } na handa nang isulat: NULL ang blangko, 1/0 ang Yes/No, at
+// NULL ang pang-babae lang kapag male (tignan EXTRA_PATIENT_FIELDS).
+function extraFieldValues(data, sex) {
+  const values = {}
+  for (const field of EXTRA_PATIENT_FIELDS) {
+    if (data[field.key] === undefined) continue
+    values[field.key] = field.womenOnly && sex === 'male' ? null : toDbValue(field, data[field.key])
+  }
+  return values
+}
+
 async function insertPatient(data, patientCode) {
+  const extras = extraFieldValues(data, data.sex)
+  const extraColumns = EXTRA_PATIENT_FIELDS.filter((f) => f.key in extras)
   const [result] = await pool.execute(
     `INSERT INTO patients
-      (patient_code, first_name, last_name, sex, date_of_birth, contact_number, email, address, medical_history, allergies, emergency_contact_name, emergency_contact_phone, is_legacy_migrated)
+      (patient_code, first_name, last_name, sex, date_of_birth, contact_number, email, address, medical_history, allergies, emergency_contact_name, emergency_contact_phone, is_legacy_migrated${extraColumns.map((f) => `, ${f.column}`).join('')})
      VALUES
-      (:patientCode, :firstName, :lastName, :sex, :dateOfBirth, :contactNumber, :email, :address, :medicalHistory, :allergies, :emergencyContactName, :emergencyContactPhone, :isLegacyMigrated)`,
+      (:patientCode, :firstName, :lastName, :sex, :dateOfBirth, :contactNumber, :email, :address, :medicalHistory, :allergies, :emergencyContactName, :emergencyContactPhone, :isLegacyMigrated${extraColumns.map((f) => `, :${f.key}`).join('')})`,
     {
+      ...extras,
       patientCode,
       firstName: data.firstName,
       lastName: data.lastName,
@@ -192,6 +208,24 @@ export async function updatePatient(id, data) {
     if (data[key] !== undefined) {
       setClauses.push(`${column} = :${key}`)
       params[key] = data[key]
+    }
+  }
+
+  // Patient Information Record fields (whitelist din: galing sa
+  // EXTRA_PATIENT_FIELDS ang column name, hindi sa request)
+  let sex = data.sex
+  if (sex === undefined) sex = (await findPatientById(id))?.sex
+  const extras = extraFieldValues(data, sex)
+  for (const field of EXTRA_PATIENT_FIELDS) {
+    if (field.key in extras) {
+      setClauses.push(`${field.column} = :${field.key}`)
+      params[field.key] = extras[field.key]
+    }
+  }
+  // Kapag ginawang male, burahin ang pang-babae lang kahit hindi ipinadala
+  if (sex === 'male') {
+    for (const field of EXTRA_PATIENT_FIELDS.filter((f) => f.womenOnly && !(f.key in extras))) {
+      setClauses.push(`${field.column} = NULL`)
     }
   }
 

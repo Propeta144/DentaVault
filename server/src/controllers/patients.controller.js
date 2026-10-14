@@ -8,7 +8,8 @@ import { hashPassword } from '../services/authService.js'
 import asyncHandler from '../utils/asyncHandler.js'
 import AppError from '../utils/AppError.js'
 import { csvField } from '../utils/csv.js'
-import { FIELD_LIMITS, clinicToday } from '../utils/validators.js'
+import { FIELD_LIMITS, clinicToday, isValidToothNumber } from '../utils/validators.js'
+import { EXTRA_PATIENT_FIELDS } from '../utils/patientFields.js'
 import { queryText, queryInt } from '../utils/query.js'
 
 function assertValid(req) {
@@ -36,15 +37,23 @@ export const list = asyncHandler(async (req, res) => {
 export const exportCsv = asyncHandler(async (req, res) => {
   const patients = await patientModel.listPatientsForExport({ search: queryText(req.query.search) })
 
+  // Kasama ang buong Patient Information Record (migration 015). Yes/No na
+  // sagot: "Yes" / "No" / blangko (hindi natanong).
+  const extras = EXTRA_PATIENT_FIELDS.filter((f) => f.key !== 'middleName')
+  const extraCell = (f, p) => {
+    const v = p[f.column]
+    if (f.type === 'bool') return v === null || v === undefined ? '' : v ? 'Yes' : 'No'
+    return v
+  }
   const headers = [
-    'Last Name', 'First Name', 'Sex', 'Date of Birth', 'Contact Number', 'Email',
+    'Last Name', 'First Name', 'Middle Name', 'Sex', 'Date of Birth', 'Contact Number', 'Email',
     'Address', 'Medical History', 'Allergies', 'Emergency Contact Name',
-    'Emergency Contact Phone', 'Legacy Record', 'Registered On',
+    'Emergency Contact Phone', ...extras.map((f) => f.label), 'Legacy Record', 'Registered On',
   ]
   const rows = patients.map((p) => [
-    p.last_name, p.first_name, p.sex, p.date_of_birth, p.contact_number, p.email,
+    p.last_name, p.first_name, p.middle_name, p.sex, p.date_of_birth, p.contact_number, p.email,
     p.address, p.medical_history, p.allergies, p.emergency_contact_name,
-    p.emergency_contact_phone, p.is_legacy_migrated ? 'Yes' : 'No',
+    p.emergency_contact_phone, ...extras.map((f) => extraCell(f, p)), p.is_legacy_migrated ? 'Yes' : 'No',
     // Bumabalik yung created_at bilang JS Date (DATE columns lang ang
     // pinapanatiling strings — tignan db.js) — verbose yung default
     // String() form nito, "Wed Jul 22 2026 12:18:24 GMT+0800 (...)",
@@ -233,8 +242,8 @@ function validateTreatmentEntry(entry, index) {
     throw new AppError(`${row}: a valid treatment date is required`, 422)
   }
   if (treatmentDate > clinicToday()) throw new AppError(`${row}: treatment date cannot be in the future`, 422)
-  if (toothNumber && toothNumber !== 'ALL' && !/^[1-4][1-8]$/.test(toothNumber)) {
-    throw new AppError(`${row}: tooth must be an FDI number (11-48) or ALL`, 422)
+  if (toothNumber && toothNumber !== 'ALL' && !isValidToothNumber(toothNumber)) {
+    throw new AppError(`${row}: tooth must be an FDI number (11-48, or 51-85 for baby teeth) or ALL`, 422)
   }
   if (notes.length > FIELD_LIMITS.notes) {
     throw new AppError(`${row}: notes must be ${FIELD_LIMITS.notes} characters or fewer`, 422)

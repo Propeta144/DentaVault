@@ -46,3 +46,49 @@ export function notInFuture(value) {
 export function stripPhoneFormatting(value) {
   return typeof value === 'string' ? value.replace(/[\s\-().]/g, '') : value
 }
+
+// FDI tooth number: permanent (11–18, 21–28, 31–38, 41–48) o baby teeth /
+// primary (51–55, 61–65, 71–75, 81–85; idinagdag pagkatapos ng client visit,
+// may batang pasyente ang clinic). Dati walang check sa Add Treatment at sa
+// chart, kaya puwedeng ma-save ang "99" o "abc".
+export const TOOTH_NUMBER_PATTERN = /^(?:[1-4][1-8]|[5-8][1-5])$/
+
+export function isValidToothNumber(value) {
+  return TOOTH_NUMBER_PATTERN.test(String(value ?? ''))
+}
+
+// Ang mga condition code na tinatanggap ng chart (tugma sa ENUM ng
+// chart_entries.condition_code, migration 014, at sa CONDITIONS ng
+// client/src/constants/dental.js).
+export const CHART_CONDITIONS = [
+  'healthy', 'caries', 'filling', 'root_canal', 'crown', 'extracted',
+  'missing_caries', 'missing_other', 'indicated_extraction', 'root_fragment',
+  'removable_denture', 'amalgam', 'abutment', 'pontic', 'inlay', 'composite',
+  'extraction_other', 'congenitally_missing', 'supernumerary', 'sealant',
+  'impacted', 'fractured', 'unerupted',
+]
+
+// Mga kondisyon na para sa BUONG ngipin (hal. nawawala, crown, root canal):
+// laging sine-save bilang 'whole' kahit sa isang surface pinindot. Kapareho
+// ng `scope: 'whole'` sa client.
+export const WHOLE_TOOTH_CONDITIONS = [
+  'root_canal', 'crown', 'extracted', 'missing_caries', 'missing_other',
+  'indicated_extraction', 'root_fragment', 'removable_denture', 'abutment',
+  'pontic', 'extraction_other', 'congenitally_missing', 'supernumerary',
+  'impacted', 'unerupted',
+]
+
+// Intraoral Examination (ibabang bahagi ng papel na chart ng clinic): mga
+// code na puwedeng i-check. Kapareho ng INTRAORAL_GROUPS sa client
+// (constants/dental.js).
+export const INTRAORAL_ITEMS = [
+  // Periodontal Screening
+  'gingivitis', 'early_periodontitis', 'moderate_periodontitis', 'advanced_periodontitis',
+  // Occlusion
+  'overjet', 'overbite', 'midline_deviation', 'crossbite',
+  // Appliances
+  'orthodontic', 'stayplate',
+  // TMD
+  'clenching', 'clicking', 'trismus', 'muscle_spasm',
+]
+export const MOLAR_CLASSES = ['I', 'II', 'III']

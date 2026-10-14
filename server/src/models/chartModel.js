@@ -113,3 +113,29 @@ export async function createWholeToothEntry({ patientId, toothNumber, conditionC
     connection.release()
   }
 }
+
+// Intraoral Examination (migration 017): isang kasalukuyang record bawat
+// patient. JSON column → parse (parehong mysql2 raw-string gotcha sa itaas).
+export async function getIntraoralExam(patientId) {
+  const [rows] = await pool.execute(
+    `SELECT ie.findings, ie.updated_at, u.full_name AS updated_by_name
+     FROM intraoral_exams ie
+     JOIN users u ON u.id = ie.updated_by
+     WHERE ie.patient_id = :patientId`,
+    { patientId },
+  )
+  const row = rows[0]
+  if (!row) return null
+  if (typeof row.findings === 'string') row.findings = JSON.parse(row.findings)
+  return row
+}
+
+export async function saveIntraoralExam(patientId, findings, userId) {
+  await pool.execute(
+    `INSERT INTO intraoral_exams (patient_id, findings, updated_by)
+     VALUES (:patientId, :findings, :userId)
+     ON DUPLICATE KEY UPDATE findings = VALUES(findings), updated_by = VALUES(updated_by)`,
+    { patientId, findings: JSON.stringify(findings), userId },
+  )
+  return getIntraoralExam(patientId)
+}

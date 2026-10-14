@@ -13,6 +13,25 @@ export const FIELD_LIMITS = {
   medicalHistory: 2000,
   allergies: 2000,
   notes: 2000,
+  // Patient Information Record (migration 015; server/src/utils/patientFields.js)
+  middleName: 100,
+  occupation: 100,
+  nationality: 60,
+  religion: 60,
+  guardianName: 150,
+  previousDentist: 150,
+  lastDentalVisit: 100,
+  physicianName: 150,
+  physicianSpecialty: 100,
+  physicianOfficeAddress: 255,
+  physicianOfficeNumber: 30,
+  medicalTreatmentDetails: 255,
+  seriousIllnessDetails: 255,
+  hospitalizationDetails: 255,
+  medicationDetails: 255,
+  bleedingTime: 50,
+  bloodType: 10,
+  bloodPressure: 20,
 }
 
 // Kapareho ng server/src/config/upload.js MAX_FILE_SIZE_BYTES

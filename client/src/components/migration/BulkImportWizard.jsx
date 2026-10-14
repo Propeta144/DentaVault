@@ -163,6 +163,8 @@ export default function BulkImportWizard() {
 
   const missingRequired = preview ? preview.requiredFields.filter((f) => !mapping[f]) : []
   const mappedColumns = preview ? preview.fields.filter((f) => mapping[f]) : []
+  const infoFields = preview?.infoFields || []
+  const fieldLabel = (field) => FIELD_LABELS[field] || preview?.fieldLabels?.[field] || field
   const willAdd = check ? check.createdCount + check.treatmentsAddedCount : 0
 
   return (
@@ -230,7 +232,14 @@ export default function BulkImportWizard() {
                 Separate several medical conditions or allergies with a comma. Write <span className="font-medium">None</span>{' '}
                 if the patient has no allergies.
               </li>
-              <li>Procedure must be one of: {PROCEDURES.map((p) => p.value).join(', ')}.</li>
+              <li>
+                Yes/No questions from the patient form (for example, Pregnant? or Taking Medication?) accept Yes, No,
+                Oo, or Hindi. Leave the cell blank if the question was not answered.
+              </li>
+              <li>
+                Procedure must be one of: {PROCEDURES.map((p) => p.value).join(', ')}. Common short names also work, such
+                as Cleaning, Filling, Pasta, Extraction, Bunot, Root Canal, Braces, or Whitening.
+              </li>
               <li>
                 In Excel, select all and double-click the line between two column letters to widen the columns so every
                 header is readable.
@@ -255,7 +264,13 @@ export default function BulkImportWizard() {
           </div>
 
           {[
-            { title: 'Patient details', fields: preview.fields.filter((f) => !TREATMENT_FIELDS.includes(f)) },
+            {
+              title: 'Patient details',
+              fields: preview.fields.filter((f) => !TREATMENT_FIELDS.includes(f) && !infoFields.includes(f)),
+            },
+            // Buong Patient Information Record (papel na form ng clinic); ang
+            // label ay galing sa server (iisang listahan, patientFields.js)
+            { title: 'Patient information record (optional)', fields: infoFields },
             { title: 'Treatment history (optional, one row per past visit)', fields: TREATMENT_FIELDS },
           ].map((group) => (
             <fieldset key={group.title}>
@@ -267,7 +282,7 @@ export default function BulkImportWizard() {
                   return (
                     <div key={field}>
                       <label htmlFor={id} className="mb-1 block text-base font-medium text-slate-700">
-                        {FIELD_LABELS[field]}
+                        {fieldLabel(field)}
                         {required && <span className="ml-0.5 text-red-600">*</span>}
                       </label>
                       <select
@@ -314,7 +329,7 @@ export default function BulkImportWizard() {
                     <tr>
                       {mappedColumns.map((f) => (
                         <th key={f} className="whitespace-nowrap px-3 py-2">
-                          {FIELD_LABELS[f]}
+                          {fieldLabel(f)}
                         </th>
                       ))}
                     </tr>
@@ -347,7 +362,7 @@ export default function BulkImportWizard() {
           </div>
           {missingRequired.length > 0 && (
             <p className="text-right text-sm text-red-600">
-              Choose a column for: {missingRequired.map((f) => FIELD_LABELS[f]).join(', ')}
+              Choose a column for: {missingRequired.map(fieldLabel).join(', ')}
             </p>
           )}
         </div>

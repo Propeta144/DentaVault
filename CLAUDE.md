@@ -1269,3 +1269,108 @@ blur nagdadagdag ng na-type, Backspace/X, comma paste, Escape sa list lang (hind
 None confirm, eksaktong value na ipinapadala sa server, 360px walang overflow, 0 console error); template: 15/15 header
 auto-match, lumang format OK, dry-run import OK, phone fix 8 kaso. Build pasado. Walang test data na naisulat (naka-stub
 ang Register request). **Naka-push na** (commit `b1f5c2d`, 2026-10-12). Walang migration (walang binago sa database).
+
+---
+
+## 29. Mga Pagbabago Mula sa Client Visit (Oct 13, 2026)
+
+Galing sa pagbisita sa clinic (sagot sa checklist, litrato ng papel na patient form, dental chart, at karatula; nasa
+`Downloads/pagpunta sa client`). Mga desisyon ng team: **Bacoor address** lang sa print, **buong patient form**,
+**baby teeth sa 2D at print lang** (hindi 3D), at **isang dentist account** pa rin (kahit dalawa ang nasa karatula).
+Hindi binago (tama na ayon sa clinic): FDI numbering, surfaces, kulay, dashboard, retention. **Walang Dental X-ray** sa procedures: wala silang X-ray equipment (galing sa ibang clinic ang X-ray; dumarating sa Messenger at ina-upload ng dentist).
+
+### A. Procedures (7 → 17) + CSV template
+- Dagdag: **Consultation**, Deep Scaling, Pit & Fissure Sealant, Amalgam Filling, Inlay / Onlay, Braces
+  Installation, **Crown** at **Bridge** (hiwalay na), Denture, Veneers, Teeth Whitening. Naka-grupo sa 8 category
+  (Diagnostic → Cosmetic). Ang lumang "Crown / Bridge" ay nasa database pa: lumalabas sa dashboard kapag may record,
+  pero wala na sa mga form; sa import, may mensaheng "Write Crown or Bridge".
+- **Add Treatment:** maikling label sa button (hal. "Cleaning", buo sa tooltip), 2–5 column, modal `max-w-4xl`, kaya kita
+  pa rin ang Save sa 1366×768. Sa phone (390px), kaunting scroll sa loob ng modal.
+- **Import aliases:** "Cleaning", "Pasta", "Bunot", "RCT", "Jacket Crown", "Whitening", atbp. → tamang procedure.
+- **Dashboard "Procedures Performed":** kulay bawat **category** (8 lang ang ligtas na kulay; validate_palette adjacent PASS,
+  CVD ΔE 15.2, normal 15.6), may legend.
+
+### B. Mga kondisyon (6 → 23) + letter codes ng clinic
+- Lahat ng nasa legend ng papel nila (D, M, F, I, RF, MO, RM, J, A, AB, P, In, FX, X, XO, ✓, CM, Sp, S) + Impacted, Fractured,
+  Unerupted. Pareho ang 6 na lumang code (binago lang ang label, hal. Crown → "Jacket Crown"), kaya buo ang lumang data.
+- **Kulay = grupo (7)**, ang **letter code** ang nakasulat sa mismong ngipin (palapit sa bite line), gaya ng kahon sa papel nila.
+  Aqua (Other findings) vs magenta = CVD ΔE 6.1 (WARN, pinapayagan dahil laging may letter code).
+- `scope`: pang-surface (D, F, A, FX, In, S, Fr) o pang-buong-ngipin (hal. M, J, RC). Ang pang-buong-ngipin ay laging
+  sine-save sa 5 surface (client **at** server: `WHOLE_TOOTH_CONDITIONS`). Lahat ng "missing" (X, XO, M, MO, CM) = abong X.
+- Chart modal: naka-grupo, may letter. 3D pen: pang-surface lang (8). Legend (`ConditionLegend`): kulay ng grupo + nakatiklop
+  na "Letter codes" (bukas sa print). Findings table: isang "Whole Tooth" row na lang (dati 6 na ulit).
+
+### C. Baby teeth (51–55, 61–65, 71–75, 81–85)
+- 2D chart: hilera sa **itaas at ibaba** ng permanent (gaya ng papel nila), 85% ang laki, nakahanay sa papalit na ngipin
+  (55 sa tapat ng 15). Primary 4–5 = molar ang hugis. Kusang lumalabas kapag may naitala; may **"Show baby teeth"** button.
+- Print Chart: lumalabas kapag may naitala. 3D: paalala na "Baby teeth appear on the 2D chart only".
+- Tooth dropdown (Add Treatment, Manual Entry): may "Baby teeth" na grupo.
+- **Bagong server check:** tooth number = 11–48 o 51–85 (o "ALL") sa chart, Add Treatment, batch, at import. Dati walang
+  check sa Add Treatment at chart (puwedeng "99").
+
+### D. Buong Patient Information Record (papel na form nila)
+- Middle name, occupation, nationality, religion, **parent/guardian** (lumalabas kapag wala pang 18), previous dentist, last
+  dental visit, physician (name, specialty, office address/number), **Yes/No na tanong 1–7 at 10** (may "Please specify"
+  kapag Yes; "For women" kapag Female), bleeding time, blood type, blood pressure. Ang #8 (allergies) at #13 (checklist ng
+  sakit) ay ang dating Allergies at Medical History (dinagdagan ng "Respiratory problems" at "Jaundice").
+- Yes/No: **Yes / No / hindi natanong** (NULL). Pindutin ulit para burahin. Kapag Male, binubura ang pang-babae (server din).
+- Profile: dilaw na "Health questions: ..." sa header (hal. Pregnant, Taking medication), at nakatiklop na
+  **Patient Information Record** card. Print Summary: may "Patient Information" (ang may sagot lang). Pangalan may middle name.
+- CSV export at import: lahat ng bagong field (Yes/No: Yes/No/Oo/Hindi). Template: 43 column; ang Map Columns step ay may
+  hiwalay na grupong "Patient information record (optional)" (label galing sa server).
+
+### E. Print header
+- Gaya ng papel nila: logo, **437 Sapanghila Building (above LJ Bike Shop), Molino IV, Bacoor, Cavite**, Smart/Globe na numero,
+  email (`constants/clinic.js` → `CLINIC_INFO`). Sa lahat ng print page.
+
+### F. Intraoral Examination (ibaba ng papel na chart nila)
+- **Periodontal Screening** (gingivitis, early/moderate/advanced periodontitis), **Occlusion** (Class I/II/III molar, overjet,
+  overbite, midline deviation, crossbite), **Appliances** (orthodontic, stayplate, others), **TMD** (clenching, clicking,
+  trismus, muscle spasm). Para sa buong bibig, kaya hiwalay na table (isang kasalukuyang record bawat patient).
+- Card sa ilalim ng 2D/3D chart sa Dental Chart tab: checkbox, lalabas ang Save kapag may binago. Patient: basa lang.
+  Kasama sa Print Chart (2D at 3D) kapag may laman. Audit: `UPDATE_INTRAORAL_EXAM` (may dating laman sa details).
+
+### Hindi muna isinama: Appointments
+Ginawa (bagong tab sa profile, dashboard card, Copy reminder / Text patient, paalala sa oras ng clinic) pero **tinanggal muna**
+ayon sa hiling ng team (Oct 14, 2026). Walang natira sa code o sa local database. Backup ng code:
+`Downloads/pagpunta sa client/appointments-backup/` (mga file + `shared-files-before-removal.diff`). Kapag ibabalik, gawing
+**017** ang migration (016 na ang intraoral).
+
+> ⚠️ **Bago/kasabay ng push, patakbuhin sa Aiven ang migrations 014, 015, 016**
+> (`$env:DOTENV_CONFIG_PATH=".env.aiven"; npm run migrate` sa `server/`). Kung hindi: pumapalya ang pag-save ng bagong
+> kondisyon (014), ang pag-register at pag-edit ng patient (015), at ang Intraoral Examination (016). ✅ Napatakbo na sa Aiven (2026-10-14, bago ang push).
+> **Para sa paper:** i-update ang ERD (bagong columns sa `patients`, bagong `intraoral_exams` table, bagong condition codes),
+> ang listahan ng procedures, at banggitin na tugma na sa form at chart ng clinic.
+
+| Name | Type | Purpose |
+|---|---|---|
+| `server/db/migrations/014_add_clinic_chart_conditions.sql` | **NEW** | 17 bagong `condition_code`. Napatakbo na sa local. |
+| `server/db/migrations/015_add_patient_information_record.sql` | **NEW** | 28 column sa `patients`. Napatakbo na sa local. |
+| `server/db/migrations/016_add_intraoral_exams.sql` | **NEW** | `intraoral_exams` (JSON findings bawat patient). Napatakbo na sa local. |
+| `server/src/models/chartModel.js`, `controllers/chart.controller.js`, `routes/chart.routes.js` | MODIFIED | `GET/PUT /patients/:code/intraoral` (whitelist `INTRAORAL_ITEMS`, `MOLAR_CLASSES`). |
+| `client/src/components/chart/IntraoralExam.jsx` | **NEW** | Card (edit/view) at print na bersyon. `INTRAORAL_GROUPS` sa `dental.js`; `services/chart.js` may get/save. |
+| `server/src/utils/patientFields.js` | **NEW** | `EXTRA_PATIENT_FIELDS` (iisang listahan: model, validation, import/export), `toDbValue`, `parseYesNo`. |
+| `server/src/utils/validators.js` | MODIFIED | `isValidToothNumber` (permanent + baby), `CHART_CONDITIONS`, `WHOLE_TOOTH_CONDITIONS`. |
+| `server/src/models/patientModel.js` | MODIFIED | Insert/update ng mga bagong field; pang-babae → NULL kapag male. |
+| `server/src/routes/{patients,chart}.routes.js`, `controllers/{patients,chart}.controller.js` | MODIFIED | Validation ng bagong field at tooth number; whole-tooth conditions; CSV export may bagong columns. |
+| `server/src/services/patientImportService.js`, `controllers/patientImport.controller.js` | MODIFIED | 17 procedures + aliases, baby teeth, bagong columns + Yes/No, template 43 column, `infoFields`/`fieldLabels` sa preview. |
+| `client/src/constants/dental.js` | MODIFIED | `PROCEDURE_CATEGORIES`, 17 `PROCEDURES` (`short`), `RETIRED_PROCEDURES`, `PRIMARY_ROWS/TEETH`, `TOOTH_SELECT_GROUPS`, `CONDITION_GROUPS`, 23 `CONDITIONS` (letter/scope), helpers. |
+| `client/src/constants/{clinic,patientInfo}.js` | **NEW** | `CLINIC_INFO`; `INFO_TEXT_FIELDS`, `HEALTH_QUESTIONS`, `BLOOD_TYPES`, `patientInfoToForm`. |
+| `client/src/constants/{dashboardColors,fieldLimits,medicalOptions}.js` | MODIFIED | Category/condition colors + legends; limits ng bagong field; 2 bagong medical option. |
+| `client/src/components/chart/{Odontogram2D,Tooth,toothShape,ChartEntryModal,ChartFindings,Odontogram3D,Tooth3D}.jsx` | MODIFIED | Baby teeth rows/toggle, letter codes, grouped modal, whole-tooth rules, findings dedupe, 3D pen. |
+| `client/src/components/chart/ConditionLegend.jsx` | **NEW** | Legend ng grupo + letter codes. |
+| `client/src/components/patients/PatientInfoRecord.jsx` | **NEW** | Card ng buong record + `healthAlerts()`. |
+| `client/src/components/patients/{PatientForm,EditPatientModal,AddTreatmentForm}.jsx` | MODIFIED | Bagong sections + `YesNoQuestion`; prefill; 17 procedures. |
+| `client/src/components/common/PrintHeader.jsx` | MODIFIED | Address, numbers, email. |
+| `client/src/components/dashboard/HorizontalBarChart.jsx` | MODIFIED | `legend` prop. |
+| `client/src/components/migration/{BulkImportWizard,LegacyTreatmentEntry}.jsx` | MODIFIED | Grupo ng bagong field, gabay sa Yes/No at aliases, grouped procedures, baby teeth. |
+| `client/src/pages/{Dashboard,PatientProfile,PatientSummaryPrint,ChartPrint,Chart3DPrint}Page.jsx` | MODIFIED | Tingnan A–F. |
+| `client/src/utils/{auditAction,patientName}.js` | MODIFIED | Audit labels (condition, intraoral), middle name. |
+| `.claude/skills/dentavault-ui/SKILL.md` | MODIFIED | "Clinic data" na seksyon (procedures, conditions, patient info, clinic constants). |
+
+**Na-verify (local, Edge via Playwright + API):** Phase 1 **21/21** (procedures, walang Dental X-ray, aliases, lumang import format, dashboard legend,
+Save kita sa 1366×768, print header); Phase 2 **29/29** (bagong codes, whole-tooth mula sa surface, baby teeth 55/84, maling
+tooth number 59/99/19/abc = 422, letter codes, toggle, grouped modal 23, print + findings dedupe, 3D pen 8); Phase 3 **30/30**
+(create/update/export/import ng bagong field, Oo/Hindi, male → binubura ang pang-babae, guardian para sa minor, Edit prefill,
+Print Summary; 2 sa test script ay timing, nakumpirma sa screenshot); Phase 5 **13/13** (intraoral API 422/403, card, Save, print, 360px); patient view 4/4; responsive sweep **45 screens** (320–1366px), 0 overflow, 0 page errors (bago tanggalin ang Appointments; pagkatapos: build at 3 tab sa 320–1024px muling sinuri). Build pasado.
+Nilinis ang lahat ng test data. **Hindi pa naka-commit o naka-push.**

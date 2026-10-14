@@ -5,8 +5,9 @@ export function listName(patient) {
   return `${patient.last_name}, ${patient.first_name}`
 }
 
+// May middle name kapag naitala (Patient Information Record, migration 015)
 export function fullName(patient) {
-  return `${patient.first_name} ${patient.last_name}`
+  return [patient.first_name, patient.middle_name, patient.last_name].filter(Boolean).join(' ')
 }
 
 // "male" → "Male" (lowercase ang naka-save sa DB)

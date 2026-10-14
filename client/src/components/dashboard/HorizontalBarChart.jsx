@@ -7,20 +7,23 @@
 // sa hover kaysa sa maikling label (hal. buong pangalan ng procedure). Lalabas lang yung legend kapag mahigit isa yung distinct colors
 // na ginagamit — kasi kung single-hue naman, yung section title na mismo
 // ang nagsasabi kung ano 'yon, sunod sa "single series needs no legend box"
-// na rule.
-export default function HorizontalBarChart({ data, showLegend = false }) {
+// na rule. `legend` ({ label, color }[]): sariling legend kapag ang kulay
+// ay para sa GRUPO at hindi sa bawat bar (hal. procedure categories).
+export default function HorizontalBarChart({ data, showLegend = false, legend }) {
   if (!data || data.length === 0 || data.every((d) => d.value === 0)) {
     return <p className="text-sm text-slate-400">No data yet.</p>
   }
 
   const max = Math.max(...data.map((d) => d.value), 1)
-  const legendEntries = showLegend
-    ? [...new Map(data.map((d) => [d.label, d.color])).entries()]
-    : []
+  const legendEntries = legend
+    ? legend.map((l) => [l.label, l.color])
+    : showLegend
+      ? [...new Map(data.map((d) => [d.label, d.color])).entries()]
+      : []
 
   return (
     <div>
-      {showLegend && (
+      {legendEntries.length > 0 && (
         <div className="mb-3 flex flex-wrap gap-x-4 gap-y-1">
           {legendEntries.map(([label, color]) => (
             <div key={label} className="flex items-center gap-1.5 text-xs text-slate-600">

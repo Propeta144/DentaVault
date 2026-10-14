@@ -7,7 +7,13 @@ import Gingiva from './Gingiva'
 import { ARCHES } from './archLayout'
 import { TOOTH_PLACEMENTS as PLACEMENTS, SceneLights, groupChartEntries } from './chartScene'
 import ChartEntryModal from './ChartEntryModal'
-import { ODONTOGRAM_ROWS, CONDITIONS, conditionColor } from '../../constants/dental'
+import { ODONTOGRAM_ROWS, CONDITIONS, conditionColor, isPrimaryTooth } from '../../constants/dental'
+import ConditionLegend from './ConditionLegend'
+
+// Pagpipilian ng pen: ang mga kondisyon na iginuguhit sa isang SURFACE lang
+// (Decayed, Filled, ...). Ang pang-buong-ngipin (Missing, Crown, ...) ay
+// pinipili sa modal pagkatapos gumuhit, o sa 2D chart.
+const PEN_CONDITIONS = CONDITIONS.filter((c) => c.scope !== 'whole')
 import { getCurrentChart, createChartEntry } from '../../services/chart'
 
 // Same physical dental arch (upper + lower) as Odontogram2D, laid out in
@@ -133,7 +139,7 @@ export default function Odontogram3D({ patientId, canEdit, onPendingChange }) {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            {CONDITIONS.map((c) => (
+            {PEN_CONDITIONS.map((c) => (
               <button
                 key={c.code}
                 type="button"
@@ -145,6 +151,7 @@ export default function Odontogram3D({ patientId, canEdit, onPendingChange }) {
                 }`}
               >
                 <span className="h-3.5 w-3.5 rounded-full border border-black/10" style={{ backgroundColor: c.color }} />
+                <span className="font-semibold">{c.letter}</span>
                 {c.label}
               </button>
             ))}
@@ -235,14 +242,13 @@ export default function Odontogram3D({ patientId, canEdit, onPendingChange }) {
 
       <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-400">Legend</h3>
-        <div className="flex flex-wrap gap-x-4 gap-y-2">
-          {CONDITIONS.map((c) => (
-            <div key={c.code} className="flex items-center gap-1.5 text-base text-slate-600">
-              <span className="h-3.5 w-3.5 rounded-full border border-black/10" style={{ backgroundColor: c.color }} />
-              {c.label}
-            </div>
-          ))}
-        </div>
+        <ConditionLegend />
+        {/* Permanent teeth lang ang 3D model (desisyon ng team) */}
+        {entries.some((e) => isPrimaryTooth(e.tooth_number)) && (
+          <p className="mt-2 text-sm text-slate-500">
+            This patient has baby teeth on record. Baby teeth appear on the 2D chart only.
+          </p>
+        )}
       </div>
 
       {!canEdit && (

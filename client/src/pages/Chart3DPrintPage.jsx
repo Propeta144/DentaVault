@@ -5,8 +5,10 @@ import { getCurrentChart } from '../services/chart'
 import Chart3DSnapshots from '../components/chart/Chart3DSnapshots'
 import PageLoader from '../components/common/PageLoader'
 import PrintHeader from '../components/common/PrintHeader'
-import ChartFindings, { ColorDot } from '../components/chart/ChartFindings'
-import { CONDITIONS } from '../constants/dental'
+import ChartFindings from '../components/chart/ChartFindings'
+import IntraoralExam from '../components/chart/IntraoralExam'
+import { isPrimaryTooth } from '../constants/dental'
+import ConditionLegend from '../components/chart/ConditionLegend'
 import { formatDate, formatDateTime } from '../utils/formatDate'
 
 // 3D na bersyon ng Print Chart (Feature #22). Galing sa paper: "Print the
@@ -103,15 +105,16 @@ export default function Chart3DPrintPage() {
 
       <div className="mt-6 break-inside-avoid">
         <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">Legend</h2>
-        <div className="flex flex-wrap gap-x-4 gap-y-1.5">
-          {CONDITIONS.map((c) => (
-            <div key={c.code} className="flex items-center gap-1.5 text-sm text-slate-700">
-              <ColorDot color={c.color} />
-              {c.label}
-            </div>
-          ))}
-        </div>
+        <ConditionLegend expanded />
+        {/* Permanent teeth lang ang 3D model; nasa Findings pa rin ang baby teeth */}
+        {entries.some((e) => isPrimaryTooth(e.tooth_number)) && (
+          <p className="mt-2 text-xs text-slate-500">
+            Baby teeth are not part of the 3D model. Their findings are listed below and shown on the 2D chart.
+          </p>
+        )}
       </div>
+
+      <IntraoralExam patientId={id} printMode />
 
       <ChartFindings entries={entries} />
 

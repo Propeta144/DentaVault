@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { CONDITIONS, FDI_TEETH, SURFACES, conditionColor } from '../../constants/dental'
+import { CHART_TOOTH_ORDER, SURFACES, conditionColor, conditionLabel, conditionLetter } from '../../constants/dental'
 import { formatDate } from '../../utils/formatDate'
 
 // Listahan ng findings sa ilalim ng 2D at 3D Print Chart (Feature #22):
@@ -24,10 +24,22 @@ export default function ChartFindings({ entries }) {
   const findings = useMemo(
     () =>
       entries
-        .slice()
+        // Ang whole-tooth save ay sumusulat ng 6 na row (whole + 5 surfaces,
+        // tignan createWholeToothEntry). Isang "Whole Tooth" row na lang ang
+        // ipinapakita kapag pareho ang kondisyon at oras ng surface sa whole;
+        // ang surface na binago pagkatapos ay lalabas pa rin.
+        .filter((e) => {
+          if (e.surface === 'whole') return true
+          const whole = entries.find((w) => w.tooth_number === e.tooth_number && w.surface === 'whole')
+          return !(
+            whole &&
+            whole.condition_code === e.condition_code &&
+            new Date(whole.recorded_at).getTime() === new Date(e.recorded_at).getTime()
+          )
+        })
         .sort(
           (a, b) =>
-            FDI_TEETH.indexOf(a.tooth_number) - FDI_TEETH.indexOf(b.tooth_number) ||
+            CHART_TOOTH_ORDER.indexOf(a.tooth_number) - CHART_TOOTH_ORDER.indexOf(b.tooth_number) ||
             SURFACE_ORDER.indexOf(a.surface) - SURFACE_ORDER.indexOf(b.surface),
         ),
     [entries],
@@ -59,7 +71,9 @@ export default function ChartFindings({ entries }) {
                 <td className="py-1.5 pr-3">
                   <span className="flex items-center gap-1.5 whitespace-nowrap">
                     <ColorDot color={conditionColor(f.condition_code)} />
-                    {CONDITIONS.find((c) => c.code === f.condition_code)?.label || f.condition_code}
+                    {/* Letter code ng clinic (hal. "D") + buong pangalan */}
+                    <span className="w-6 font-semibold">{conditionLetter(f.condition_code)}</span>
+                    {conditionLabel(f.condition_code)}
                   </span>
                 </td>
                 <td className="py-1.5 pr-3 text-slate-600">{f.notes || '—'}</td>

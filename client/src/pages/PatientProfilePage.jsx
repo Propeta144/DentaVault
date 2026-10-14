@@ -22,6 +22,8 @@ import {
 import { useAuth } from '../context/AuthContext'
 import { getPatient, listTreatments, addTreatment, getPortalAccount } from '../services/patients'
 import AddTreatmentForm from '../components/patients/AddTreatmentForm'
+import IntraoralExam from '../components/chart/IntraoralExam'
+import PatientInfoRecord, { healthAlerts } from '../components/patients/PatientInfoRecord'
 import PatientXraysSection from '../components/xray/PatientXraysSection'
 import EditPatientModal from '../components/patients/EditPatientModal'
 import DeletePatientModal from '../components/patients/DeletePatientModal'
@@ -252,6 +254,16 @@ export default function PatientProfilePage() {
           <MedicalAlertBadge label="Allergies" value={patient.allergies} />
           <MedicalAlertBadge label="Medical History" value={patient.medical_history} />
         </div>
+        {/* Mahahalagang sagot sa Health Questions (hal. buntis, umiinom ng
+            gamot), para kita bago mag-treatment kahit nakatiklop ang record */}
+        {healthAlerts(patient).length > 0 && (
+          <p className="mt-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>
+              <span className="font-semibold">Health questions:</span> {healthAlerts(patient).join(' · ')}
+            </span>
+          </p>
+        )}
 
         <div className="mt-5 hidden border-t border-slate-100 pt-5 lg:block">
           <PatientDetails patient={patient} portalAccount={portalAccount} showPortal={isDentist} />
@@ -399,6 +411,8 @@ export default function PatientProfilePage() {
                 </Suspense>
               )}
             </div>
+            {/* Periodontal, Occlusion, Appliances, TMD (buong bibig; papel ng clinic) */}
+            <IntraoralExam patientId={id} canEdit={isDentist} />
           </div>
         )}
 
@@ -412,14 +426,17 @@ export default function PatientProfilePage() {
         <PatientDetails patient={patient} portalAccount={portalAccount} showPortal={isDentist} />
       </section>
 
+      {/* Buong Patient Information Record (papel na form ng clinic): nakatiklop */}
+      <PatientInfoRecord patient={patient} />
+
       {/* MODALS */}
       {addingTreatment && (
-        // max-w-2xl: isang linya lang ang bawat procedure button, kaya kasya
+        // max-w-4xl: 5 column ng procedure buttons (17 procedures), kaya kasya
         // ang buong form (pati Save) sa 768px na taas ng laptop
         <Modal
           title={`Add Treatment — ${fullName(patient)}`}
           onClose={addTreatmentGuard.requestClose}
-          maxWidth="max-w-2xl"
+          maxWidth="max-w-4xl"
         >
           <AddTreatmentForm onSubmit={handleAddTreatment} guard={addTreatmentGuard} />
         </Modal>

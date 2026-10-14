@@ -1,5 +1,8 @@
 import {
   conditionColor,
+  conditionLabel,
+  conditionLetter,
+  isMissingCondition,
   toothOrientation,
   UNMARKED_COLOR,
   UNMARKED_STROKE,
@@ -22,10 +25,26 @@ function surfaceLabel(code) {
   return SURFACES.find((s) => s.code === code)?.label || code
 }
 
+const SURFACE_ORDER = ['whole', 'occlusal', 'mesial', 'distal', 'facial', 'lingual']
+
+// Mga letter code ng clinic (D, F, J, ...) para sa isang ngipin, walang
+// ulit. Kapag may whole-tooth entry na pareho sa lahat ng surface, isa lang.
+// Ang "✓" (Present) ay ipinapakita lang kapag iyon lang ang naitala.
+export function toothLetters(chartState) {
+  const codes = []
+  for (const surface of SURFACE_ORDER) {
+    const code = chartState[surface]?.condition_code
+    if (code && !codes.includes(code)) codes.push(code)
+  }
+  const meaningful = codes.filter((c) => c !== 'healthy')
+  return meaningful.length > 0 ? meaningful : codes
+}
+
 export default function Tooth({
   toothNumber,
   x,
   y,
+  scale = 1,
   labelPosition = 'below',
   chartState,
   canEdit,
@@ -44,7 +63,15 @@ export default function Tooth({
 
   const shape = toothShape(toothNumber)
   const wholeEntry = chartState.whole
-  const isExtracted = wholeEntry?.condition_code === 'extracted'
+  // Lahat ng "wala na ang ngipin" (Extracted, Missing, Congenitally Missing...)
+  const isMissing = isMissingCondition(wholeEntry?.condition_code)
+
+  // Letter codes: nasa kabilang gilid ng numero (palapit sa bite line), gaya
+  // ng mga kahon sa papel na chart ng clinic. Hanggang 3 ang ipinapakita;
+  // nasa tooltip ang lahat.
+  const codes = toothLetters(chartState)
+  const shownLetters = codes.slice(0, 3).map(conditionLetter).join(' ')
+  const lettersY = labelPosition === 'above' ? SIZE + 18 : -8
 
   function fillFor(surfaceCode) {
     const entry = chartState[surfaceCode]
@@ -53,19 +80,19 @@ export default function Tooth({
 
   return (
     <g
-      transform={`translate(${x},${y})`}
+      transform={`translate(${x},${y}) scale(${scale})`}
       filter="url(#tooth-shadow)"
       className={highlighted ? 'animate-[pulse_1s_ease-in-out_2]' : ''}
     >
-      {isExtracted ? (
+      {isMissing ? (
         <g
           onClick={() => canEdit && onWholeClick(toothNumber)}
           className={canEdit ? 'cursor-pointer transition-all duration-150 hover:brightness-90' : ''}
         >
-          <title>{`Tooth ${toothNumber} — Extracted / Missing`}</title>
+          <title>{`Tooth ${toothNumber} — ${conditionLabel(wholeEntry.condition_code)}`}</title>
           <polygon
             points={shape.outline}
-            fill={conditionColor('extracted')}
+            fill={conditionColor(wholeEntry.condition_code)}
             stroke={UNMARKED_STROKE}
             strokeWidth={0.75}
           />
@@ -129,6 +156,22 @@ export default function Tooth({
             pointerEvents="none"
           />
         </>
+      )}
+      {codes.length > 0 && (
+        <text
+          x={SIZE / 2}
+          y={lettersY}
+          textAnchor="middle"
+          fontSize="14"
+          fontWeight="700"
+          fill="#171123"
+          pointerEvents="none"
+          className="select-none"
+        >
+          <title>{codes.map(conditionLabel).join(', ')}</title>
+          {shownLetters}
+          {codes.length > 3 ? ' +' : ''}
+        </text>
       )}
       {/* Invisible hit area, mas malaki pa sa mismong nakalimbag na numero,
           para talagang matap yung "click the number to open the whole-tooth

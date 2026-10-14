@@ -1,4 +1,5 @@
 import { importPatients, previewImport, IMPORT_TEMPLATE_HEADERS } from '../services/patientImportService.js'
+import { EXTRA_PATIENT_FIELDS } from '../utils/patientFields.js'
 import { recordAuditLog } from '../models/auditLogModel.js'
 import asyncHandler from '../utils/asyncHandler.js'
 import AppError from '../utils/AppError.js'
@@ -74,6 +75,10 @@ const TEMPLATE_COLUMN_TITLES = {
   treatment_date: 'Treatment Date (MM/DD/YYYY)',
   tooth_number: 'Tooth Number (e.g. 26 or ALL)',
   treatment_notes: 'Treatment Notes',
+  // Patient Information Record (papel na form ng clinic)
+  ...Object.fromEntries(
+    EXTRA_PATIENT_FIELDS.map((f) => [f.column, f.type === 'bool' ? `${f.label}? (Yes/No)` : f.label]),
+  ),
 }
 
 // Blangkong template (header row lang). Dati may 2 halimbawang row

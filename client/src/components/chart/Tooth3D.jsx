@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { Text, useGLTF } from '@react-three/drei'
 import { configureTextBuilder } from 'troika-three-text'
-import { conditionColor } from '../../constants/dental'
+import { conditionColor, isMissingCondition } from '../../constants/dental'
 import teethModelUrl from '../../assets/models/teeth.glb?url'
 import TEETH_EXTENTS from '../../assets/models/teethExtents.json'
 
@@ -316,7 +316,8 @@ export default function Tooth3D({
   const nodeName = toothNodeName(toothNumber)
   const toothGeometry = nodes[nodeName]?.geometry
   const extents = TEETH_EXTENTS[nodeName]
-  const isExtracted = chartState.whole?.condition_code === 'extracted'
+  // Lahat ng "wala na ang ngipin" (Extracted, Missing, Congenitally Missing...)
+  const isExtracted = isMissingCondition(chartState.whole?.condition_code)
 
   // Hindi simetriko ang mga ngipin (iba ang mesial at distal na side), at
   // +X = mesial sa geometry. Sa mga posisyong nasa kabilang direksyon ang

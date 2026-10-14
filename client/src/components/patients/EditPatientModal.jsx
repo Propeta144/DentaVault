@@ -3,6 +3,7 @@ import PatientForm from './PatientForm'
 import { updatePatient } from '../../services/patients'
 import { useToast } from '../../context/ToastContext'
 import useDiscardGuard from '../../hooks/useDiscardGuard'
+import { patientInfoToForm } from '../../constants/patientInfo'
 
 // Snake_case yung DB rows; camelCase naman yung ginagamit ng PatientForm —
 // same shape na tinatanggap ng API — kaya kailangan i-map muna papuntang
@@ -20,6 +21,8 @@ function toFormValues(patient) {
     allergies: patient.allergies || '',
     emergencyContactName: patient.emergency_contact_name || '',
     emergencyContactPhone: patient.emergency_contact_phone || '',
+    // Buong Patient Information Record (middle name, health questions, ...)
+    ...patientInfoToForm(patient),
   }
 }
 

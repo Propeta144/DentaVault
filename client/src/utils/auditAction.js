@@ -1,3 +1,5 @@
+import { conditionLabel } from '../constants/dental'
+
 // Ginagamit parehong AuditLogPage (full table) at DashboardPage (recent
 // activity feed) — cosmetic grouping lang naman 'to, para scannable pa rin
 // yung mahabang listahan ng action codes (CREATE_PATIENT, LOGIN_FAILED,
@@ -40,6 +42,7 @@ const ACTION_LABELS = {
   UPDATE_PATIENT: { label: 'Updated patient details' },
   DELETE_PATIENT: { label: 'Deleted a patient' },
   CREATE_TREATMENT: { label: 'Added a treatment' },
+  UPDATE_INTRAORAL_EXAM: { label: 'Updated the intraoral examination' },
   CREATE_CHART_ENTRY: { label: 'Updated the dental chart', plural: (n) => `Updated the dental chart (${n} entries)` },
   UPLOAD_XRAY: { label: 'Uploaded an X-ray' },
   PATIENT_UPLOAD_XRAY: { label: 'Patient uploaded an X-ray (patient portal)' },
@@ -74,14 +77,14 @@ export function actionLabel(action, count = 1) {
 // patientId (numeric na internal ID — Feature #7: walang patient ID sa
 // screen; nasa "Patient" column na ang pangalan) at messageId (mahabang
 // email header, walang silbi sa dentist).
-const HIDDEN_DETAIL_KEYS = new Set(['patientId', 'messageId', 'propagatedToAllSurfaces', 'holdId', 'dkim'])
+const HIDDEN_DETAIL_KEYS = new Set(['patientId', 'messageId', 'propagatedToAllSurfaces', 'holdId', 'dkim', 'previous'])
 
 const DETAIL_FORMATTERS = {
   name: (v) => `Patient: ${v}`,
   count: (v) => `${v} patient${Number(v) === 1 ? '' : 's'}`,
   toothNumber: (v) => (v === 'ALL' ? 'All teeth' : `Tooth ${v}`),
   surface: (v) => `Surface: ${v}`,
-  conditionCode: (v) => `Condition: ${String(v).replace(/_/g, ' ')}`,
+  conditionCode: (v) => `Condition: ${conditionLabel(v)}`,
   filename: (v) => `File: ${v}`,
   senderEmail: (v) => `From: ${v}`,
   subject: (v) => `Subject: "${v}"`,
@@ -98,6 +101,7 @@ const DETAIL_FORMATTERS = {
   limitedBy: (v) => `Limit: ${{ ip: 'per IP address', email: 'per account email', user: 'per account' }[v] ?? v}`,
   windowMinutes: (v) => `Wait: ${v} min`,
   byPatient: () => 'Removed by the patient (before review)',
+  findingCount: (v) => `${v} finding${Number(v) === 1 ? '' : 's'} checked`,
 }
 
 export function formatAuditDetails(details) {

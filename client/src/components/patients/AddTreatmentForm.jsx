@@ -1,21 +1,10 @@
 import { useId, useLayoutEffect, useRef, useState } from 'react'
 import { ClipboardPlus } from 'lucide-react'
-import { PROCEDURES, FDI_TEETH, ALL_TEETH, isWholeMouthProcedure } from '../../constants/dental'
+import { PROCEDURES, ALL_TEETH, TOOTH_SELECT_GROUPS, isWholeMouthProcedure } from '../../constants/dental'
 import { useToast } from '../../context/ToastContext'
 import DiscardChangesBar from '../common/DiscardChangesBar'
 import { FIELD_LIMITS } from '../../constants/fieldLimits'
 import { todayISO } from '../../utils/formatDate'
-
-// Grouped by quadrant (tugma sa arch labels ng visual 2D chart —
-// UPPER RIGHT/LEFT, LOWER RIGHT/LEFT) para may parehong anatomical anchor
-// yung pagpili ng ngipin dito kagaya ng pag-click sa odontogram, sa halip
-// na flat list lang ng two-digit FDI codes na walang reference point.
-const TOOTH_GROUPS = [
-  { label: 'Upper Right', teeth: FDI_TEETH.filter((t) => t[0] === '1') },
-  { label: 'Upper Left', teeth: FDI_TEETH.filter((t) => t[0] === '2') },
-  { label: 'Lower Left', teeth: FDI_TEETH.filter((t) => t[0] === '3') },
-  { label: 'Lower Right', teeth: FDI_TEETH.filter((t) => t[0] === '4') },
-]
 
 // Nasa loob ng Modal (PatientProfilePage). Para sa chairside na paggamit:
 // - Procedure = malalaking button (isang tap), hindi dropdown
@@ -113,7 +102,11 @@ export default function AddTreatmentForm({ onSubmit, guard }) {
           aria-required="true"
           aria-invalid={errors.procedureName ? true : undefined}
           aria-describedby={errors.procedureName ? `${ids.procedure}-error` : undefined}
-          className="grid grid-cols-2 gap-2" // 2 column kahit sa phone: mas maikli ang modal, kita ang Save
+          // 17 na ang procedures (client visit): maikling pangalan (`short`,
+          // buo sa tooltip) at 2–5 column, para kita pa rin ang Save nang
+          // hindi nag-i-scroll sa laptop (1366×768). Nakaayos ayon sa grupo
+          // (Diagnostic → Cosmetic), tignan PROCEDURES sa dental.js.
+          className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5"
         >
           {PROCEDURES.map((p, i) => {
             const checked = procedureName === p.value
@@ -124,14 +117,15 @@ export default function AddTreatmentForm({ onSubmit, guard }) {
                 type="button"
                 role="radio"
                 aria-checked={checked}
+                title={p.short ? p.value : undefined}
                 onClick={() => handleProcedureChange(p.value)}
-                className={`min-h-11 rounded-md border px-3 py-2 text-left text-base transition-colors ${
+                className={`min-h-11 rounded-md border px-3 py-2 text-left text-base leading-snug transition-colors ${
                   checked
                     ? 'border-sky-500 bg-sky-50 font-medium text-sky-900 ring-1 ring-sky-500'
                     : `${errors.procedureName ? 'border-red-300' : 'border-slate-200'} text-slate-700 hover:border-slate-300 hover:bg-slate-50`
                 }`}
               >
-                {p.value}
+                {p.short || p.value}
               </button>
             )
           })}
@@ -166,7 +160,7 @@ export default function AddTreatmentForm({ onSubmit, guard }) {
               Select a tooth...
             </option>
             <option value={ALL_TEETH}>All Teeth / Full Mouth</option>
-            {TOOTH_GROUPS.map((group) => (
+            {TOOTH_SELECT_GROUPS.map((group) => (
               <optgroup key={group.label} label={group.label}>
                 {group.teeth.map((t) => (
                   <option key={t} value={t}>

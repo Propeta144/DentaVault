@@ -4,6 +4,7 @@ import { getPatient } from '../services/patients'
 import { getCurrentChart } from '../services/chart'
 import Odontogram2D from '../components/chart/Odontogram2D'
 import ChartFindings from '../components/chart/ChartFindings'
+import IntraoralExam from '../components/chart/IntraoralExam'
 import PageLoader from '../components/common/PageLoader'
 import PrintHeader from '../components/common/PrintHeader'
 import { formatDate, formatDateTime } from '../utils/formatDate'
@@ -57,7 +58,9 @@ export default function ChartPrintPage() {
         </div>
       </div>
 
-      <Odontogram2D patientId={id} canEdit={false} />
+      <Odontogram2D patientId={id} canEdit={false} printMode />
+
+      <IntraoralExam patientId={id} printMode />
 
       <ChartFindings entries={entries} />
 
