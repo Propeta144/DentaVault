@@ -1,13 +1,20 @@
 import multer from 'multer'
 import AppError from '../utils/AppError.js'
 
-const ALLOWED_MIME_TYPES = new Set(['text/csv', 'application/vnd.ms-excel', 'application/json', 'text/plain'])
+const ALLOWED_MIME_TYPES = new Set([
+  'text/csv',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/json',
+  'text/plain',
+])
 const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024 // 5MB — maliit lang naman ang text data ng legacy patient lists
 
 function fileFilter(req, file, cb) {
-  const isCsvOrJsonExt = /\.(csv|json)$/i.test(file.originalname)
-  if (!ALLOWED_MIME_TYPES.has(file.mimetype) && !isCsvOrJsonExt) {
-    return cb(new AppError('Only CSV or JSON files are allowed', 415))
+  // .xls: pinapapasok para makita ang malinaw na "Save As .xlsx" na mensahe
+  const isAllowedExt = /\.(csv|json|xlsx|xls)$/i.test(file.originalname)
+  if (!ALLOWED_MIME_TYPES.has(file.mimetype) && !isAllowedExt) {
+    return cb(new AppError('Only Excel (.xlsx), CSV, or JSON files are allowed', 415))
   }
   cb(null, true)
 }

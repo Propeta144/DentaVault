@@ -4,6 +4,7 @@ import * as treatmentModel from '../models/treatmentModel.js'
 import AppError from '../utils/AppError.js'
 import { FIELD_LIMITS, stripPhoneFormatting, isValidToothNumber, clinicToday } from '../utils/validators.js'
 import { EXTRA_PATIENT_FIELDS, parseYesNo } from '../utils/patientFields.js'
+import { readXlsx, isXlsxBuffer, isLegacyXlsBuffer } from '../utils/xlsx.js'
 
 const REQUIRED_COLUMNS = ['first_name', 'last_name', 'sex', 'date_of_birth']
 const OPTIONAL_COLUMNS = [
@@ -100,7 +101,16 @@ const IMPORT_LENGTH_CHECKS = [
 
 // Binabasa ang file nang hindi pa binabago ang mga header (para maipakita
 // sa Map Columns step kung ano mismo ang nakasulat sa file ng clinic).
-function parseFile(buffer, originalname) {
+// Excel (.xlsx) = kinikilala sa laman ng file (ZIP), hindi lang sa pangalan.
+async function parseFile(buffer, originalname) {
+  if (isXlsxBuffer(buffer)) return readXlsx(buffer)
+  if (isLegacyXlsBuffer(buffer) || /\.xls$/i.test(originalname)) {
+    throw new AppError('Old Excel files (.xls) are not supported. In Excel, use File → Save As → Excel Workbook (.xlsx).', 422)
+  }
+  if (/\.xlsx$/i.test(originalname)) {
+    throw new AppError('That Excel file could not be read. Open it in Excel and save it again as .xlsx.', 422)
+  }
+
   const isJson = /\.json$/i.test(originalname)
   if (isJson) {
     let parsed
@@ -222,8 +232,8 @@ function applyMapping(rawRows, mapping) {
 }
 
 // Step 1 → 2: basahin ang file, ibalik ang headers, unang 5 row, at mungkahing mapping
-export function previewImport(buffer, originalname) {
-  const { headers, rows } = parseFile(buffer, originalname)
+export async function previewImport(buffer, originalname) {
+  const { headers, rows } = await parseFile(buffer, originalname)
   if (rows.length === 0) throw new AppError('The file has no rows to import', 422)
   return {
     headers,
@@ -494,7 +504,7 @@ function validateAndNormalizeTreatmentRow(raw, { dayFirst } = {}) {
 // row, makikita na niya yung patient na ginawa ng mas naunang row sa parehong
 // import — walang hiwalay pang in-memory tracking na kailangan.
 export async function importPatients(buffer, originalname, importedByUserId, { mapping, dryRun = false } = {}) {
-  const { headers, rows: fileRows } = parseFile(buffer, originalname)
+  const { headers, rows: fileRows } = await parseFile(buffer, originalname)
   if (fileRows.length === 0) {
     throw new AppError('The file has no rows to import', 422)
   }

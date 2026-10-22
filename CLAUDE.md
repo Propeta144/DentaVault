@@ -798,7 +798,7 @@ spreadsheet preview sa Map Columns). Na-check din ang screenshots isa-isa. Regre
 1. ~~**Patient upload ng X-ray sa app**: sa Functional Requirements at Patient Dashboard wireframe, may "Upload X-ray Image"
    ang patient; sa system, email lang (Mailgun). Gawin, o linawin sa paper na email ang paraan.~~ Naayos sa #27.
 2. ~~**Print ng 3D chart**: "Print the graphical dental chart (2D or 3D view)"; 2D lang ang Print Chart.~~ Naayos sa #22.
-3. **Excel**: "CSV/Excel templates"; CSV lang (Save As CSV).
+3. ~~**Excel**: "CSV/Excel templates"; CSV lang (Save As CSV).~~ Naayos sa #31.
 4. **Search by ID**: tinanggal sa #7 (hiling ng adviser); "name or ID" pa rin sa paper.
 5. **Kulay ng Caries**: red sa paper, magenta na (#12, color-blind safe).
 6. **ERD**: iba sa totoong database (hal. `roles` table, `middle_name`, `chief_complaint`/`diagnosis`, `dental_chart_records`).
@@ -1463,3 +1463,47 @@ teeth default at switch, Add/Edit/Delete, Save kita sa 1366×768, discard guard,
 390px walang overflow, 3D print 5 + 3 larawan, 0 console error). Regression: procedures 21/21, chart 28/29 (ang 1 ay ang
 lumang "2D only" na paalala na sinadyang tanggalin), patient info 28/30 (2 na kilalang timing, gaya ng #29). Build
 pasado. Nilinis ang test data. **Naka-push na** (commit `0eb45ba`, 2026-10-22). Napatakbo muna ang migration 017 sa Aiven bago ang push.
+
+---
+
+## 31. Excel (.xlsx) sa Bulk Import
+
+**Problema:** sa paper, "CSV/Excel templates", pero CSV lang ang tinatanggap (kailangang "Save As CSV" muna sa Excel, at
+nawawala ang "0" ng 0917... kapag tinype sa Excel). Nasa Limitations pa ng paper bilang "CSV-Only Bulk Import".
+
+**Ayos:**
+- **Puwede nang i-upload ang `.xlsx`** sa Migration → Bulk Import. Pareho ang 5 hakbang (Map Columns, Validate, Preview,
+  Import): ginagawang text ang bawat cell kaya iisa ang daan ng CSV at Excel. Unang nakikitang sheet na may laman ang binabasa;
+  ang unang row na may laman = header.
+- **Excel template na ang default** ("Download a blank Excel template"; may "or a CSV template" pa rin): naka-bold at naka-freeze
+  ang header; **Text format** sa Contact/Emergency phone, Tooth Number, Physician office number, Blood pressure (ginagawang petsa
+  ng Excel ang "120/80"), Bleeding time, at Last dental visit, kaya **hindi na nawawala ang 0**; date format sa Date of Birth at
+  Treatment Date; **dropdown** sa Sex (male/female) at sa lahat ng Yes/No na tanong.
+- Totoong petsa sa Excel → `YYYY-MM-DD` (UTC, walang day shift); formula → resulta; hyperlink (email) → text; rich text → text.
+- **Lumang `.xls` (Excel 97–2003):** hindi binabasa, pero malinaw ang mensahe ("File → Save As → Excel Workbook (.xlsx)").
+  Kinikilala ang format sa **laman ng file** (ZIP / OLE signature), hindi lang sa pangalan.
+- **Proteksyon:** bago i-unzip, binabasa ang listahan ng laman ng ZIP; tinatanggihan kapag lampas 100 MB pag-unzip (zip bomb)
+  at kapag lampas 20,000 row. 5 MB pa rin ang limit ng upload. Dentist lang (gaya ng dati).
+- **Library:** `exceljs` 4.4.0 (MIT). May lumang `uuid` ito sa loob (moderate advisory), kaya may `overrides: { uuid: ^11.1.1 }`
+  sa `server/package.json` → `npm audit`: 0 vulnerabilities. Hindi ginamit ang `xlsx` (SheetJS) sa npm (may hindi naayos na butas doon).
+- Walang migration, walang binago sa database. Ang filling na walang surfaces column ay walang marka sa chart (gaya ng dati, #30).
+
+| Name | Type | Purpose |
+|---|---|---|
+| `server/src/utils/xlsx.js` | **NEW** | `readXlsx()` (→ `{ headers, rows }`), `isXlsxBuffer`/`isLegacyXlsBuffer`, zip size check, `buildXlsxTemplate()` (formats + dropdowns). |
+| `server/src/services/patientImportService.js` | MODIFIED | `parseFile` async: `.xlsx` → `readXlsx`; `.xls` → malinaw na 422. `previewImport` async na. |
+| `server/src/controllers/patientImport.controller.js` | MODIFIED | `await previewImport`; template `.xlsx` (default) o `?format=csv`; `TEXT_COLUMNS`, `DATE_COLUMNS`, `BOOL_COLUMNS`. |
+| `server/src/config/importUpload.js` | MODIFIED | Tinatanggap ang `.xlsx` (at `.xls`, para sa mensahe); bagong error text. |
+| `server/package.json`, `package-lock.json` | MODIFIED | `exceljs`, `overrides.uuid`. |
+| `client/src/components/migration/BulkImportWizard.jsx` | MODIFIED | `accept` may `.xlsx`; "Choose an Excel or CSV file"; dalawang template button; gabay sa Excel. |
+| `client/src/services/patientImport.js` | MODIFIED | `downloadImportTemplate(format)` (`xlsx` default, `csv`). |
+| `client/src/pages/{MigrationPage,PatientsListPage}.jsx` | MODIFIED | "Bulk Import (Excel or CSV)"; empty-state text. |
+
+**Na-verify (local):** API **25/25** (template: content-type, 43 column, bold/frozen, Text format, date format, dropdowns; CSV template;
+patient 403; template na pinunan → preview 4 row, auto-map, ISO date; dry run 2 bago + 2 treatment + 1 error (future DOB) at walang
+naisulat; totoong import: DOB, phone na naka-number → 09..., Excel serial date, procedures/aliases, audit filename; `.xls` 422 na may
+paliwanag, pekeng at sirang `.xlsx` 422, `.exe` 415, CSV gumagana pa). **Totoong Excel** (COM): bumubukas ang template, Text format
+(nanatili ang 0 ng 09171234567), Sex dropdown; file na sine-save ng Excel → Validate: 2 patient, 1 treatment, 0 error. UI (Edge)
+**10/11** (ang 1 ay timing ng test; gumana ang click sa sumunod na hakbang): template downloads, `.xls` message, Map Columns, Validate,
+390px walang overflow, 0 console error. Build pasado. Nilinis ang test data. **Hindi pa naka-push.**
+

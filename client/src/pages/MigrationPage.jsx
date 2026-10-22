@@ -24,7 +24,7 @@ const MODES = [
   {
     value: 'bulk',
     icon: FileSpreadsheet,
-    title: 'Bulk Import (CSV)',
+    title: 'Bulk Import (Excel or CSV)',
     description: 'Upload a spreadsheet of many patient records at once.',
     cta: 'Import a file',
   },

@@ -226,7 +226,7 @@ export default function PatientsListPage() {
           description={
             hasSearch
               ? 'Check the spelling, or search by first or last name only.'
-              : 'Register a patient, or import existing records from a CSV file.'
+              : 'Register a patient, or import existing records from an Excel or CSV file.'
           }
           action={
             isDentist &&

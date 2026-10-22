@@ -184,7 +184,7 @@ export default function BulkImportWizard() {
           <input
             id={fileInputId}
             type="file"
-            accept=".csv,.json,text/csv,application/json"
+            accept=".xlsx,.csv,.json,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,application/json"
             onChange={(e) => handleFile(e.target.files[0])}
             className="sr-only"
           />
@@ -199,21 +199,31 @@ export default function BulkImportWizard() {
           >
             <Upload className="h-7 w-7 text-slate-400" />
             <span className="text-base font-medium text-slate-700">
-              {busy ? 'Reading file...' : 'Choose a CSV file or drag it here'}
+              {busy ? 'Reading file...' : 'Choose an Excel or CSV file, or drag it here'}
             </span>
             <span className="text-sm text-slate-500">
-              From Excel: File → Save As → <span className="font-medium">CSV (Comma delimited)</span>. Column names can be
-              anything; you will match them in the next step.
+              Excel workbook (.xlsx) or CSV. Column names can be anything; you will match them in the next step.
             </span>
           </label>
-          <button
-            type="button"
-            onClick={downloadImportTemplate}
-            className="flex min-h-11 items-center gap-1.5 text-base font-medium text-sky-700 hover:underline"
-          >
-            <Download className="h-4 w-4" />
-            Download a blank template
-          </button>
+          {/* Excel ang pangunahing template (may dropdown at tamang format ng
+              cell); CSV para sa ibang spreadsheet app */}
+          <div className="flex flex-wrap items-center gap-x-4">
+            <button
+              type="button"
+              onClick={() => downloadImportTemplate('xlsx')}
+              className="flex min-h-11 items-center gap-1.5 text-base font-medium text-sky-700 hover:underline"
+            >
+              <Download className="h-4 w-4" />
+              Download a blank Excel template
+            </button>
+            <button
+              type="button"
+              onClick={() => downloadImportTemplate('csv')}
+              className="flex min-h-11 items-center text-sm font-medium text-slate-600 hover:text-sky-700 hover:underline"
+            >
+              or a CSV template
+            </button>
+          </div>
           {/* Blangko na ang template (header row lang), kaya dito ang paliwanag
               kung paano punan. Nasa header mismo ang * at ang format. */}
           <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
@@ -244,8 +254,9 @@ export default function BulkImportWizard() {
                 as Cleaning, Filling, Pasta, Extraction, Bunot, Root Canal, Braces, or Whitening.
               </li>
               <li>
-                In Excel, select all and double-click the line between two column letters to widen the columns so every
-                header is readable.
+                In the Excel template, Sex and the Yes/No questions have a dropdown, and phone numbers keep their leading
+                0. Only the first sheet of an Excel file is imported. Old Excel files (.xls) must first be saved as
+                Excel Workbook (.xlsx).
               </li>
             </ul>
           </div>
