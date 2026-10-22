@@ -1504,6 +1504,6 @@ patient 403; template na pinunan → preview 4 row, auto-map, ISO date; dry run 
 naisulat; totoong import: DOB, phone na naka-number → 09..., Excel serial date, procedures/aliases, audit filename; `.xls` 422 na may
 paliwanag, pekeng at sirang `.xlsx` 422, `.exe` 415, CSV gumagana pa). **Totoong Excel** (COM): bumubukas ang template, Text format
 (nanatili ang 0 ng 09171234567), Sex dropdown; file na sine-save ng Excel → Validate: 2 patient, 1 treatment, 0 error. UI (Edge)
-**10/11** (ang 1 ay timing ng test; gumana ang click sa sumunod na hakbang): template downloads, `.xls` message, Map Columns, Validate,
-390px walang overflow, 0 console error. Build pasado. Nilinis ang test data. **Hindi pa naka-push.**
+**10/11** (11/11 pagkatapos ayusin ang timing ng test): template downloads, `.xls` message, Map Columns, Validate,
+390px walang overflow, 0 console error. Build pasado. Nilinis ang test data. **Naka-push na** (commit `3f9b716`, 2026-10-22). Walang migration.
 
