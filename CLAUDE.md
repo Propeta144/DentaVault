@@ -1462,4 +1462,4 @@ blangko 422, ginagamit na 409, audit); import dry run: 7 format tama, Feb 30 at 
 teeth default at switch, Add/Edit/Delete, Save kita sa 1366×768, discard guard, 2D sync, chart → history, portal hint,
 390px walang overflow, 3D print 5 + 3 larawan, 0 console error). Regression: procedures 21/21, chart 28/29 (ang 1 ay ang
 lumang "2D only" na paalala na sinadyang tanggalin), patient info 28/30 (2 na kilalang timing, gaya ng #29). Build
-pasado. Nilinis ang test data. **Hindi pa naka-push.**
+pasado. Nilinis ang test data. **Naka-push na** (commit `0eb45ba`, 2026-10-22). Napatakbo muna ang migration 017 sa Aiven bago ang push.
