@@ -29,6 +29,7 @@ router.post(
     body('surface').isIn(SURFACES).withMessage('Invalid surface'),
     body('conditionCode').isIn(CHART_CONDITIONS).withMessage('Invalid condition'),
     body('strokeData').optional({ nullable: true }).isArray().withMessage('strokeData must be an array'),
+    body('addTreatment').optional().isBoolean({ strict: true }).withMessage('addTreatment must be true or false'),
     body('notes')
       .optional({ values: 'falsy' })
       .isLength({ max: FIELD_LIMITS.notes })

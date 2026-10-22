@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { ODONTOGRAM_ROWS } from '../../constants/dental'
+import { ODONTOGRAM_ROWS, PRIMARY_ROWS } from '../../constants/dental'
 import { toothExtents } from './Tooth3D'
 
 // Hugis at pwesto ng totoong dental arch para sa 3D chart (at sa gums).
@@ -71,11 +71,39 @@ function rowArcCenters(row) {
   return centers
 }
 
-function buildArch(rowIndex) {
+// Specs bawat dentition. Baby teeth (Feature #30): mas maliit at mas bilog
+// na arch ng bata (~84% ang lapad, ~70% ang lalim ng adult), 5 ngipin bawat
+// quadrant, mas tuwid ang incisors, at mas maliit ang overjet.
+const PRIMARY_SCALE = { x: 0.84, z: 0.7 }
+const scaleArch = (points) => points.map(([x, z]) => [x * PRIMARY_SCALE.x, z * PRIMARY_SCALE.z])
+const DENTITION_SPECS = {
+  permanent: {
+    rows: ODONTOGRAM_ROWS,
+    curves: [UPPER_ARCH_MM, LOWER_ARCH_MM],
+    lowerZOffset: LOWER_Z_OFFSET,
+    tilts: [UPPER_TILT_DEG, LOWER_TILT_DEG],
+    papilla: PAPILLA,
+    gumHeight: 0.75,
+  },
+  primary: {
+    rows: PRIMARY_ROWS,
+    curves: [scaleArch(UPPER_ARCH_MM), scaleArch(LOWER_ARCH_MM)],
+    lowerZOffset: 0.15,
+    tilts: [
+      [6, 5, 3, 0, 0],
+      [4, 4, 2, 0, 0],
+    ],
+    papilla: [0.32, 0.28, 0.24, 0.16, 0.14],
+    gumHeight: 0.6,
+  },
+}
+
+function buildArch(rowIndex, dentition = 'permanent') {
+  const spec = DENTITION_SPECS[dentition]
   const upper = rowIndex === 0
-  const curve = buildCurve(upper ? UPPER_ARCH_MM : LOWER_ARCH_MM, upper ? 0 : LOWER_Z_OFFSET)
+  const curve = buildCurve(spec.curves[rowIndex], upper ? 0 : spec.lowerZOffset)
   const length = curve.getLength()
-  const row = ODONTOGRAM_ROWS[rowIndex]
+  const row = spec.rows[rowIndex]
   const centers = rowArcCenters(row)
   const teeth = row.map((toothNumber, i) => {
     const ext = toothExtents(toothNumber)
@@ -89,8 +117,8 @@ function buildArch(rowIndex) {
       tz: ext.z,
       aCervical,
       zenith: aCervical - MARGIN_OVERLAP,
-      papilla: PAPILLA[position],
-      tiltDeg: (upper ? UPPER_TILT_DEG : LOWER_TILT_DEG)[position],
+      papilla: spec.papilla[position],
+      tiltDeg: spec.tilts[rowIndex][position],
     }
   })
   const half = row.length / 2
@@ -98,11 +126,16 @@ function buildArch(rowIndex) {
   const right = teeth.slice(half)
   const left = teeth.slice(0, half).reverse()
   const lastEdge = Math.max(...teeth.map((t) => Math.abs(t.s) + t.halfWidth)) + TOOTH_GAP / 2
-  const topA = Math.max(...teeth.map((t) => t.aCervical)) + 0.75
+  const topA = Math.max(...teeth.map((t) => t.aCervical)) + spec.gumHeight
   return { upper, curve, length, teeth, right, left, lastEdge, topA, sign: upper ? 1 : -1 }
 }
 
-export const ARCHES = [buildArch(0), buildArch(1)]
+// Upper at lower arch bawat dentition: permanent (32) at baby teeth (20)
+export const DENTITION_ARCHES = {
+  permanent: [buildArch(0), buildArch(1)],
+  primary: [buildArch(0, 'primary'), buildArch(1, 'primary')],
+}
+export const ARCHES = DENTITION_ARCHES.permanent
 
 // Punto sa arch (arc length s mula midline) at ang palabas (facial) na direksyon
 export function archFrame(arch, s) {
@@ -113,8 +146,8 @@ export function archFrame(arch, s) {
   return { point, outward }
 }
 
-export function toothPlacement(rowIndex, indexInRow) {
-  const arch = ARCHES[rowIndex]
+export function toothPlacement(rowIndex, indexInRow, dentition = 'permanent') {
+  const arch = DENTITION_ARCHES[dentition][rowIndex]
   const tooth = arch.teeth[indexInRow]
   const { point, outward } = archFrame(arch, tooth.s)
   // Pivot = gitna ng cervical line (kung saan lumalabas ang ngipin sa gums);

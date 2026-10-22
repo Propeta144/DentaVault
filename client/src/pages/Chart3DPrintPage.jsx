@@ -30,6 +30,9 @@ export default function Chart3DPrintPage() {
   const [patient, setPatient] = useState(null)
   const [entries, setEntries] = useState(null)
   const [shots, setShots] = useState(null)
+  // Baby teeth (Feature #30): hiwalay na set ng larawan, kinukunan PAGKATAPOS
+  // ng permanent (isang WebGL canvas lang sa isang pagkakataon)
+  const [primaryShots, setPrimaryShots] = useState(null)
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -51,6 +54,8 @@ export default function Chart3DPrintPage() {
   if (!patient || !entries) return <PageLoader fullScreen />
 
   const byKey = Object.fromEntries((shots || []).map((s) => [s.key, s]))
+  const hasPrimary = entries.some((e) => isPrimaryTooth(e.tooth_number))
+  const ready = shots && (!hasPrimary || primaryShots)
 
   return (
     <div className="mx-auto max-w-3xl bg-white p-8 text-slate-900">
@@ -59,10 +64,10 @@ export default function Chart3DPrintPage() {
         <button
           type="button"
           onClick={() => window.print()}
-          disabled={!shots}
+          disabled={!ready}
           className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
         >
-          {shots ? 'Print' : 'Preparing...'}
+          {ready ? 'Print' : 'Preparing...'}
         </button>
       </div>
 
@@ -103,15 +108,35 @@ export default function Chart3DPrintPage() {
         </div>
       )}
 
+      {shots && hasPrimary && (
+        <div className="mt-6 break-inside-avoid">
+          <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">Baby teeth</h2>
+          {!primaryShots ? (
+            <>
+              <PageLoader label="Preparing baby teeth views..." />
+              <Chart3DSnapshots
+                entries={entries}
+                dentition="primary"
+                viewKeys={['front', 'upper', 'lower']}
+                onDone={setPrimaryShots}
+                onError={handleSnapshotError}
+              />
+            </>
+          ) : (
+            <div className="space-y-4">
+              <Snapshot shot={primaryShots.find((s) => s.key === 'front')} className="mx-auto w-3/4" />
+              <div className="grid grid-cols-2 gap-4">
+                <Snapshot shot={primaryShots.find((s) => s.key === 'upper')} />
+                <Snapshot shot={primaryShots.find((s) => s.key === 'lower')} />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="mt-6 break-inside-avoid">
         <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">Legend</h2>
         <ConditionLegend expanded />
-        {/* Permanent teeth lang ang 3D model; nasa Findings pa rin ang baby teeth */}
-        {entries.some((e) => isPrimaryTooth(e.tooth_number)) && (
-          <p className="mt-2 text-xs text-slate-500">
-            Baby teeth are not part of the 3D model. Their findings are listed below and shown on the 2D chart.
-          </p>
-        )}
       </div>
 
       <IntraoralExam patientId={id} printMode />

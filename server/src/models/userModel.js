@@ -98,3 +98,14 @@ export async function createUser({ patientId, role, email, passwordHash, fullNam
   )
   return findUserById(result.insertId)
 }
+
+// Feature #30: kapag binago ng dentist ang email/pangalan ng patient,
+// sumusunod ang portal account (dati kailangang gumawa ulit ng account).
+// Hindi binabago ang password at hindi nasisira ang session.
+export async function updatePortalIdentity(userId, { email, fullName }) {
+  await pool.execute('UPDATE users SET email = :email, full_name = :fullName WHERE id = :userId', {
+    userId,
+    email,
+    fullName,
+  })
+}

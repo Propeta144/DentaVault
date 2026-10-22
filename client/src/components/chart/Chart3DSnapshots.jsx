@@ -1,12 +1,10 @@
-import { Suspense, useEffect, useMemo, useRef } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { Canvas, useThree } from '@react-three/fiber'
 import { Text } from '@react-three/drei'
 import Tooth3D, { toothExtents } from './Tooth3D'
 import Gingiva from './Gingiva'
-import { ARCHES } from './archLayout'
-import { ODONTOGRAM_ROWS } from '../../constants/dental'
-import { TOOTH_PLACEMENTS, SceneLights, groupChartEntries } from './chartScene'
+import { DENTITION_SCENES, SceneLights, groupChartEntries } from './chartScene'
 
 // Mga larawan ng 3D chart para sa print (Feature #22). Hindi maaasahan ang
 // pag-print ng mismong 3D canvas (madalas blangko, at isang anggulo lang
@@ -61,9 +59,12 @@ function labelPosition(placement, toothNumber, mode) {
   return toWorld(placement, [0, placement.labelY, ext.z + 0.22])
 }
 
-const ALL_TEETH = ODONTOGRAM_ROWS.flatMap((row, rowIndex) =>
-  row.map((toothNumber, i) => ({ toothNumber, upper: rowIndex === 0, placement: TOOTH_PLACEMENTS[rowIndex][i] })),
-)
+// Lahat ng ngipin ng isang dentition (permanent o baby teeth), may pwesto
+function sceneTeeth(scene) {
+  return scene.rows.flatMap((row, rowIndex) =>
+    row.map((toothNumber, i) => ({ toothNumber, upper: rowIndex === 0, placement: scene.placements[rowIndex][i] })),
+  )
+}
 
 // Ilapit/ilayo ang camera hanggang kasya ang box sa frame (ilang ulit,
 // dahil perspective: hindi linear ang laki sa distansya)
@@ -96,7 +97,7 @@ function fitCamera(camera, box, dir, up) {
 
 const nextFrame = () => new Promise((resolve) => requestAnimationFrame(() => resolve()))
 
-function SnapshotTaker({ archRefs, labelRefs, labelsReady, onDone, onError }) {
+function SnapshotTaker({ teeth, views, archRefs, labelRefs, labelsReady, onDone, onError }) {
   const { gl, scene } = useThree()
 
   useEffect(() => {
@@ -116,7 +117,7 @@ function SnapshotTaker({ archRefs, labelRefs, labelsReady, onDone, onError }) {
       const headlight = new THREE.DirectionalLight('#ffffff', 0.55)
       scene.add(headlight, headlight.target)
       const shots = []
-      for (const view of SNAPSHOT_VIEWS) {
+      for (const view of views) {
         const box = new THREE.Box3()
         for (const key of ['upper', 'lower']) {
           const group = archRefs[key].current
@@ -131,7 +132,7 @@ function SnapshotTaker({ archRefs, labelRefs, labelsReady, onDone, onError }) {
         const hasFacing = facing.lengthSq() > 0.01
         if (hasFacing) facing.normalize()
 
-        for (const { toothNumber, upper, placement } of ALL_TEETH) {
+        for (const { toothNumber, upper, placement } of teeth) {
           const label = labelRefs.current[toothNumber]
           if (!label) continue
           // Numero lang ng mga ngipin na nakaharap sa camera (sa gilid at
@@ -175,8 +176,13 @@ function SnapshotTaker({ archRefs, labelRefs, labelsReady, onDone, onError }) {
 
 // Kumukuha ng 5 larawan; tinatawag ang onDone([{ key, title, src }]) kapag tapos.
 // Walang nakikita sa screen (nasa labas ng viewport ang Canvas).
-export default function Chart3DSnapshots({ entries, onDone, onError }) {
+// `dentition`: 'permanent' (default) o 'primary' (baby teeth, Feature #30).
+// `viewKeys`: aling mga anggulo lang (hal. front/upper/lower para sa baby teeth).
+export default function Chart3DSnapshots({ entries, onDone, onError, dentition = 'permanent', viewKeys }) {
   const chartByTooth = useMemo(() => groupChartEntries(entries), [entries])
+  const scene = DENTITION_SCENES[dentition]
+  const [teeth] = useState(() => sceneTeeth(scene))
+  const [views] = useState(() => SNAPSHOT_VIEWS.filter((v) => !viewKeys || viewKeys.includes(v.key)))
   const archRefs = { upper: useRef(null), lower: useRef(null) }
   const labelRefs = useRef({})
 
@@ -191,7 +197,7 @@ export default function Chart3DSnapshots({ entries, onDone, onError }) {
       promise,
       onSync(toothNumber) {
         synced.add(toothNumber)
-        if (synced.size === ALL_TEETH.length) {
+        if (synced.size === teeth.length) {
           clearTimeout(timer)
           resolve()
         }
@@ -214,14 +220,14 @@ export default function Chart3DSnapshots({ entries, onDone, onError }) {
         <color attach="background" args={['#ffffff']} />
         <SceneLights />
         <Suspense fallback={null}>
-          {ARCHES.map((arch, rowIndex) => {
+          {scene.arches.map((arch, rowIndex) => {
             const key = arch.upper ? 'upper' : 'lower'
             return (
               <group key={key} ref={archRefs[key]}>
                 <Gingiva arch={arch} />
-                {ODONTOGRAM_ROWS[rowIndex].map((toothNumber, i) => {
+                {scene.rows[rowIndex].map((toothNumber, i) => {
                   const { position, rotationY, flipUpper, mesialOnPositiveX, tiltX, labelY } =
-                    TOOTH_PLACEMENTS[rowIndex][i]
+                    scene.placements[rowIndex][i]
                   return (
                     <Tooth3D
                       key={toothNumber}
@@ -241,7 +247,7 @@ export default function Chart3DSnapshots({ entries, onDone, onError }) {
               </group>
             )
           })}
-          {ALL_TEETH.map(({ toothNumber }) => (
+          {teeth.map(({ toothNumber }) => (
             <Text
               key={toothNumber}
               ref={(el) => {
@@ -260,6 +266,8 @@ export default function Chart3DSnapshots({ entries, onDone, onError }) {
             </Text>
           ))}
           <SnapshotTaker
+            teeth={teeth}
+            views={views}
             archRefs={archRefs}
             labelRefs={labelRefs}
             labelsReady={labels.promise}

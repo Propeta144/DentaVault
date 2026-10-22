@@ -42,6 +42,8 @@ const ACTION_LABELS = {
   UPDATE_PATIENT: { label: 'Updated patient details' },
   DELETE_PATIENT: { label: 'Deleted a patient' },
   CREATE_TREATMENT: { label: 'Added a treatment' },
+  UPDATE_TREATMENT: { label: 'Edited a treatment' },
+  DELETE_TREATMENT: { label: 'Deleted a treatment' },
   UPDATE_INTRAORAL_EXAM: { label: 'Updated the intraoral examination' },
   CREATE_CHART_ENTRY: { label: 'Updated the dental chart', plural: (n) => `Updated the dental chart (${n} entries)` },
   UPLOAD_XRAY: { label: 'Uploaded an X-ray' },
@@ -62,6 +64,7 @@ const ACTION_LABELS = {
   MIGRATE_TREATMENT_HISTORY: { label: 'Encoded past treatments (migration)' },
   CREATE_PATIENT_PORTAL_ACCOUNT: { label: 'Created patient portal account' },
   RESET_PATIENT_PORTAL_PASSWORD: { label: 'Reset patient portal password' },
+  UPDATE_PORTAL_ACCOUNT_EMAIL: { label: 'Changed patient portal sign-in email' },
   CHANGE_OWN_PASSWORD: { label: 'Changed own password' },
   PRUNE_AUDIT_LOGS: { label: 'Archived old audit entries' },
 }
@@ -77,7 +80,16 @@ export function actionLabel(action, count = 1) {
 // patientId (numeric na internal ID — Feature #7: walang patient ID sa
 // screen; nasa "Patient" column na ang pangalan) at messageId (mahabang
 // email header, walang silbi sa dentist).
-const HIDDEN_DETAIL_KEYS = new Set(['patientId', 'messageId', 'propagatedToAllSurfaces', 'holdId', 'dkim', 'previous'])
+const HIDDEN_DETAIL_KEYS = new Set(['patientId', 'messageId', 'propagatedToAllSurfaces', 'holdId', 'dkim', 'previous', 'treatmentId'])
+
+// Treatment History ↔ chart (Feature #30)
+const CHART_CHANGE_LABELS = {
+  none: 'Treatment History only',
+  updated: 'Chart mark updated',
+  replaced: 'Chart mark replaced',
+  removed: 'Chart mark removed',
+  added: 'Added to the chart',
+}
 
 const DETAIL_FORMATTERS = {
   name: (v) => `Patient: ${v}`,
@@ -102,6 +114,14 @@ const DETAIL_FORMATTERS = {
   windowMinutes: (v) => `Wait: ${v} min`,
   byPatient: () => 'Removed by the patient (before review)',
   findingCount: (v) => `${v} finding${Number(v) === 1 ? '' : 's'} checked`,
+  chartEntries: (v) => (Number(v) > 0 ? 'Also on the dental chart' : 'Treatment History only'),
+  chartChange: (v) => CHART_CHANGE_LABELS[v] ?? v,
+  chartEntriesRemoved: (v) => (Number(v) > 0 ? 'Removed from the dental chart too' : 'Was not on the chart'),
+  fromChart: () => 'Added from the dental chart',
+  deleted: (v) =>
+    [v?.procedureName, v?.toothNumber && (v.toothNumber === 'ALL' ? 'all teeth' : `tooth ${v.toothNumber}`), v?.treatmentDate]
+      .filter(Boolean)
+      .join(', '),
 }
 
 export function formatAuditDetails(details) {

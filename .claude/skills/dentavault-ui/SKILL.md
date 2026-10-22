@@ -140,6 +140,9 @@ a display class (`grid`/`flex`) and `hidden` on the same element; wrap it instea
 - Chart conditions: `CONDITIONS` (23, may `letter`, `group`, `scope`) + `CONDITION_GROUPS` (7 kulay). Kulay = grupo; ipakita
   laging kasama ang letter code. Legend → `components/chart/ConditionLegend.jsx` (`expanded` sa print).
 - Tooth dropdown → `TOOTH_SELECT_GROUPS` (may baby teeth). Tooth number checks: 11–48, 51–85, "ALL".
+- Treatment ↔ chart sync (Feature #30): `PROCEDURE_CHART` / `procedureForCondition()` sa `dental.js` (kapareho ng
+  `server/src/utils/treatmentChart.js`). Huwag gumawa ng hiwalay na mapping; idagdag sa dalawang file.
+- 3D scene bawat dentition: `DENTITION_SCENES` sa `components/chart/chartScene.jsx` (permanent / primary).
 - Patient record fields → `constants/patientInfo.js` (`INFO_TEXT_FIELDS`, `HEALTH_QUESTIONS`). Yes/No na tanong = Yes / No /
   hindi natanong (null), hindi checkbox.
 - Clinic contact → `constants/clinic.js` (`CLINIC_INFO`). Huwag i-hardcode sa page.

@@ -1,5 +1,5 @@
 import { useId, useState } from 'react'
-import { AlertTriangle, Clock, History, Loader2 } from 'lucide-react'
+import { AlertTriangle, ClipboardList, Clock, History, Loader2 } from 'lucide-react'
 import Modal from '../common/Modal'
 import {
   CONDITIONS,
@@ -8,6 +8,7 @@ import {
   conditionColor,
   conditionLabel,
   isWholeToothCondition,
+  procedureForCondition,
   toothOrientation,
 } from '../../constants/dental'
 import { getToothHistory } from '../../services/chart'
@@ -103,6 +104,12 @@ export default function ChartEntryModal({
     return 'healthy'
   })
   const [notes, setNotes] = useState(currentEntry?.notes || '')
+  // Feature #30: "Also add to Treatment History" para sa kondisyong
+  // treatment (Filled, Root Canal, Crown, Extracted...). Naka-check bilang
+  // default, MALIBAN kung ito na mismo ang kasalukuyang marka at galing na sa
+  // isang treatment (hal. notes lang ang binabago), para walang doble.
+  // null = hindi pa ginagalaw ng dentist (sumusunod sa default).
+  const [addTreatmentChoice, setAddTreatmentChoice] = useState(null)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [showHistory, setShowHistory] = useState(false)
@@ -114,6 +121,10 @@ export default function ChartEntryModal({
   // Pang-buong-ngipin na kondisyon (hal. Missing, Jacket Crown), kahit saan
   // pa galing na entry point — tignan ang comment sa availableConditions.
   const applyToWholeTooth = isWholeTooth || isWholeToothCondition(conditionCode)
+  const procedureName = procedureForCondition(conditionCode)
+  const alreadyInHistory =
+    Boolean(currentEntry?.treatment_id) && currentEntry.condition_code === conditionCode
+  const addTreatment = Boolean(procedureName) && (addTreatmentChoice ?? !alreadyInHistory)
 
   function toggleHistory() {
     if (showHistory) {
@@ -149,11 +160,12 @@ export default function ChartEntryModal({
         conditionCode,
         notes,
         strokeData,
+        addTreatment,
       })
       showToast(
         applyToWholeTooth
-          ? `Tooth ${toothNumber} marked ${selectedLabel.toLowerCase()} — all 5 surfaces updated.`
-          : `Tooth ${toothNumber} (${surfaceLabel}) updated.`,
+          ? `Tooth ${toothNumber} marked ${selectedLabel.toLowerCase()} — all 5 surfaces updated.${addTreatment ? ' Added to Treatment History.' : ''}`
+          : `Tooth ${toothNumber} (${surfaceLabel}) updated.${addTreatment ? ' Added to Treatment History.' : ''}`,
         { type: 'success' },
       )
       onClose()
@@ -197,6 +209,12 @@ export default function ChartEntryModal({
               {' — '}
               {timeAgo(currentEntry.recorded_at)} by {currentEntry.dentist_name}
             </p>
+            {currentEntry.treatment_id && (
+              <p className="mt-1 flex items-center gap-1.5">
+                <ClipboardList className="h-3.5 w-3.5" />
+                Also in Treatment History (edit it there to change both)
+              </p>
+            )}
             {currentEntry.notes && (
               <p className="mt-1.5 border-t border-slate-200 pt-1.5 italic text-slate-600">
                 "{currentEntry.notes}"
@@ -309,6 +327,23 @@ export default function ChartEntryModal({
             className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base text-slate-900 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-100"
           />
         </div>
+
+        {procedureName && (
+          <label className="flex min-h-11 cursor-pointer items-start gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2.5 text-base text-slate-700">
+            <input
+              type="checkbox"
+              checked={addTreatment}
+              onChange={(e) => setAddTreatmentChoice(e.target.checked)}
+              className="mt-0.5 h-5 w-5 shrink-0 accent-sky-600"
+            />
+            <span>
+              Also add to Treatment History
+              <span className="block text-sm text-slate-500">
+                {procedureName}, tooth {toothNumber}, today. Uncheck if this was done before (e.g. at another clinic).
+              </span>
+            </span>
+          </label>
+        )}
 
         {/* Dalawang button gaya ng ibang modal (dati Save lang) */}
         <div className="flex gap-2">

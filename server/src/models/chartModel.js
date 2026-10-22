@@ -19,7 +19,7 @@ function parseStrokeData(row) {
 // 32 teeth.
 export async function getCurrentChart(patientId) {
   const [rows] = await pool.execute(
-    `SELECT ce.id, ce.tooth_number, ce.surface, ce.condition_code, ce.notes, ce.stroke_data, ce.recorded_at, u.full_name AS dentist_name
+    `SELECT ce.id, ce.treatment_id, ce.tooth_number, ce.surface, ce.condition_code, ce.notes, ce.stroke_data, ce.recorded_at, u.full_name AS dentist_name
      FROM (
        SELECT *, ROW_NUMBER() OVER (
          PARTITION BY tooth_number, surface ORDER BY recorded_at DESC, id DESC
@@ -138,4 +138,13 @@ export async function saveIntraoralExam(patientId, findings, userId) {
     { patientId, findings: JSON.stringify(findings), userId },
   )
   return getIntraoralExam(patientId)
+}
+
+export async function findChartEntry(id) {
+  const [rows] = await pool.execute(
+    `SELECT ce.*, u.full_name AS dentist_name FROM chart_entries ce
+     JOIN users u ON u.id = ce.recorded_by WHERE ce.id = :id`,
+    { id },
+  )
+  return parseStrokeData(rows[0])
 }

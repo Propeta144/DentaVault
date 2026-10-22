@@ -1374,3 +1374,92 @@ tooth number 59/99/19/abc = 422, letter codes, toggle, grouped modal 23, print +
 (create/update/export/import ng bagong field, Oo/Hindi, male → binubura ang pang-babae, guardian para sa minor, Edit prefill,
 Print Summary; 2 sa test script ay timing, nakumpirma sa screenshot); Phase 5 **13/13** (intraoral API 422/403, card, Save, print, 360px); patient view 4/4; responsive sweep **45 screens** (320–1366px), 0 overflow, 0 page errors (bago tanggalin ang Appointments; pagkatapos: build at 3 tab sa 320–1024px muling sinuri). Build pasado.
 Nilinis ang lahat ng test data. **Naka-push na** (commit `5cd533d`, 2026-10-14). Napatakbo muna ang migrations 014–016 sa Aiven bago ang push.
+
+---
+
+## 30. Edit/Delete ng Treatment, Sync ng Treatment History ↔ 2D/3D Chart, Baby Teeth sa 3D, Petsa sa CSV, Portal Email
+
+Mga puna ng team (Oct 22, 2026). Mga desisyon: **two-way sync kapag tugma**, **Edit at Delete**, at **Permanent / Baby
+teeth switch** sa 3D.
+
+### A. Edit at Delete ng treatment (dentist lang)
+- Bawat entry sa Treatment History ay may ⋯ menu: **Edit treatment** (parehong form ng Add Treatment, naka-prefill;
+  disabled ang Save hangga't walang binago; may discard guard) at **Delete treatment** (kumpirmasyon; para sa maling entry).
+- Naka-log: `UPDATE_TREATMENT` (kasama ang dating laman) at `DELETE_TREATMENT` (kasama ang binurang laman).
+- Patient: walang menu; 403 sa API.
+
+### B. Sync: Treatment History ↔ 2D/3D chart
+Hindi lahat ng procedure ay may marka sa chart, at hindi lahat ng marka ay treatment, kaya may tahasang mapa
+(`PROCEDURE_CHART`, pareho sa client at server):
+
+| Procedure | Marka sa chart |
+|---|---|
+| Composite Filling | FX (o F kapag galing sa chart), **pipili ng surface(s)** |
+| Amalgam Filling / Inlay-Onlay / Sealant | A / In / S, pipili ng surface(s) |
+| Tooth Extraction | X (Caries) o XO (Other causes), buong ngipin |
+| Root Canal / Crown / Denture | RC / J / RM, buong ngipin |
+| Iba pa (Cleaning, Consultation, Bridge, Veneers, Braces...) | Treatment History lang |
+
+- **Treatment → chart:** Add Treatment (pati Manual Entry at Bulk Import) ay sabay na gumagawa ng chart entry. Ang lumang
+  petsa (hal. 2020) ay itinatala sa petsang iyon, kaya **hindi natatakpan** ang mas bagong marka sa chart.
+- **Chart → treatment:** sa chart modal, may **"Also add to Treatment History"** (naka-check) kapag treatment ang kondisyon.
+  Wala ito sa findings (Decayed, Impacted, Missing...). Hindi naka-check kapag ito na ang kasalukuyang marka at galing na
+  sa treatment (iwas doble). Kasama ang drawing ng 3D pen.
+- **Edit:** notes/petsa lang → ina-update ang chart entry (buo ang drawing); ibang ngipin/surface/procedure → pinapalitan
+  ang marka; procedure na walang marka → inaalis. **Delete:** inaalis din ang marka (bumabalik ang ngipin sa dating naitala).
+- Treatment History: "Tooth 26 · M, O" at badge na **On chart**; sa chart modal: "Also in Treatment History".
+- Bumabasa ulit ang Treatment History pagbalik sa tab (para lumabas ang idinagdag mula sa chart).
+- Laptop 1366×768: nasa iisang hanay ang Tooth, Date, at Surfaces/Reason, kaya kita pa rin ang Save.
+
+### C. Baby teeth sa 3D (pinapalitan ang desisyon sa #29 na 2D lang)
+- 3D chart: **Permanent / Baby teeth** switch. Kusang Baby teeth kapag baby teeth lang ang may record. Naka-lock habang
+  may hindi pa naka-save na drawing.
+- Walang bagong model: ginagamit ang pinakamalapit na permanent na hugis, pinaliit ayon sa laki ng primary crown
+  (A/B = incisors, C = canine, D ≈ maliit na molar, E ≈ first molar), sa mas maliit at mas bilog na arch (84% lapad,
+  70% lalim). Pareho ang pagpinta at pen.
+- **3D print:** kapag may baby teeth, may dagdag na seksyong "Baby teeth" (Front, Upper, Lower).
+
+### D. Petsa sa CSV import (dati halos lahat "invalid")
+Binabago ng Excel ang petsa pagka-Save As CSV ayon sa Windows setting. Tinatanggap na: `03/14/1985`, `3/14/85`,
+`14/03/1985` (DD/MM kapag malinaw, at buong column kapag may ganoong row), `1985-03-14` (may oras man), `14-Mar-85`,
+`March 14, 1985`, at Excel serial number. Tinatanggihan pa rin ang hindi totoong petsa (Feb 30) at petsa sa hinaharap,
+na may malinaw na mensahe.
+
+### E. Portal account email
+Dati, kapag binago ang email ng patient, luma pa rin ang sign-in email ng portal account (kailangang gumawa ulit). Ngayon
+**sumusunod ang sign-in email** (at pangalan) sa Edit. Hindi nagbabago ang password. Bawal iblangko ang email kapag may
+portal account (422); bawal ang email ng ibang account (409). May paalala sa Email field ng Edit modal. Audit:
+`UPDATE_PORTAL_ACCOUNT_EMAIL`.
+
+> ⚠️ **Bago/kasabay ng push, patakbuhin sa Aiven ang migration 017**
+> (`$env:DOTENV_CONFIG_PATH=".env.aiven"; npm run migrate` sa `server/`). Kung hindi, **pumapalya ang Add Treatment**
+> at ang pagbukas ng Treatment History (`treatments.surfaces`, `chart_entries.treatment_id`). ✅ Napatakbo na sa Aiven (2026-10-22, bago ang push).
+
+| Name | Type | Purpose |
+|---|---|---|
+| `server/db/migrations/017_link_treatments_chart.sql` | **NEW** | `treatments.surfaces`, `chart_entries.treatment_id`. Napatakbo na sa local. |
+| `server/src/utils/treatmentChart.js` | **NEW** | `PROCEDURE_CHART`, `CONDITION_PROCEDURE`, `normalizeSurfaces`, `chartPlanFor`. |
+| `server/src/models/treatmentModel.js` | MODIFIED | Transactions: `createTreatment` (+ chart), `createTreatments` (batch), `createChartEntryWithTreatment`, `updateTreatment`, `deleteTreatment`; `chart_entry_count`/`chart_condition` sa listahan. |
+| `server/src/models/chartModel.js` | MODIFIED | `treatment_id` sa current chart; `findChartEntry`. |
+| `server/src/controllers/{patients,chart}.controller.js`, `routes/{patients,chart}.routes.js` | MODIFIED | `PUT/DELETE /patients/:code/treatments/:treatmentId`; `surfaces`, `chartCondition`, `addTreatment`; portal email sync sa update. |
+| `server/src/models/userModel.js` | MODIFIED | `updatePortalIdentity`. |
+| `server/src/services/patientImportService.js` | MODIFIED | `normalizeDate` (maraming format), `detectDayFirst`, mas malinaw na error. |
+| `client/src/constants/dental.js` | MODIFIED | `PROCEDURE_CHART`, `procedureForCondition`, `surfaceLetters`. |
+| `client/src/components/patients/AddTreatmentForm.jsx` | MODIFIED | Edit mode, Surfaces, Reason (X/XO), chart hint. |
+| `client/src/components/patients/DeleteTreatmentModal.jsx` | **NEW** | Kumpirmasyon ng pagbura. |
+| `client/src/pages/PatientProfilePage.jsx` | MODIFIED | ⋯ menu bawat treatment, Edit modal, reload ng history, portal email. |
+| `client/src/components/chart/ChartEntryModal.jsx` | MODIFIED | "Also add to Treatment History", "Also in Treatment History". |
+| `client/src/components/chart/{Tooth3D.jsx,archLayout.js,chartScene.jsx,Odontogram3D.jsx,Chart3DSnapshots.jsx}` | MODIFIED | Baby teeth: hugis/laki, arch, `DENTITION_SCENES`, switch, print. |
+| `client/src/pages/{Chart3DPrintPage,PatientSummaryPrintPage}.jsx` | MODIFIED | Baby teeth views; surfaces sa summary. |
+| `client/src/components/patients/{PatientForm,EditPatientModal}.jsx`, `services/patients.js` | MODIFIED | `portalEmail` hint/validation; `updatePatient` → `{ patient, portalAccount }`; `updateTreatment`, `deleteTreatment`. |
+| `client/src/components/migration/BulkImportWizard.jsx`, `utils/auditAction.js` | MODIFIED | Gabay sa petsa; labels ng bagong audit actions. |
+| `.claude/skills/dentavault-ui/SKILL.md` | MODIFIED | `PROCEDURE_CHART` at `DENTITION_SCENES` sa "Clinic data". |
+
+**Na-verify (local, Edge via Playwright + API):** API **51/51** (sync sa bawat procedure, surfaces, X/XO, lumang petsa
+hindi tumatakip, edit updated/replaced/removed/added, delete kasama ang chart, chart → treatment pati drawing, findings
+= 422, batch all-or-nothing, patient 403, ibang patient 404, portal email: sumusunod, login gamit ang bago, luma hindi na,
+blangko 422, ginagamit na 409, audit); import dry run: 7 format tama, Feb 30 at 2099 tinanggihan; UI **34/34** (3D Baby
+teeth default at switch, Add/Edit/Delete, Save kita sa 1366×768, discard guard, 2D sync, chart → history, portal hint,
+390px walang overflow, 3D print 5 + 3 larawan, 0 console error). Regression: procedures 21/21, chart 28/29 (ang 1 ay ang
+lumang "2D only" na paalala na sinadyang tanggalin), patient info 28/30 (2 na kilalang timing, gaya ng #29). Build
+pasado. Nilinis ang test data. **Hindi pa naka-push.**

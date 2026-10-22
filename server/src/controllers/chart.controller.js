@@ -1,11 +1,13 @@
 import { validationResult } from 'express-validator'
 import * as chartModel from '../models/chartModel.js'
 import * as patientModel from '../models/patientModel.js'
+import * as treatmentModel from '../models/treatmentModel.js'
 import { recordAuditLog } from '../models/auditLogModel.js'
 import { canAccessPatientRecord } from '../middleware/rbac.js'
 import asyncHandler from '../utils/asyncHandler.js'
 import AppError from '../utils/AppError.js'
 import { WHOLE_TOOTH_CONDITIONS, INTRAORAL_ITEMS, MOLAR_CLASSES } from '../utils/validators.js'
+import { CONDITION_PROCEDURE } from '../utils/treatmentChart.js'
 
 async function assertPatientAccess(req, patientCode) {
   const patient = await patientModel.findPatientByCode(patientCode)
@@ -46,23 +48,55 @@ export const createEntry = asyncHandler(async (req, res) => {
   // hal. Missing, Jacket Crown) kahit sa isang surface pinindot: walang
   // "medyo nawawala" sa mesial lang.
   const isWholeTooth = surface === 'whole' || WHOLE_TOOTH_CONDITIONS.includes(conditionCode)
-  const entry = isWholeTooth
-    ? await chartModel.createWholeToothEntry({
-        patientId: patient.id,
-        toothNumber,
-        conditionCode,
-        notes,
-        recordedBy: req.user.userId,
-      })
-    : await chartModel.createChartEntry({
-        patientId: patient.id,
-        toothNumber,
-        surface,
-        conditionCode,
-        notes,
-        strokeData,
-        recordedBy: req.user.userId,
-      })
+
+  // Feature #30: "Also add to Treatment History" — para lang sa kondisyong
+  // TREATMENT talaga (Filled, Root Canal, Crown, Extracted...). Ang findings
+  // (Decayed, Impacted...) ay walang katapat na procedure.
+  const procedureName = req.body.addTreatment === true ? CONDITION_PROCEDURE[conditionCode] : null
+  if (req.body.addTreatment === true && !procedureName) {
+    throw new AppError('This condition is a finding, not a treatment, so it cannot be added to Treatment History', 422)
+  }
+
+  let entry
+  let treatmentId = null
+  if (procedureName) {
+    const created = await treatmentModel.createChartEntryWithTreatment({
+      patientId: patient.id,
+      procedureName,
+      plan: { toothNumber, conditionCode, surfaces: [isWholeTooth ? 'whole' : surface] },
+      notes,
+      strokeData: isWholeTooth ? null : strokeData,
+      recordedBy: req.user.userId,
+    })
+    treatmentId = created.treatmentId
+    entry = await chartModel.findChartEntry(created.chartEntryId)
+    await recordAuditLog({
+      userId: req.user.userId,
+      action: 'CREATE_TREATMENT',
+      entityType: 'treatment',
+      entityId: treatmentId,
+      details: { patientId: patient.id, fromChart: true },
+      ipAddress: req.ip,
+    })
+  } else {
+    entry = isWholeTooth
+      ? await chartModel.createWholeToothEntry({
+          patientId: patient.id,
+          toothNumber,
+          conditionCode,
+          notes,
+          recordedBy: req.user.userId,
+        })
+      : await chartModel.createChartEntry({
+          patientId: patient.id,
+          toothNumber,
+          surface,
+          conditionCode,
+          notes,
+          strokeData,
+          recordedBy: req.user.userId,
+        })
+  }
 
   await recordAuditLog({
     userId: req.user.userId,
@@ -75,11 +109,12 @@ export const createEntry = asyncHandler(async (req, res) => {
       surface: entry.surface,
       conditionCode: entry.condition_code,
       propagatedToAllSurfaces: isWholeTooth,
+      ...(treatmentId ? { treatmentId } : {}),
     },
     ipAddress: req.ip,
   })
 
-  res.status(201).json({ entry })
+  res.status(201).json({ entry, treatmentId })
 })
 
 // Intraoral Examination (Periodontal, Occlusion, Appliances, TMD) — para sa

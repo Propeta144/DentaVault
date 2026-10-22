@@ -7,6 +7,7 @@ import { requireRole } from '../middleware/rbac.js'
 import { uploadImportFile } from '../config/importUpload.js'
 import { FIELD_LIMITS, notInFuture, stripPhoneFormatting, isValidToothNumber } from '../utils/validators.js'
 import { EXTRA_PATIENT_FIELDS } from '../utils/patientFields.js'
+import { isValidSurfaceList, CONDITION_PROCEDURE } from '../utils/treatmentChart.js'
 
 const router = Router()
 
@@ -93,6 +94,16 @@ const treatmentValidation = [
     .custom(notInFuture)
     .withMessage('Treatment date cannot be in the future'),
   maxLength('notes', 'Notes'),
+  // Feature #30 (sync sa chart): surfaces ng pang-surface na procedure (hal.
+  // filling), at ang chart condition kapag may pagpipilian (Extraction: X/XO)
+  body('surfaces')
+    .optional({ values: 'null' })
+    .custom(isValidSurfaceList)
+    .withMessage('Surfaces must be mesial, distal, occlusal, facial, or lingual'),
+  body('chartCondition')
+    .optional({ values: 'falsy' })
+    .isIn(Object.keys(CONDITION_PROCEDURE))
+    .withMessage('Invalid chart condition'),
 ]
 
 // Dentist lang ang nagrerehistro/nag-eedit ng patients at nag-lo-log ng
@@ -133,6 +144,16 @@ router.post(
   treatmentValidation,
   patientsController.addTreatment,
 )
+
+// Edit at Delete ng treatment (Feature #30): dentist lang. Kasama ang marka
+// nito sa 2D/3D chart (naka-sync).
+router.put(
+  '/:code/treatments/:treatmentId',
+  requireRole('dentist'),
+  treatmentValidation,
+  patientsController.updateTreatment,
+)
+router.delete('/:code/treatments/:treatmentId', requireRole('dentist'), patientsController.deleteTreatment)
 
 // Legacy Record Migration → Manual Entry (maraming lumang treatment nang sabay)
 router.post('/:code/treatments/batch', requireRole('dentist'), patientsController.addTreatmentsBatch)

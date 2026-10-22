@@ -150,6 +150,27 @@ export const update = asyncHandler(async (req, res) => {
   const existing = await patientModel.findPatientByCode(req.params.code)
   if (!existing) throw new AppError('Patient not found', 404)
 
+  // Portal account: ang email ng patient = sign-in email niya (Feature #30).
+  // Sinusuri MUNA bago may isulat, para walang kalahating update.
+  const account = await userModel.findUserByPatientId(existing.id)
+  const newEmail = (req.body.email || '').trim()
+  let emailChanged = false
+  if (account) {
+    if (!newEmail) {
+      throw new AppError(
+        'This patient signs in to the patient portal with their email. Enter the new email instead of leaving it blank.',
+        422,
+      )
+    }
+    emailChanged = newEmail.toLowerCase() !== String(account.email).toLowerCase()
+    if (emailChanged) {
+      const other = await userModel.findUserByEmail(newEmail)
+      if (other && other.id !== account.id) {
+        throw new AppError('Another portal account already signs in with that email. Use a different email.', 409)
+      }
+    }
+  }
+
   const patient = await patientModel.updatePatient(existing.id, req.body)
 
   await recordAuditLog({
@@ -160,7 +181,26 @@ export const update = asyncHandler(async (req, res) => {
     ipAddress: req.ip,
   })
 
-  res.json({ patient })
+  let portalAccount = null
+  if (account) {
+    await userModel.updatePortalIdentity(account.id, {
+      email: emailChanged ? newEmail : account.email,
+      fullName: `${patient.first_name} ${patient.last_name}`,
+    })
+    portalAccount = { id: account.id, email: emailChanged ? newEmail : account.email, isActive: account.isActive }
+    if (emailChanged) {
+      await recordAuditLog({
+        userId: req.user.userId,
+        action: 'UPDATE_PORTAL_ACCOUNT_EMAIL',
+        entityType: 'user',
+        entityId: account.id,
+        details: { patientId: patient.id },
+        ipAddress: req.ip,
+      })
+    }
+  }
+
+  res.json({ patient, portalAccount })
 })
 
 export const remove = asyncHandler(async (req, res) => {
@@ -195,17 +235,24 @@ export const listTreatments = asyncHandler(async (req, res) => {
   res.json({ treatments })
 })
 
+const treatmentInput = (body) => ({
+  procedureName: body.procedureName,
+  toothNumber: body.toothNumber || null,
+  surfaces: body.surfaces ?? null,
+  chartCondition: body.chartCondition || null,
+  notes: body.notes || null,
+  treatmentDate: body.treatmentDate,
+})
+
 export const addTreatment = asyncHandler(async (req, res) => {
   assertValid(req)
   const patient = await patientModel.findPatientByCode(req.params.code)
   if (!patient) throw new AppError('Patient not found', 404)
 
+  // Kasama na ang marka sa 2D/3D chart kapag may katapat (Feature #30)
   const treatment = await treatmentModel.createTreatment({
+    ...treatmentInput(req.body),
     patientId: patient.id,
-    procedureName: req.body.procedureName,
-    toothNumber: req.body.toothNumber,
-    notes: req.body.notes,
-    treatmentDate: req.body.treatmentDate,
     createdBy: req.user.userId,
   })
 
@@ -214,11 +261,70 @@ export const addTreatment = asyncHandler(async (req, res) => {
     action: 'CREATE_TREATMENT',
     entityType: 'treatment',
     entityId: treatment.id,
-    details: { patientId: patient.id },
+    details: { patientId: patient.id, chartEntries: treatment.chart_entry_count },
     ipAddress: req.ip,
   })
 
   res.status(201).json({ treatment })
+})
+
+async function findPatientTreatment(req) {
+  const patient = await patientModel.findPatientByCode(req.params.code)
+  if (!patient) throw new AppError('Patient not found', 404)
+  const treatmentId = Number(req.params.treatmentId)
+  const treatment = Number.isInteger(treatmentId)
+    ? await treatmentModel.findTreatmentForPatient(treatmentId, patient.id)
+    : null
+  if (!treatment) throw new AppError('Treatment not found', 404)
+  return { patient, treatment }
+}
+
+const treatmentSnapshot = (t) => ({
+  procedureName: t.procedure_name,
+  toothNumber: t.tooth_number,
+  surfaces: t.surfaces,
+  treatmentDate: t.treatment_date,
+  notes: t.notes,
+})
+
+// Edit (Feature #30): naka-log ang dating laman. Sumusunod ang chart.
+export const updateTreatment = asyncHandler(async (req, res) => {
+  assertValid(req)
+  const { patient, treatment: before } = await findPatientTreatment(req)
+
+  const { treatment, chartChange } = await treatmentModel.updateTreatment(before.id, {
+    ...treatmentInput(req.body),
+    patientId: patient.id,
+    updatedBy: req.user.userId,
+  })
+
+  await recordAuditLog({
+    userId: req.user.userId,
+    action: 'UPDATE_TREATMENT',
+    entityType: 'treatment',
+    entityId: treatment.id,
+    details: { patientId: patient.id, previous: treatmentSnapshot(before), chartChange },
+    ipAddress: req.ip,
+  })
+
+  res.json({ treatment, chartChange })
+})
+
+// Delete (maling entry): kasama ang marka nito sa chart
+export const deleteTreatment = asyncHandler(async (req, res) => {
+  const { patient, treatment } = await findPatientTreatment(req)
+  const chartEntriesRemoved = await treatmentModel.deleteTreatment(treatment.id)
+
+  await recordAuditLog({
+    userId: req.user.userId,
+    action: 'DELETE_TREATMENT',
+    entityType: 'treatment',
+    entityId: treatment.id,
+    details: { patientId: patient.id, deleted: treatmentSnapshot(treatment), chartEntriesRemoved },
+    ipAddress: req.ip,
+  })
+
+  res.status(204).send()
 })
 
 // Legacy Record Migration → Manual Entry: sabay-sabay na pag-encode ng mga
@@ -264,12 +370,10 @@ export const addTreatmentsBatch = asyncHandler(async (req, res) => {
   }
   const valid = entries.map(validateTreatmentEntry)
 
-  const treatments = []
-  for (const entry of valid) {
-    treatments.push(
-      await treatmentModel.createTreatment({ ...entry, patientId: patient.id, createdBy: req.user.userId }),
-    )
-  }
+  // Iisang transaction na (dati isa-isa): all-or-nothing pati sa chart
+  const treatments = await treatmentModel.createTreatments(
+    valid.map((entry) => ({ ...entry, patientId: patient.id, createdBy: req.user.userId })),
+  )
 
   await recordAuditLog({
     userId: req.user.userId,

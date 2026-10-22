@@ -200,6 +200,38 @@ export function conditionLetter(code) {
   return CONDITIONS.find((c) => c.code === code)?.letter || ''
 }
 
+// Feature #30: sync ng Treatment History ↔ Dental Chart. Aling procedure ang
+// may marka sa chart, at aling kondisyon. KAPAREHO ng PROCEDURE_CHART sa
+// server/src/utils/treatmentChart.js. `conditions[0]` = default; `scope`
+// 'surface' = pipili ng surface(s) sa Add Treatment, 'whole' = buong ngipin.
+// Ang wala rito (Cleaning, Consultation, Bridge, Veneers...) ay Treatment
+// History lang. Ang chart findings (Decayed, Impacted...) ay hindi treatment.
+export const PROCEDURE_CHART = {
+  'Composite Restoration / Filling': { conditions: ['composite', 'filling'], scope: 'surface' },
+  'Amalgam Filling': { conditions: ['amalgam'], scope: 'surface' },
+  'Inlay / Onlay': { conditions: ['inlay'], scope: 'surface' },
+  'Pit & Fissure Sealant': { conditions: ['sealant'], scope: 'surface' },
+  'Tooth Extraction': { conditions: ['extracted', 'extraction_other'], scope: 'whole' },
+  'Root Canal Treatment': { conditions: ['root_canal'], scope: 'whole' },
+  Crown: { conditions: ['crown'], scope: 'whole' },
+  Denture: { conditions: ['removable_denture'], scope: 'whole' },
+}
+
+// Chart condition → procedure ("Also add to Treatment History")
+export function procedureForCondition(code) {
+  return Object.entries(PROCEDURE_CHART).find(([, m]) => m.conditions.includes(code))?.[0] || null
+}
+
+// Pang-display ng surfaces: "mesial,occlusal" → "M, O"
+const SURFACE_LETTERS = { mesial: 'M', distal: 'D', occlusal: 'O', facial: 'F', lingual: 'L' }
+export function surfaceLetters(surfaces) {
+  if (!surfaces) return ''
+  return String(surfaces)
+    .split(',')
+    .map((s) => SURFACE_LETTERS[s.trim()] || s)
+    .join(', ')
+}
+
 export const UNMARKED_COLOR = '#ffffff'
 export const UNMARKED_STROKE = '#cbd5e1' // slate-300
 

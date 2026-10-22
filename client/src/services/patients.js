@@ -28,8 +28,10 @@ export function createPatient(payload) {
   return api.post('/patients', payload).then((r) => r.data.patient)
 }
 
+// { patient, portalAccount }: sumusunod ang sign-in email ng portal account
+// sa email ng patient (null kapag walang account)
 export function updatePatient(id, payload) {
-  return api.put(`/patients/${id}`, payload).then((r) => r.data.patient)
+  return api.put(`/patients/${id}`, payload).then((r) => r.data)
 }
 
 export function deletePatient(id) {
@@ -42,6 +44,15 @@ export function listTreatments(patientId) {
 
 export function addTreatment(patientId, payload) {
   return api.post(`/patients/${patientId}/treatments`, payload).then((r) => r.data.treatment)
+}
+
+// Edit at Delete (Feature #30). Kasama ang marka sa 2D/3D chart.
+export function updateTreatment(patientId, treatmentId, payload) {
+  return api.put(`/patients/${patientId}/treatments/${treatmentId}`, payload).then((r) => r.data)
+}
+
+export function deleteTreatment(patientId, treatmentId) {
+  return api.delete(`/patients/${patientId}/treatments/${treatmentId}`)
 }
 
 export function getSummary(patientId) {

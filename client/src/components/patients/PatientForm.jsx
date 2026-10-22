@@ -37,7 +37,7 @@ const PH_MOBILE_PATTERN = /^(09\d{9}|\+639\d{9})$/
 // server: stripPhoneFormatting sa server/src/utils/validators.js)
 const cleanPhone = (value) => value.replace(/[\s\-().]/g, '')
 
-function validate(form) {
+function validate(form, { portalEmail } = {}) {
   const errors = {}
 
   if (!form.firstName.trim()) errors.firstName = 'First name is required'
@@ -52,6 +52,9 @@ function validate(form) {
 
   if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
     errors.email = 'Enter a valid email address'
+  } else if (portalEmail && !form.email.trim()) {
+    // Sign-in email ng portal account; hindi puwedeng mawala
+    errors.email = 'The patient signs in to the portal with this email. Enter the new email instead.'
   }
 
   if (!form.contactNumber.trim()) {
@@ -232,6 +235,8 @@ function YesNoQuestion({ number, question, value, onChange, children }) {
 // - onOpenExisting(patientCode): para sa duplicate warning (Register lang)
 // - stickyFooter: Register page lang (laging kita ang Save/Cancel)
 // - patientCode: Edit lang — para hindi isama ang sarili sa "shared email" check
+// - portalEmail: Edit lang — sign-in email ng portal account (kung meron).
+//   Kapag binago ang Email, sumusunod ang sign-in email (Feature #30).
 // onSubmit(form, { allowDuplicate }) — ang form ay may malinis nang
 // contact numbers (walang espasyo/gitling).
 export default function PatientForm({
@@ -243,6 +248,7 @@ export default function PatientForm({
   onOpenExisting,
   stickyFooter = false,
   patientCode,
+  portalEmail,
 }) {
   const [initial] = useState(() => ({ ...EMPTY_FORM, ...initialValues }))
   const [form, setForm] = useState(initial)
@@ -304,7 +310,7 @@ export default function PatientForm({
 
   async function submit({ allowDuplicate = false } = {}) {
     setFormError('')
-    const errors = validate(form)
+    const errors = validate(form, { portalEmail })
     setFieldErrors(errors)
     if (Object.keys(errors).length > 0) {
       setSubmitAttempt((n) => n + 1)
@@ -466,12 +472,25 @@ export default function PatientForm({
           label="Email"
           error={fieldErrors.email}
           hint={
-            sharedWith.length > 0 && (
-              <span className="text-amber-700">
-                Also on {sharedWith.slice(0, 3).map(listName).join('; ')}
-                {sharedWith.length > 3 ? ` and ${sharedWith.length - 3} more` : ''}. X-rays emailed from this address
-                will wait in the X-ray Inbox for you to choose the patient.
-              </span>
+            (sharedWith.length > 0 || portalEmail) && (
+              <>
+                {portalEmail &&
+                  (form.email.trim() && form.email.trim().toLowerCase() !== portalEmail.toLowerCase() ? (
+                    <span className="block text-amber-700">
+                      The patient will sign in to the portal with this new email (was {portalEmail}). Their password
+                      stays the same.
+                    </span>
+                  ) : (
+                    <span className="block">The patient also signs in to the portal with this email.</span>
+                  ))}
+                {sharedWith.length > 0 && (
+                  <span className="block text-amber-700">
+                    Also on {sharedWith.slice(0, 3).map(listName).join('; ')}
+                    {sharedWith.length > 3 ? ` and ${sharedWith.length - 3} more` : ''}. X-rays emailed from this address
+                    will wait in the X-ray Inbox for you to choose the patient.
+                  </span>
+                )}
+              </>
             )
           }
         >

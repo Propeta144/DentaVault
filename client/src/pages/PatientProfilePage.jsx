@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, lazy, Suspense } from 'react'
+import { useEffect, useRef, useState, useCallback, lazy, Suspense } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import {
   Printer,
@@ -20,8 +20,9 @@ import {
   FileCheck2,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
-import { getPatient, listTreatments, addTreatment, getPortalAccount } from '../services/patients'
+import { getPatient, listTreatments, addTreatment, updateTreatment, getPortalAccount } from '../services/patients'
 import AddTreatmentForm from '../components/patients/AddTreatmentForm'
+import DeleteTreatmentModal from '../components/patients/DeleteTreatmentModal'
 import IntraoralExam from '../components/chart/IntraoralExam'
 import PatientInfoRecord, { healthAlerts } from '../components/patients/PatientInfoRecord'
 import PatientXraysSection from '../components/xray/PatientXraysSection'
@@ -35,7 +36,7 @@ import DropdownMenu from '../components/common/DropdownMenu'
 import EmptyState from '../components/common/EmptyState'
 import StatusBadge from '../components/common/StatusBadge'
 import Odontogram2D from '../components/chart/Odontogram2D'
-import { ALL_TEETH } from '../constants/dental'
+import { ALL_TEETH, surfaceLetters } from '../constants/dental'
 import MedicalAlertBadge from '../components/common/MedicalAlertBadge'
 import PageLoader from '../components/common/PageLoader'
 import { useSelectedPatientCode, openPrintTab, profileState, PROFILE_PATH } from '../utils/selectedPatient'
@@ -125,6 +126,11 @@ export default function PatientProfilePage() {
   // X / Escape / Cancel sa Add Treatment: magtatanong muna kapag may na-type
   const closeAddTreatment = useCallback(() => setAddingTreatment(false), [])
   const addTreatmentGuard = useDiscardGuard(closeAddTreatment)
+  // Edit at Delete ng treatment (Feature #30)
+  const [editingTreatment, setEditingTreatment] = useState(null)
+  const [deletingTreatment, setDeletingTreatment] = useState(null)
+  const closeEditTreatment = useCallback(() => setEditingTreatment(null), [])
+  const editTreatmentGuard = useDiscardGuard(closeEditTreatment)
 
   const load = useCallback(() => {
     if (!id) return
@@ -153,11 +159,33 @@ export default function PatientProfilePage() {
     load()
   }, [load])
 
+  // Sync (Feature #30): ang treatment na idinagdag mula sa Dental Chart ("Also
+  // add to Treatment History") ay lalabas pagbalik sa tab na ito. Ang chart
+  // naman ay laging binabasa ulit pagbukas ng Dental Chart tab.
+  // (Ang unang pagbukas ay galing na sa load() sa itaas.)
+  const historyLoaded = useRef(false)
+  useEffect(() => {
+    if (tab !== 'history') return
+    if (!historyLoaded.current) {
+      historyLoaded.current = true
+      return
+    }
+    reloadTreatments().catch(() => {})
+  }, [tab, reloadTreatments])
+
   async function handleAddTreatment(payload, { keepOpen }) {
     await addTreatment(id, payload)
     await reloadTreatments()
     setTab('history') // para makita agad ang bagong entry
     if (!keepOpen) setAddingTreatment(false) // "Add another" = manatiling bukas
+  }
+
+  // Ang chart ay binabasa ulit pagbukas ng Dental Chart tab, kaya kusang
+  // lumalabas doon ang pagbabago (naka-sync, Feature #30)
+  async function handleEditTreatment(payload) {
+    await updateTreatment(id, editingTreatment.id, payload)
+    await reloadTreatments()
+    setEditingTreatment(null)
   }
 
   // Kinopya/tinype lang yung URL, o nag-expire yung history state — walang
@@ -344,12 +372,30 @@ export default function PatientProfilePage() {
                         {t.tooth_number && (
                           <StatusBadge variant="sky">
                             {t.tooth_number === ALL_TEETH ? 'Full mouth' : `Tooth ${t.tooth_number}`}
+                            {t.surfaces ? ` · ${surfaceLetters(t.surfaces)}` : ''}
+                          </StatusBadge>
+                        )}
+                        {/* Naka-sync sa 2D/3D chart (Feature #30) */}
+                        {Number(t.chart_entry_count) > 0 && (
+                          <StatusBadge variant="slate" icon={Grid3x3}>
+                            On chart
                           </StatusBadge>
                         )}
                       </div>
                       {t.notes && <p className="mt-1 text-base text-slate-600">{t.notes}</p>}
                       <p className="mt-1 text-sm text-slate-400">by {t.dentist_name}</p>
                     </div>
+                    {isDentist && (
+                      <div className="-mr-2 -mt-2 self-end sm:self-start">
+                        <DropdownMenu
+                          label={`Actions for ${t.procedure_name} on ${formatDate(t.treatment_date)}`}
+                          items={[
+                            { label: 'Edit treatment', icon: Pencil, onClick: () => setEditingTreatment(t) },
+                            { label: 'Delete treatment', icon: Trash2, danger: true, onClick: () => setDeletingTreatment(t) },
+                          ]}
+                        />
+                      </div>
+                    )}
                   </li>
                 ))}
               </ol>
@@ -442,6 +488,25 @@ export default function PatientProfilePage() {
         </Modal>
       )}
 
+      {editingTreatment && (
+        <Modal
+          title={`Edit Treatment — ${fullName(patient)}`}
+          onClose={editTreatmentGuard.requestClose}
+          maxWidth="max-w-4xl"
+        >
+          <AddTreatmentForm treatment={editingTreatment} onSubmit={handleEditTreatment} guard={editTreatmentGuard} />
+        </Modal>
+      )}
+
+      {deletingTreatment && (
+        <DeleteTreatmentModal
+          patientCode={id}
+          treatment={deletingTreatment}
+          onClose={() => setDeletingTreatment(null)}
+          onDeleted={reloadTreatments}
+        />
+      )}
+
       {confirmLeave3D && (
         <Modal title="Discard unsaved 3D mark?" onClose={() => setConfirmLeave3D(false)}>
           <div className="space-y-4">
@@ -478,8 +543,12 @@ export default function PatientProfilePage() {
       {editing && (
         <EditPatientModal
           patient={patient}
+          portalEmail={portalAccount?.email}
           onClose={() => setEditing(false)}
-          onSaved={(updated) => setPatient((prev) => ({ ...prev, ...updated }))}
+          onSaved={(updated, account) => {
+            setPatient((prev) => ({ ...prev, ...updated }))
+            if (account) setPortalAccount(account) // sumusunod ang sign-in email
+          }}
         />
       )}
 

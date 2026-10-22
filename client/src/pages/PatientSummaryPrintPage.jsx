@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { HEALTH_QUESTIONS, INFO_TEXT_FIELDS, yesNoLabel } from '../constants/patientInfo'
 import { usePrintState } from '../utils/selectedPatient'
 import { getSummary } from '../services/patients'
-import { ALL_TEETH } from '../constants/dental'
+import { ALL_TEETH, surfaceLetters } from '../constants/dental'
 import PageLoader from '../components/common/PageLoader'
 import PrintHeader from '../components/common/PrintHeader'
 import { formatDate, formatDateTime } from '../utils/formatDate'
@@ -125,6 +125,7 @@ export default function PatientSummaryPrintPage() {
               <td className="py-1 pr-2 align-top">{t.procedure_name}</td>
               <td className="py-1 pr-2 align-top">
                 {t.tooth_number === ALL_TEETH ? 'All Teeth' : t.tooth_number || '—'}
+                {t.surfaces ? ` (${surfaceLetters(t.surfaces)})` : ''}
               </td>
               <td className="py-1 align-top">{t.notes || '—'}</td>
             </tr>

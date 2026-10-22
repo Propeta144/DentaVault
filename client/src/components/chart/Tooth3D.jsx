@@ -48,16 +48,35 @@ const UV_CELLS = {
   distal: [0.5, 0, 1, 1 / 3],
 }
 
-// Quadrant 3/4 = lower (mandibular) na hugis
-function toothNodeName(toothNumber) {
-  const lower = toothNumber[0] === '3' || toothNumber[0] === '4'
-  return `${lower ? 'LowerTooth' : 'Tooth'}${toothNumber[1]}`
+// Baby teeth (Feature #30): walang hiwalay na model, kaya ginagamit ang
+// pinakamalapit na permanent na hugis, pinaliit ayon sa karaniwang laki ng
+// primary crown (mm, mesial-distal): [permanent position, scale].
+// A/B = incisors, C = canine, D (first primary molar) ≈ maliit na molar,
+// E (second primary molar) ≈ permanent first molar.
+const PRIMARY_SHAPES = {
+  upper: { 1: [1, 0.8], 2: [2, 0.82], 3: [3, 0.88], 4: [7, 0.8], 5: [6, 0.85] },
+  lower: { 1: [1, 0.85], 2: [2, 0.86], 3: [3, 0.8], 4: [7, 0.78], 5: [6, 0.88] },
 }
 
-// Half-extents (x = mesial-distal, y = taas, z = facial-lingual) ng mismong
-// hugis na ginagamit ng ngiping ito, mula teethExtents.json
+// Quadrant 3/4 (at 7/8 sa baby teeth) = lower (mandibular) na hugis
+function toothShapeInfo(toothNumber) {
+  const quadrant = Number(toothNumber[0])
+  const position = Number(toothNumber[1])
+  const lower = [3, 4, 7, 8].includes(quadrant)
+  const [shape, scale] = quadrant >= 5 ? PRIMARY_SHAPES[lower ? 'lower' : 'upper'][position] : [position, 1]
+  return { nodeName: `${lower ? 'LowerTooth' : 'Tooth'}${shape}`, scale }
+}
+
+// Half-extents (x = mesial-distal, y = taas, z = facial-lingual) ng ngiping
+// ito sa scene (kasama na ang liit ng baby teeth), mula teethExtents.json
+const extentsCache = new Map()
 export function toothExtents(toothNumber) {
-  return TEETH_EXTENTS[toothNodeName(toothNumber)]
+  if (!extentsCache.has(toothNumber)) {
+    const { nodeName, scale } = toothShapeInfo(toothNumber)
+    const e = TEETH_EXTENTS[nodeName]
+    extentsCache.set(toothNumber, e && { x: e.x * scale, y: e.y * scale, z: e.z * scale })
+  }
+  return extentsCache.get(toothNumber)
 }
 
 // Kung saang surface tumama ang isang drawing point, mula sa UV niya: bawat
@@ -313,9 +332,9 @@ export default function Tooth3D({
   const { nodes } = useGLTF(teethModelUrl, USE_DRACO, USE_MESHOPT)
   // FDI: quadrant digit + position digit (1-8). Upper (Q1/Q2) at lower
   // (Q3/Q4) ay may kani-kaniyang hugis na.
-  const nodeName = toothNodeName(toothNumber)
+  const { nodeName, scale } = toothShapeInfo(toothNumber)
   const toothGeometry = nodes[nodeName]?.geometry
-  const extents = TEETH_EXTENTS[nodeName]
+  const extents = toothExtents(toothNumber)
   // Lahat ng "wala na ang ngipin" (Extracted, Missing, Congenitally Missing...)
   const isExtracted = isMissingCondition(chartState.whole?.condition_code)
 
@@ -357,7 +376,7 @@ export default function Tooth3D({
         <group
           position={[0, extents ? (flipUpper ? -extents.y : extents.y) : 0, 0]}
           rotation={[0, 0, flipUpper ? Math.PI : 0]}
-          scale={[mirrorX ? -1 : 1, 1, 1]}
+          scale={[mirrorX ? -scale : scale, scale, scale]}
         >
           {toothGeometry && (
             <mesh castShadow receiveShadow geometry={toothGeometry} raycast={() => null}>

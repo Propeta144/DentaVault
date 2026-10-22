@@ -26,16 +26,24 @@ function toFormValues(patient) {
   }
 }
 
-export default function EditPatientModal({ patient, onClose, onSaved }) {
+// portalEmail: sign-in email ng portal account (kung meron). Sumusunod ito
+// sa Email field kapag na-save (Feature #30), kaya ipinapaalam sa form.
+export default function EditPatientModal({ patient, portalEmail, onClose, onSaved }) {
   const { showToast } = useToast()
   // X / Escape / Cancel: magtatanong muna kapag may binago
   const guard = useDiscardGuard(onClose)
 
   async function handleSubmit(form) {
     try {
-      const updated = await updatePatient(patient.patient_code, form)
-      showToast('Patient information updated successfully.', { type: 'success' })
-      onSaved(updated)
+      const { patient: updated, portalAccount } = await updatePatient(patient.patient_code, form)
+      const loginChanged = portalAccount && portalEmail && portalAccount.email !== portalEmail
+      showToast(
+        loginChanged
+          ? `Patient information updated. The patient now signs in with ${portalAccount.email}.`
+          : 'Patient information updated successfully.',
+        { type: 'success' },
+      )
+      onSaved(updated, portalAccount)
       onClose()
     } catch (err) {
       showToast(err.response?.data?.error || 'Failed to update patient.', { type: 'error' })
@@ -51,6 +59,7 @@ export default function EditPatientModal({ patient, onClose, onSaved }) {
         submitLabel="Save Changes"
         guard={guard}
         patientCode={patient.patient_code}
+        portalEmail={portalEmail}
       />
     </Modal>
   )

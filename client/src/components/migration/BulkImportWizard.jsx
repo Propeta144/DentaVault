@@ -223,7 +223,10 @@ export default function BulkImportWizard() {
                 Columns marked <span className="font-semibold text-red-600">*</span> are required: First Name, Last Name,
                 Sex, and Date of Birth.
               </li>
-              <li>Write dates as MM/DD/YYYY (e.g. 03/14/1985). Leave a cell blank if you don't know it.</li>
+              <li>
+                Write dates as MM/DD/YYYY (e.g. 03/14/1985). Dates that Excel changes on its own (such as 14/03/1985,
+                3/14/85, or 14-Mar-85) are also accepted. Leave a cell blank if you don't know it.
+              </li>
               <li>
                 One row per patient. For past visits, add one row per visit and repeat the patient's name, sex, and date
                 of birth.

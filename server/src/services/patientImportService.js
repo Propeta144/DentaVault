@@ -2,7 +2,7 @@ import { parse as parseCsv } from 'csv-parse/sync'
 import * as patientModel from '../models/patientModel.js'
 import * as treatmentModel from '../models/treatmentModel.js'
 import AppError from '../utils/AppError.js'
-import { FIELD_LIMITS, stripPhoneFormatting, isValidToothNumber } from '../utils/validators.js'
+import { FIELD_LIMITS, stripPhoneFormatting, isValidToothNumber, clinicToday } from '../utils/validators.js'
 import { EXTRA_PATIENT_FIELDS, parseYesNo } from '../utils/patientFields.js'
 
 const REQUIRED_COLUMNS = ['first_name', 'last_name', 'sex', 'date_of_birth']
@@ -248,29 +248,100 @@ function normalizeSex(value) {
   return null
 }
 
-// Tinatanggap ang YYYY-MM-DD o MM/DD/YYYY; tinatanggihan yung iba pa sa
-// halip na manghula, kasi mas malala pa yung tahimik na na-misparse na
-// birth date kaysa sa isang rejected row.
-function normalizeDate(value) {
-  const v = String(value || '').trim()
-  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) {
-    return isValidCalendarDate(v) ? v : null
+// Petsa galing sa papel/Excel (Feature #30). Dati YYYY-MM-DD at MM/DD/YYYY
+// lang ang tinatanggap, pero binabago ng Excel ang petsa ayon sa Windows
+// setting kapag nag-Save As CSV (hal. "1985-03-14" → "14/03/1985", o
+// "3/14/85", o "14-Mar-85"), kaya halos lahat ng row ay "invalid". Ngayon:
+// - YYYY-MM-DD / YYYY/MM/DD (pati may oras sa dulo, "1985-03-14 00:00")
+// - MM/DD/YYYY, M-D-YY, M.D.YYYY (/, -, o .); 2-digit na taon = 19xx o 20xx
+//   (hindi puwedeng sa hinaharap)
+// - DD/MM/YYYY kapag malinaw (hal. 14/03/1985: walang ika-14 na buwan), at
+//   kapag may ganoong row sa parehong column, DD/MM ang buong column (tingnan
+//   detectDayFirst) para hindi magkahalo
+// - May pangalan ng buwan: "Mar 14, 1985", "14 March 1985", "14-Mar-85"
+// - Excel serial number (hal. 31120), kapag naka-Number ang column
+// Tinatanggihan pa rin ang hindi totoong petsa (Feb 30) at petsa sa hinaharap.
+const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec']
+
+function monthFromName(name) {
+  const i = MONTHS.indexOf(String(name).slice(0, 3).toLowerCase())
+  return i < 0 ? null : i + 1
+}
+
+function fullYear(y) {
+  if (y.length !== 2) return Number(y)
+  const n = Number(y)
+  const currentYY = Number(clinicToday().slice(2, 4))
+  return n > currentYY ? 1900 + n : 2000 + n
+}
+
+function toIso(year, month, day) {
+  if (!year || !month || !day) return null
+  const iso = `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+  return isValidCalendarDate(iso) ? iso : null
+}
+
+// Para sa buong column: may value bang malinaw na DD/MM (unang numero > 12)?
+export function detectDayFirst(values) {
+  return values.some((value) => {
+    const m = String(value ?? '').trim().match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{2}|\d{4})(?:\s.*)?$/)
+    return m && Number(m[1]) > 12 && Number(m[2]) <= 12
+  })
+}
+
+export function normalizeDate(value, { dayFirst = false } = {}) {
+  let v = String(value ?? '').trim()
+  if (!v) return null
+
+  // Excel serial (araw mula 1899-12-30). 20000–60000 = 1954–2064.
+  if (/^\d{5}(\.0+)?$/.test(v)) {
+    const n = Number(v)
+    if (n >= 20000 && n <= 60000) {
+      const d = new Date(Date.UTC(1899, 11, 30) + Math.floor(n) * 86400000)
+      return toIso(d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate())
+    }
+    return null
   }
-  const usMatch = v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
-  if (usMatch) {
-    const [, month, day, year] = usMatch
-    const iso = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
-    return isValidCalendarDate(iso) ? iso : null
+
+  // Oras sa dulo ("1985-03-14 00:00:00", "3/14/1985 0:00")
+  v = v.replace(/[T\s]+\d{1,2}:\d{2}(:\d{2})?(\.\d+)?\s*(am|pm)?z?$/i, '').trim()
+
+  let m = v.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/)
+  if (m) return toIso(Number(m[1]), Number(m[2]), Number(m[3]))
+
+  m = v.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2}|\d{4})$/)
+  if (m) {
+    const a = Number(m[1])
+    const b = Number(m[2])
+    const year = fullYear(m[3])
+    // Malinaw kapag isa lang ang puwedeng buwan; kung pareho (≤ 12), MM/DD
+    // gaya ng template, maliban kung DD/MM ang column
+    const dayFirstHere = a > 12 || (dayFirst && b <= 12)
+    return dayFirstHere ? toIso(year, b, a) : toIso(year, a, b)
   }
+
+  // "Mar 14, 1985" / "March 14 1985" / "Mar-14-1985"
+  m = v.match(/^([a-z]{3,9})\.?[\s-]+(\d{1,2})(?:st|nd|rd|th)?,?[\s-]+(\d{2}|\d{4})$/i)
+  if (m) return toIso(fullYear(m[3]), monthFromName(m[1]), Number(m[2]))
+
+  // "14 Mar 1985" / "14-Mar-85" / "14 March, 1985"
+  m = v.match(/^(\d{1,2})(?:st|nd|rd|th)?[\s-]+([a-z]{3,9})\.?,?[\s-]+(\d{2}|\d{4})$/i)
+  if (m) return toIso(fullYear(m[3]), monthFromName(m[2]), Number(m[1]))
+
   return null
 }
 
+// Totoong petsa sa kalendaryo (hindi Feb 30), at hindi sa hinaharap (oras sa
+// Pilipinas). Dati `new Date()`, na tinatanggap ang 1985-02-31 (Mar 3).
 function isValidCalendarDate(isoString) {
-  const date = new Date(isoString)
-  if (Number.isNaN(date.getTime())) return false
-  if (date > new Date()) return false
-  return true
+  const [y, mo, d] = isoString.split('-').map(Number)
+  if (y < 1900 || mo < 1 || mo > 12 || d < 1) return false
+  const date = new Date(Date.UTC(y, mo - 1, d))
+  if (date.getUTCMonth() !== mo - 1 || date.getUTCDate() !== d) return false
+  return isoString <= clinicToday()
 }
+
+const DATE_HELP = 'Use MM/DD/YYYY, e.g. 03/14/1985'
 
 // Excel: kapag tinype ang 09171234567, nagiging numero (9171234567) at
 // nawawala ang 0; ang +639... ay nagiging 639.... Ibinabalik dito ang
@@ -284,17 +355,23 @@ function normalizeImportPhone(value) {
   return original
 }
 
-function validateAndNormalizeRow(raw) {
+function validateAndNormalizeRow(raw, { dayFirst } = {}) {
   const errors = []
   const firstName = String(raw.first_name || '').trim()
   const lastName = String(raw.last_name || '').trim()
   const sex = normalizeSex(raw.sex)
-  const dateOfBirth = normalizeDate(raw.date_of_birth)
+  const dateOfBirth = normalizeDate(raw.date_of_birth, { dayFirst: dayFirst?.date_of_birth })
 
   if (!firstName) errors.push('first_name is required')
   if (!lastName) errors.push('last_name is required')
   if (!sex) errors.push(`sex must be male/female (got "${raw.sex ?? ''}")`)
-  if (!dateOfBirth) errors.push(`date_of_birth is invalid or missing (got "${raw.date_of_birth ?? ''}")`)
+  if (!dateOfBirth) {
+    errors.push(
+      String(raw.date_of_birth ?? '').trim()
+        ? `date_of_birth "${raw.date_of_birth}" is not a date we can read, or is in the future. ${DATE_HELP}`
+        : 'date_of_birth is required',
+    )
+  }
 
   // Haba ng bawat field (FIELD_LIMITS = laki ng column sa DB). Dati walang
   // check: sa Aiven (strict mode) error sa database ang sobrang habang
@@ -347,7 +424,7 @@ function validateAndNormalizeRow(raw) {
 // duplicate row) — hasTreatment stays false and the row is never rejected
 // for missing treatment_date/tooth_number, since those only matter once
 // there's actually a procedure to attach.
-function validateAndNormalizeTreatmentRow(raw) {
+function validateAndNormalizeTreatmentRow(raw, { dayFirst } = {}) {
   const rawProcedureName = raw.procedure_name ? String(raw.procedure_name).trim() : ''
   if (!rawProcedureName) return { hasTreatment: false }
 
@@ -362,9 +439,13 @@ function validateAndNormalizeTreatmentRow(raw) {
     errors.push(`procedure_name "${rawProcedureName}" doesn't match a standard procedure. Valid values: ${valid}`)
   }
 
-  const treatmentDate = normalizeDate(raw.treatment_date)
+  const treatmentDate = normalizeDate(raw.treatment_date, { dayFirst: dayFirst?.treatment_date })
   if (!treatmentDate) {
-    errors.push(`treatment_date is invalid or missing (got "${raw.treatment_date ?? ''}") — required when procedure_name is set`)
+    errors.push(
+      String(raw.treatment_date ?? '').trim()
+        ? `treatment_date "${raw.treatment_date}" is not a date we can read, or is in the future. ${DATE_HELP}`
+        : 'treatment_date is required when procedure_name is set',
+    )
   }
 
   // Whole-mouth procedures (cleaning, fluoride) always apply to the whole
@@ -428,12 +509,17 @@ export async function importPatients(buffer, originalname, importedByUserId, { m
   // makilala pa rin ang paulit-ulit na patient sa parehong file (long
   // format), tinatandaan dito ang mga "magiging bago" na patient.
   const plannedNew = new Set()
+  // DD/MM ba ang buong column? (tingnan detectDayFirst)
+  const dayFirst = {
+    date_of_birth: detectDayFirst(rawRows.map((r) => r.date_of_birth)),
+    treatment_date: detectDayFirst(rawRows.map((r) => r.treatment_date)),
+  }
 
   for (let i = 0; i < rawRows.length; i++) {
     const rowNumber = i + 2 // +1 para sa 0-index, +1 para sa header row
     const raw = rawRows[i]
-    const { data: patientData, errors: patientErrors } = validateAndNormalizeRow(raw)
-    const treatmentResult = validateAndNormalizeTreatmentRow(raw)
+    const { data: patientData, errors: patientErrors } = validateAndNormalizeRow(raw, { dayFirst })
+    const treatmentResult = validateAndNormalizeTreatmentRow(raw, { dayFirst })
 
     const errors = [...(patientErrors || []), ...(treatmentResult.errors || [])]
     if (errors.length > 0) {
