@@ -58,7 +58,6 @@ export default function EditPatientModal({ patient, portalEmail, onClose, onSave
         onSubmit={handleSubmit}
         submitLabel="Save Changes"
         guard={guard}
-        patientCode={patient.patient_code}
         portalEmail={portalEmail}
       />
     </Modal>

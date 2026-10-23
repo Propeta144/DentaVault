@@ -95,25 +95,6 @@ export async function findPatientByCode(value) {
   return rows[0] || null
 }
 
-// Ginagamit 'to ng Mailgun inbound webhook para itugma yung emailed X-ray
-// sa patient, base sa address ng sender. LAHAT ng tugma ang ibinabalik
-// (hindi LIMIT 1): puwedeng iisa ang email ng ilang patient (hal. magulang
-// para sa mga anak), at kapag 2+ ang tugma, hindi na dapat hulaan kung
-// kanino — ang dentist ang pipili (tignan webhooks.controller.js). Hindi
-// tutugma yung email ng deleted patient. `exceptId`: para sa Edit (hindi
-// kasama ang sarili). Max 10 — sapat para malaman kung "shared" na.
-export async function findPatientsByEmail(email, { exceptId = null } = {}) {
-  const [rows] = await pool.execute(
-    `SELECT id, patient_code, first_name, last_name FROM patients
-     WHERE LOWER(email) = LOWER(:email) AND deleted_at IS NULL
-       AND (:exceptId IS NULL OR id <> :exceptId)
-     ORDER BY last_name, first_name
-     LIMIT 10`,
-    { email, exceptId },
-  )
-  return rows
-}
-
 // Ginagamit 'to ng legacy import para ma-detect yung duplicate profiles.
 // Name + DOB, same de-dup key din naman na gagamitin ng front-desk clerk
 // kung titignan lang niya mismo sa paper folder. Hindi binibilang na

@@ -47,7 +47,7 @@ function GroupTime({ group }) {
 
 function UserCell({ log }) {
   if (!log.user_name) {
-    // hal. unmatched Mailgun inbound email, o ang retention job — walang logged-in user
+    // hal. lumang Mailgun inbound email (bago ang #32), o ang retention job — walang logged-in user
     return <span className="italic text-slate-400">System</span>
   }
   // Role sa sariling linya: dati katabi ng pangalan, kaya nahahati ang

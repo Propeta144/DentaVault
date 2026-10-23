@@ -131,7 +131,6 @@ router.post(
   patientImportController.importFile,
 )
 router.get('/export', requireRole('dentist'), patientsController.exportCsv)
-router.get('/email-usage', requireRole('dentist'), patientsController.emailUsage)
 
 router.get('/:code', patientsController.getOne)
 router.put('/:code', requireRole('dentist'), patientValidation, patientsController.update)

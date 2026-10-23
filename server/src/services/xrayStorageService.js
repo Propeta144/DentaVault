@@ -47,7 +47,7 @@ async function writeToLocalDisk(buffer, originalname) {
 }
 
 // Sine-save yung bytes ng isang uploaded file (galing sa memoryStorage ni
-// multer — tignan config/upload.js at config/mailgunUpload.js) tapos
+// multer — tignan config/upload.js) tapos
 // ibinabalik yung string na ise-save bilang xray_images.file_url.
 export async function storeXrayFile(buffer, originalname) {
   return isCloudinaryConfigured
@@ -72,21 +72,4 @@ export function resolveXrayFile(fileUrl) {
     return { redirectUrl }
   }
   return { localPath: path.join(UPLOAD_DIR, fileUrl) }
-}
-
-// Binubura ang file (local o Cloudinary). Ginagamit lang sa "Dismiss" ng
-// X-ray email na hinawakan muna (inbound_xray_holds) — hindi kailanman
-// na-file sa patient, at puwedeng galing sa nagpapanggap, kaya walang
-// dahilan para itago. (Ang mga X-ray na naka-file na sa patient ay soft
-// delete lang, tignan xrays.controller.js remove.) Hindi nagt-throw kapag
-// wala na ang file.
-export async function deleteXrayFile(fileUrl) {
-  if (fileUrl.startsWith(CLOUDINARY_PREFIX)) {
-    const publicId = fileUrl.slice(CLOUDINARY_PREFIX.length)
-    await cloudinary.uploader.destroy(publicId, { resource_type: 'image', type: 'authenticated' })
-    return
-  }
-  await fs.unlink(path.join(UPLOAD_DIR, fileUrl)).catch((err) => {
-    if (err.code !== 'ENOENT') throw err
-  })
 }

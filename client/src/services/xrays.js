@@ -38,28 +38,12 @@ export function getUnreviewedXrayCount() {
   return api.get('/xrays/unreviewed-count').then((r) => r.data.count)
 }
 
-// X-ray inbox (dentist): X-rays galing email sa buong clinic + mga email na
-// hindi na-match sa patient. status: 'new' (hindi pa nabubuksan) | 'all'
+// X-ray inbox (dentist): X-rays na in-upload ng mga patient sa buong clinic.
+// status: 'new' (hindi pa nabubuksan) | 'all'
 export function getXrayInbox({ status = 'new', page = 1 } = {}) {
   return api.get('/xrays/inbox', { params: { status, page } }).then((r) => r.data)
 }
 
 export function markXrayReviewed(xrayId) {
   return api.put(`/xrays/${xrayId}/reviewed`)
-}
-
-// X-ray emails na hinawakan muna (iisang email ng ilang patient, o hindi
-// pumasa sa SPF): kasama sa getXrayInbox() bilang `held`. Ang dentist ang
-// pipili kung kanino ifa-file, o ida-dismiss.
-export async function fetchHeldXrayObjectUrl(holdId, fileId) {
-  const response = await api.get(`/xrays/holds/${holdId}/files/${fileId}`, { responseType: 'blob' })
-  return URL.createObjectURL(response.data)
-}
-
-export function assignHeldXray(holdId, patientCode) {
-  return api.post(`/xrays/holds/${holdId}/assign`, { patientCode }).then((r) => r.data)
-}
-
-export function dismissHeldXray(holdId) {
-  return api.post(`/xrays/holds/${holdId}/dismiss`)
 }

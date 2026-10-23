@@ -34,7 +34,7 @@ import { PROFILE_PATH } from '../utils/selectedPatient'
 // Migration, Settings — galing sa proposal), na hindi na kasya sa top bar.
 //
 // Dentist-only ang lahat maliban sa "My Record" at Settings. Ang bilang ng
-// bagong X-ray galing email ay badge sa "X-ray Inbox".
+// bagong X-ray galing sa patient ay badge sa "X-ray Inbox".
 
 // Lazy (Feature #9): dina-download lang kapag binuksan ang search
 const PatientSearchPalette = lazy(() => import('../components/common/PatientSearchPalette'))
@@ -48,7 +48,7 @@ function NavBadge({ count }) {
   return (
     <span
       className="rounded-full bg-amber-500 px-1.5 py-0.5 text-[11px] font-semibold leading-none text-white"
-      title={`${count} new X-ray${count === 1 ? '' : 's'} from email`}
+      title={`${count} new X-ray${count === 1 ? '' : 's'} from patients`}
     >
       {count}
     </span>

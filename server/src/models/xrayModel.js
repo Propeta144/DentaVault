@@ -39,18 +39,6 @@ export async function findXrayById(id) {
   return parseAnnotations(rows[0]) || null
 }
 
-// Nagre-retry si Mailgun ng inbound webhook delivery sa kahit ano maliban
-// sa mabilis na 2xx — dito na kilala ng webhook handler na "na-process
-// na pala 'to na email" tapos wala na siyang gagawin, sa halip na gumawa
-// ng duplicate X-ray sa bawat retry.
-export async function findXrayByMailgunMessageId(messageId) {
-  const [rows] = await pool.execute(
-    'SELECT id FROM xray_images WHERE mailgun_message_id = :messageId LIMIT 1',
-    { messageId },
-  )
-  return rows[0] || null
-}
-
 export async function createXray({
   patientId,
   fileUrl,
@@ -58,16 +46,15 @@ export async function createXray({
   mimeType,
   fileSizeBytes,
   source = 'manual_upload',
-  mailgunMessageId = null,
   takenDate,
   notes,
   uploadedBy,
 }) {
   const [result] = await pool.execute(
     `INSERT INTO xray_images
-      (patient_id, file_url, original_filename, mime_type, file_size_bytes, source, mailgun_message_id, taken_date, notes, uploaded_by)
+      (patient_id, file_url, original_filename, mime_type, file_size_bytes, source, taken_date, notes, uploaded_by)
      VALUES
-      (:patientId, :fileUrl, :originalFilename, :mimeType, :fileSizeBytes, :source, :mailgunMessageId, :takenDate, :notes, :uploadedBy)`,
+      (:patientId, :fileUrl, :originalFilename, :mimeType, :fileSizeBytes, :source, :takenDate, :notes, :uploadedBy)`,
     {
       patientId,
       fileUrl,
@@ -75,7 +62,6 @@ export async function createXray({
       mimeType,
       fileSizeBytes,
       source,
-      mailgunMessageId,
       takenDate: takenDate ?? null,
       notes: notes ?? null,
       uploadedBy: uploadedBy ?? null,
@@ -92,7 +78,7 @@ export async function updateAnnotations(id, annotations) {
   return findXrayById(id)
 }
 
-// Para lang 'to sa source = 'email_inbound' rows tinatawag (tignan
+// Para lang 'to sa REVIEWABLE_SOURCES rows tinatawag (tignan
 // xrays.controller.js) — minamarkahan yung "binuksan na ng dentist yung
 // X-ray tab ng patient na 'to at nakita na" para bumaba yung sidebar badge
 // count. Idempotent: unang view lang ang nag-sset nito.
@@ -104,7 +90,8 @@ export async function markXrayReviewed(id) {
 }
 
 // Mga X-ray na hindi ang dentist ang nag-upload, kaya kailangan niyang
-// makita: galing email, at (#27) in-upload ng patient sa patient portal.
+// makita: in-upload ng patient sa patient portal (#27), at mga lumang
+// galing email (bago tinanggal ang Mailgun, #32).
 // Ligtas i-interpolate: sariling constant, hindi galing sa user.
 const REVIEWABLE_SOURCES_SQL = `('email_inbound', 'patient_upload')`
 

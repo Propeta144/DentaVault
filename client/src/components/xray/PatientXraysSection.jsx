@@ -7,8 +7,8 @@ import XrayViewer from './XrayViewer'
 import CompareView from './CompareView'
 import PageLoader from '../common/PageLoader'
 
-// Patient (#27, ayon sa paper): puwede nang mag-upload ng sariling X-ray dito,
-// bukod sa pag-email. Lalabas agad sa record na may "Waiting for review", at
+// Patient (#27, ayon sa paper): dito nag-a-upload ng sariling X-ray (ito na
+// lang ang paraan mula #32; tinanggal ang email). Lalabas agad sa record na may "Waiting for review", at
 // sa X-ray Inbox ng dentist bilang "New". Puwede pa itong burahin ng patient
 // hangga't hindi pa nabubuksan ng dentist.
 export default function PatientXraysSection({ patientId }) {

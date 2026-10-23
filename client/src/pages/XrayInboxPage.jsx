@@ -1,35 +1,29 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Inbox, MailCheck, MailWarning, ScanLine, CheckCheck, ChevronLeft, ChevronRight, ArrowRight } from 'lucide-react'
+import { Inbox, MailCheck, ScanLine, CheckCheck, ChevronLeft, ChevronRight, ArrowRight } from 'lucide-react'
 import { getXrayInbox, markXrayReviewed } from '../services/xrays'
 import { useToast } from '../context/ToastContext'
 import StatusBadge from '../components/common/StatusBadge'
 import EmptyState from '../components/common/EmptyState'
 import { SkeletonRows } from '../components/common/Skeleton'
-import HeldXrayEmails from '../components/xray/HeldXrayEmails'
 import { PROFILE_PATH, profileState } from '../utils/selectedPatient'
 import { listName } from '../utils/patientName'
 import { formatActivityTime, formatDate } from '../utils/formatDate'
 
-// X-ray Inbox (dentist): lahat ng X-ray na ipinadala ng mga pasyente sa
-// email ng clinic (Mailgun inbound), sa buong clinic. Ayon sa proposal,
-// "notified" dapat ang dentist kapag may na-process na X-ray galing email —
-// dati badge count lang sa menu, at kailangan pang hulaan kung kaninong
-// patient iyon. Ngayon:
+// X-ray Inbox (dentist): lahat ng X-ray na in-upload ng mga pasyente sa
+// patient portal (#27), sa buong clinic. Ayon sa proposal, "notified" dapat
+// ang dentist kapag may bagong X-ray galing sa pasyente.
 // - New: hindi pa nabubuksan; "Open" → diretso sa X-rays tab ng patient
-//   (doon nagiging "reviewed" — parehong patakaran ng dati).
+//   (doon nagiging "reviewed").
 // - Mark reviewed: kapag alam na ng dentist, hindi na kailangang buksan.
-// - Needs your decision: X-ray emails na hinawakan muna (iisang email ng
-//   ilang patient, o hindi verified ang sender) — ang dentist ang pipili.
-// - Mga email na hindi na-match (hindi kilala ang sender): hindi sila
-//   naiimbak, kaya dito lang makikita para maidagdag ang email sa patient.
+// Dati may X-ray sa email din (Mailgun); tinanggal sa #32. Ang mga lumang
+// email X-ray ay lumalabas pa rin dito bilang "via Email".
 const FILTERS = [
   { value: 'new', label: 'New' },
   { value: 'all', label: 'All received' },
 ]
 
-// #27: bukod sa email, puwede nang mag-upload ang patient sa sariling record
-// (patient portal). Parehong lumalabas dito; ipinapakita kung saan galing.
+// Kung saan galing: patient portal, o lumang email X-ray (bago ang #32).
 function viaLabel(xray) {
   return xray.source === 'patient_upload' ? 'Patient portal' : 'Email'
 }
@@ -90,8 +84,6 @@ export default function XrayInboxPage() {
 
   const xrays = data?.xrays || []
   const totalPages = data ? Math.max(1, Math.ceil(data.total / data.limit)) : 1
-  const unmatched = data?.unmatched || []
-  const held = data?.held || []
 
   return (
     <div>
@@ -101,11 +93,9 @@ export default function XrayInboxPage() {
             <Inbox className="h-6 w-6 text-sky-600" />
             X-ray Inbox
           </h1>
-          <p className="text-base text-slate-500">X-rays patients sent by email or uploaded in the patient portal. Open one to review it in their record.</p>
+          <p className="text-base text-slate-500">X-rays patients uploaded in the patient portal. Open one to review it in their record.</p>
         </div>
       </div>
-
-      {held.length > 0 && <HeldXrayEmails holds={held} onChanged={load} />}
 
       {/* Filter: New / All (segmented, gaya ng 2D/3D toggle) */}
       <div className="mb-4 inline-flex rounded-lg border border-slate-200 bg-slate-100 p-1" role="tablist" aria-label="Filter">
@@ -142,7 +132,7 @@ export default function XrayInboxPage() {
             <EmptyState
               icon={MailCheck}
               title="All caught up"
-              description="No new X-rays from patients. New ones show up here as soon as a patient emails or uploads one."
+              description="No new X-rays from patients. New ones show up here as soon as a patient uploads one."
               action={
                 <button
                   type="button"
@@ -157,7 +147,7 @@ export default function XrayInboxPage() {
             <EmptyState
               icon={ScanLine}
               title="No X-rays received from patients yet"
-              description="When a patient emails an X-ray from the address on their record, or uploads one in the patient portal, it is filed to their record and listed here."
+              description="When a patient uploads an X-ray in the patient portal (My Record → X-rays), it is filed to their record and listed here."
             />
           )}
         </div>
@@ -299,29 +289,6 @@ export default function XrayInboxPage() {
         </>
       )}
 
-      {unmatched.length > 0 && (
-        <section className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
-          <h2 className="mb-1 flex items-center gap-2 text-base font-semibold text-amber-900">
-            <MailWarning className="h-5 w-5" />
-            Emails from unknown senders (last 90 days)
-          </h2>
-          <p className="mb-3 text-sm text-amber-800">
-            These X-rays were not saved because the sender&apos;s email is not on any patient record. Add the email to
-            the right patient (Edit patient), then ask them to send it again.
-          </p>
-          <ul className="divide-y divide-amber-200">
-            {unmatched.map((u) => (
-              <li key={u.id} className="flex flex-col gap-0.5 py-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-                <div className="min-w-0">
-                  <p className="truncate font-medium text-amber-950">{u.senderEmail || 'Unknown sender'}</p>
-                  {u.subject && <p className="truncate text-sm text-amber-800">&ldquo;{u.subject}&rdquo;</p>}
-                </div>
-                <p className="shrink-0 text-sm text-amber-800">{formatActivityTime(u.receivedAt)}</p>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
     </div>
   )
 }

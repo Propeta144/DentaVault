@@ -97,11 +97,9 @@ Current migrations: `001_init`, `002_add_emergency_contact`, `003_add_chart_entr
   `Tooth3D.jsx` redraws them on load. Entries without stroke data (2D-originated
   saves, whole-tooth saves, anything recorded before this column existed) still
   fall back to the flat-plane indicator.
-- **X-ray management**: manual upload (dentist-only) plus **Mailgun inbound-email
-  automation** (`webhooks.routes.js`, `webhooks.controller.js`, `mailgunService.js`
-  with signature verification, mounted ahead of other routers in `routes/index.js`) —
-  contrary to earlier notes, this IS built and wired up; `.env` has a real
-  `MAILGUN_WEBHOOK_SIGNING_KEY`. Stored to Cloudinary (see File storage above),
+- **X-ray management**: dentist upload plus **patient upload in the patient portal**
+  (My Record → X-rays; shows up in the dentist's X-ray Inbox as "New"). The Mailgun
+  inbound-email intake was removed in CLAUDE.md #32. Stored to Cloudinary (see File storage above),
   authenticated file serving (never a public static path — these are medical images),
   zoom, freehand + text annotation on a canvas overlay (coordinates stored as
   **fractions** of image size, not pixels, so they stay aligned at any zoom level),
@@ -145,9 +143,8 @@ Current migrations: `001_init`, `002_add_emergency_contact`, `003_add_chart_entr
 - **Patient-role portal**, verified end-to-end — the backend RBAC supports it,
   but no patient account has ever actually been created and clicked through.
 
-(Mailgun inbound automation, Cloudinary storage, and 3D charting were previously listed
-here as pending — corrected above under "What's built": all three are actually wired
-up/built already.)
+(Cloudinary storage and 3D charting were previously listed here as pending — corrected
+above under "What's built". Mailgun inbound email was built, then removed in #32.)
 
 ## A few load-bearing design decisions (don't undo without a reason)
 
@@ -224,8 +221,8 @@ large practices and priced accordingly.
    coding, tooth deletion (extraction), and procedure marking.
 3. **Radiographic Imaging and X-ray Management** — receiving, storing, viewing,
    and annotating X-rays submitted by patients from external diagnostic facilities
-   (the clinic has no X-ray sensor of its own), including automated inbound-email
-   intake via Mailgun.
+   (the clinic has no X-ray sensor of its own), uploaded by the patient in the
+   patient portal.
 
 ## Scope — functional modules
 
@@ -241,10 +238,9 @@ buccal, lingual) via a rotatable/zoomable model; chronological per-tooth treatme
 records; print chart. Patient: read-only chart viewing (2D and 3D).
 
 **III. Radiographic Imaging and X-ray Management** — Dentist: receive/store X-rays
-submitted by patients (Mailgun inbound routing + webhook automatically extracts
-email attachments), view, zoom, annotate (drawing + text), side-by-side comparison,
-print. Patient: submit X-rays by emailing the clinic's designated address; the system
-auto-extracts and links the attachment to their record.
+submitted by patients, view, zoom, annotate (drawing + text), side-by-side comparison,
+print. Patient: upload X-rays to their own record in the patient portal; they appear in
+the dentist's X-ray Inbox until reviewed.
 
 Role-based access control underlies all three modules: **Dentist** has full CRUD
 access; **Patient** is read-only on their own records plus X-ray submission.
@@ -285,8 +281,6 @@ Philippine clinic — that combination is the proposal's stated gap to fill.
 - **Database**: MySQL — patients, treatments, dental chart entries, X-ray image
   references, user accounts, audit logs, structured relationally
 - **Media storage**: Cloudinary — offloads X-ray image storage/optimization/delivery
-- **Inbound email**: Mailgun — inbound routing + webhook to auto-receive X-ray
-  attachments, upload to Cloudinary, and link to the patient record
 - **Architecture**: Progressive Web Application — browser-based, installable to a
   device home screen, no native app store distribution
 - **Auth**: JSON Web Tokens (JWT)

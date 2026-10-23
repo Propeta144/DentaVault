@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Settings, KeyRound, Mail, ShieldCheck, Copy, Check, Inbox, ScrollText, Upload } from 'lucide-react'
+import { Settings, KeyRound, ShieldCheck, Inbox, ScrollText, Upload } from 'lucide-react'
 import { getSettings } from '../services/settings'
 import { useAuth } from '../context/AuthContext'
 import { PROFILE_PATH, profileState } from '../utils/selectedPatient'
@@ -11,35 +11,12 @@ import StatusBadge from '../components/common/StatusBadge'
 // Settings (dentist at patient). Read-only na impormasyon na dating walang
 // mapupuntahan:
 // - Account: pangalan, email, role + Change password (dati nasa account menu lang)
-// - Email ng clinic para sa X-ray: sa proposal, email ang paraan ng pasyente
-//   para magpadala ng X-ray, pero wala sa app kung saan ipapadala
+// - Pag-upload ng X-ray sa patient portal (#27; ang email/Mailgun ay
+//   tinanggal sa #32)
 // - Dentist: gaano katagal itinatago ang audit log (Feature #10, RA 10173)
 
 function years(days) {
   return days % 365 === 0 ? `${days / 365} year${days === 365 ? '' : 's'}` : `${days} days`
-}
-
-function CopyButton({ text }) {
-  const [state, setState] = useState('idle')
-  async function copy() {
-    try {
-      await navigator.clipboard.writeText(text)
-      setState('copied')
-    } catch {
-      setState('failed')
-    }
-    setTimeout(() => setState('idle'), 2000)
-  }
-  return (
-    <button
-      type="button"
-      onClick={copy}
-      className="flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-md border border-slate-300 bg-white px-4 text-base font-medium text-slate-700 transition-colors hover:bg-slate-50"
-    >
-      {state === 'copied' ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
-      {state === 'copied' ? 'Copied' : state === 'failed' ? "Couldn't copy" : 'Copy'}
-    </button>
-  )
 }
 
 function Card({ icon: Icon, title, children }) {
@@ -81,7 +58,7 @@ export default function SettingsPage() {
           <Settings className="h-6 w-6 text-sky-600" />
           Settings
         </h1>
-        <p className="text-base text-slate-500">Your account and how the clinic receives X-rays.</p>
+        <p className="text-base text-slate-500">Your account and how to send X-rays to the clinic.</p>
       </div>
 
       <div className="space-y-4">
@@ -107,11 +84,11 @@ export default function SettingsPage() {
           </div>
         </Card>
 
-        {/* #27: puwede nang mag-upload ang patient sa sariling record, bukod sa email */}
+        {/* #27: dito nag-a-upload ng X-ray ang patient (wala nang email, #32) */}
         <Card icon={Upload} title="Uploading X-rays in the app">
           <p className="text-base text-slate-600">
             {isDentist
-              ? 'Patients can upload X-rays from outside clinics in their own record (My Record → X-rays). The dentist sees them in the X-ray Inbox, and the patient can remove one until it has been reviewed.'
+              ? 'Patients upload X-rays from outside clinics in their own record (My Record → X-rays). The dentist sees them in the X-ray Inbox, and the patient can remove one until it has been reviewed.'
               : 'The easiest way to send the clinic an X-ray from another clinic or laboratory: open My Record → X-rays and upload it there. You can remove it until the dentist has reviewed it.'}
           </p>
           {isDentist ? (
@@ -123,45 +100,6 @@ export default function SettingsPage() {
             <Link to={PROFILE_PATH} state={profileState(user.patientCode, { tab: 'xrays' })} className="mt-2 inline-flex min-h-11 items-center gap-1.5 text-base font-medium text-sky-700 hover:underline">
               <Upload className="h-4 w-4" />
               Upload an X-ray
-            </Link>
-          )}
-        </Card>
-
-        <Card icon={Mail} title="Sending X-rays by email">
-          {data.xraySubmissionEmail ? (
-            <div className="space-y-3">
-              <p className="text-base text-slate-600">
-                {isDentist
-                  ? 'Patients send X-rays from outside clinics to this address:'
-                  : 'Got an X-ray from another clinic or laboratory? Email the image to:'}
-              </p>
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                <p className="min-w-0 flex-1 truncate rounded-md border border-slate-200 bg-slate-50 px-3 py-2.5 font-mono text-base text-slate-900">
-                  {data.xraySubmissionEmail}
-                </p>
-                <CopyButton text={data.xraySubmissionEmail} />
-              </div>
-            </div>
-          ) : (
-            <p className="text-base text-slate-600">
-              {isDentist
-                ? 'The clinic’s X-ray email address will appear here once it is ready, so you can share it with patients.'
-                : 'Ask the clinic for the email address where you can send your X-rays.'}
-            </p>
-          )}
-          <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-slate-500">
-            <li>
-              {isDentist
-                ? 'It must come from the email saved on the patient’s record, so it is filed to the right person automatically.'
-                : 'Send it from the email address the clinic has on your record, so it is filed to you automatically.'}
-            </li>
-            <li>Accepted files: JPG, PNG, WEBP, or PDF.</li>
-            {isDentist && <li>New ones appear in the X-ray Inbox.</li>}
-          </ul>
-          {isDentist && (
-            <Link to="/xrays" className="mt-2 inline-flex min-h-11 items-center gap-1.5 text-base font-medium text-sky-700 hover:underline">
-              <Inbox className="h-4 w-4" />
-              Open X-ray Inbox
             </Link>
           )}
         </Card>

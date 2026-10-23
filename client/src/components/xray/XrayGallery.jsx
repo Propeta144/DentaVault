@@ -15,7 +15,7 @@ function xrayDate(xray) {
 const REVIEWABLE_SOURCES = ['email_inbound', 'patient_upload']
 
 const SOURCE_LABELS = {
-  email_inbound: { icon: Mail, label: 'Email' },
+  email_inbound: { icon: Mail, label: 'Email' }, // lumang record lang (bago ang #32)
   patient_upload: { icon: UserRound, label: 'Patient' },
   manual_upload: { icon: UploadCloud, label: 'Clinic' },
 }
@@ -42,7 +42,7 @@ export default function XrayGallery({ xrays, onOpen, onCompare, canUpload = fals
             ? 'X-rays taken at the clinic will appear here.'
             : viewerRole === 'patient'
               ? 'X-rays from the clinic will appear here. You can also send one with the form below.'
-              : 'Upload the first X-ray with the form below. X-rays the patient emails or uploads also appear here automatically.'
+              : 'Upload the first X-ray with the form below. X-rays the patient uploads in the patient portal also appear here automatically.'
         }
       />
     )

@@ -49,6 +49,8 @@ sa mga naunang 5):
 
 ## 3. "New X-ray from Email" Badge
 
+> Mula sa #32: wala nang email; ang badge ay para na sa X-ray na in-upload ng patient sa portal (#27).
+
 | Name | Type | Purpose |
 |---|---|---|
 | `server/db/migrations/005_add_xray_reviewed_at.sql` | **NEW** | Nagdadagdag ng `reviewed_at DATETIME NULL` column sa `xray_images`. NULL = "hindi pa nabubuksan ng dentist" — pero applicable lang talaga ito sa `source = 'email_inbound'` rows. May backfill din: lahat ng existing rows ay minarkahan agad na "reviewed" (`reviewed_at = created_at`), para hindi lumabas na maling "backlog" ng notifications sa unang pagpapatakbo nitong migration. |
@@ -842,6 +844,8 @@ sweep 60/60, responsive audit 148 screens 0 issues; screenshots ng chart, modal,
 
 ## 20. X-ray Email: Shared Email at Pekeng Sender (Hold for Review)
 
+> **Tinanggal na sa #32** (kasama ang buong Mailgun). Naiwan lang bilang kasaysayan.
+
 **Problema (dati):** (1) Walang `UNIQUE` sa `patients.email` at `LIMIT 1` ang pagtugma, kaya kapag iisa ang email ng
 magulang para sa mga anak, ang X-ray ay napupunta sa **unang** tugma, at walang babala (puwedeng maling anak).
 (2) Napapatunayan ng Mailgun signature na galing kay Mailgun ang request, pero **hindi** na ang pasyente talaga ang
@@ -1507,3 +1511,43 @@ paliwanag, pekeng at sirang `.xlsx` 422, `.exe` 415, CSV gumagana pa). **Totoong
 **10/11** (11/11 pagkatapos ayusin ang timing ng test): template downloads, `.xls` message, Map Columns, Validate,
 390px walang overflow, 0 console error. Build pasado. Nilinis ang test data. **Naka-push na** (commit `3f9b716`, 2026-10-22). Walang migration.
 
+---
+
+## 32. Tinanggal ang Mailgun (X-ray sa Email) — Patient Portal Upload na Lang
+
+**Desisyon ng team:** isang paraan na lang ang pagpapadala ng X-ray ng pasyente: **upload sa patient portal** (#27).
+Mas simple para sa pasyente (walang address na kailangang tandaan, hindi kailangang tumugma ang email), at mas ligtas
+(laging naka-login ang nag-a-upload, kaya hindi na kailangan ang SPF check, shared-email hold, at webhook signature/replay
+protection ng #20 at #26). Wala na ring public endpoint na walang login.
+
+- **Server:** binura ang webhook route/controller, `mailgunService`, `mailgunUpload`, `xrayHoldModel`, `webhookTokenModel`,
+  ang mga holds route (`/xrays/holds/...`), `GET /patients/email-usage`, ang webhook rate limiters, at
+  `listUnmatchedInboundEmails`. Ang X-ray Inbox at badge ay X-ray ng patient na lang ang binibilang (pati mga lumang email X-ray
+  na hindi pa nare-review). Settings: wala nang `xraySubmissionEmail`.
+- **Client:** binura ang "Needs your decision" (`HeldXrayEmails`), "Emails from unknown senders", ang "Sending X-rays by email"
+  card sa Settings, at ang "Also on ..." shared-email paalala sa Register/Edit. Wording: "from patients" / "patient portal".
+- **Lumang data:** ang mga X-ray na galing email (`source = 'email_inbound'`) ay nasa record pa rin at may "Email" label.
+  Hindi tinanggal ang ENUM value. Nananatili rin ang mga lumang audit label (para mabasa pa ang lumang logs).
+- **Migration 018:** binubura ang `inbound_xray_holds`, `inbound_xray_hold_files`, `mailgun_webhook_tokens`, at ang
+  `xray_images.mailgun_message_id`. Bago patakbuhin, sinuri: 0 pending holds, 0 tokens, at walang email X-ray sa Aiven.
+- **Env:** tinanggal ang `MAILGUN_*` at `CLINIC_XRAY_EMAIL` sa `.env.example` at sa DEPLOYMENT.md (puwede nang burahin sa Render).
+- **Hindi ginalaw:** walang self-service "forgot password" email (gaya ng dati, #15a).
+
+| Name | Type | Purpose |
+|---|---|---|
+| `server/db/migrations/018_remove_mailgun.sql` | **NEW** | Drop ng 3 table at 1 column. Napatakbo na sa local at Aiven. |
+| `server/src/routes/webhooks.routes.js`, `controllers/webhooks.controller.js`, `services/mailgunService.js`, `config/mailgunUpload.js`, `models/xrayHoldModel.js`, `models/webhookTokenModel.js` | **BINURA** | Mailgun intake, holds, replay tokens. |
+| `server/src/routes/{index,xrays,patients}.routes.js` | MODIFIED | Walang webhook, holds, at email-usage routes. |
+| `server/src/controllers/{xrays,patients,settings}.controller.js` | MODIFIED | Inbox/badge walang holds/unmatched; walang `emailUsage`; walang `xraySubmissionEmail`. |
+| `server/src/models/{xray,patient,auditLog}Model.js`, `services/xrayStorageService.js`, `middleware/rateLimit.js` | MODIFIED | Walang `mailgun_message_id`, `findPatientsByEmail`, `listUnmatchedInboundEmails`, `deleteXrayFile`, webhook limiters. |
+| `server/.env.example`, `DEPLOYMENT.md`, `nagawa.md` | MODIFIED | Walang Mailgun. |
+| `client/src/components/xray/HeldXrayEmails.jsx` | **BINURA** | "Needs your decision". |
+| `client/src/pages/{XrayInbox,Settings,Dashboard,Login,AuditLog}Page.jsx`, `layouts/AppLayout.jsx` | MODIFIED | Walang email sections; wording. |
+| `client/src/components/patients/{PatientForm,EditPatientModal}.jsx`, `services/{xrays,patients}.js` | MODIFIED | Walang shared-email check at holds API. |
+| `client/src/components/xray/{XrayGallery,PatientXraysSection}.jsx` | MODIFIED | Wording; "Email" label para sa lumang record lang. |
+
+**Na-verify (local):** API **13/13** (+1 inaasahan: ang lumang webhook URL ay 401 na sa auth gate, hindi na napo-proseso):
+email-usage at holds = 404, inbox walang `held`/`unmatched` at may lumang email X-rays, badge, Settings, Dashboard, patient
+upload → "New" sa inbox → patient remove 204. UI sa Edge **18/18** (1366 at 390px: inbox, Settings, Register, Dashboard,
+patient Settings; 0 overflow, 0 console error). Build pasado. Nilinis ang test X-ray (DB + Cloudinary).
+**Para sa paper:** inalis ang Mailgun sa scope, tech stack, at ERD; patient portal upload na ang paraan.

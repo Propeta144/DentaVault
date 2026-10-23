@@ -8,8 +8,7 @@ Browser ──► Vercel (React build + PWA)
               │  /api/*  (rewrite / proxy, server-side)
               ▼
             Render (Express API) ──► Aiven (MySQL, SSL)
-              ▲            └──────► Cloudinary (X-ray files)
-Mailgun ──────┘  (diretso sa Render ang inbound webhook)
+                           └──────► Cloudinary (X-ray files)
 ```
 
 Dahil pinapasa ng Vercel ang `/api` sa Render, **iisang domain** ang nakikita ng browser:
@@ -67,7 +66,6 @@ walang CORS, at walang binago sa frontend code (`/api` pa rin ang tinatawag).
    | `JWT_SECRET` | **bago at mahabang random string** (huwag gamitin ang nasa local) |
    | `JWT_EXPIRES_IN` | `8h` |
    | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | galing sa local `.env` |
-   | `MAILGUN_API_KEY`, `MAILGUN_DOMAIN`, `MAILGUN_WEBHOOK_SIGNING_KEY` | galing sa local `.env` |
    | `TRUST_PROXY` | `4` (Vercel + Cloudflare + Render LB + Render internal proxy, para tama ang IP sa Audit Log; tingnan ang Gotcha #7) |
    | `CLINIC_TIMEZONE` | *(optional)* default `Asia/Manila`. Ginagamit sa "hindi puwedeng future" na check ng mga petsa (UTC ang oras ng Render) |
    | `AUDIT_RETENTION_ENABLED` | `false` (tingnan ang Gotcha #2) |
@@ -83,12 +81,6 @@ walang CORS, at walang binago sa frontend code (`/api` pa rin ang tinatawag).
 3. Settings: **Root Directory** = `client`, Framework = **Vite** (auto-detect). Walang env vars na kailangan.
 4. Deploy. Buksan ang Vercel URL at mag-login gamit ang dentist account na ginawa sa Step 1.
 
-## 4. Mailgun (inbound X-ray email)
-
-Sa Mailgun → **Receiving → Routes**, palitan ang forward URL ng:
-`https://<render-url>/api/webhooks/mailgun/inbound`
-(Diretso sa Render, hindi sa Vercel. Hindi browser ang Mailgun, kaya hindi kailangan ang proxy.)
-
 ---
 
 ## Verification checklist (pagka-deploy)
@@ -100,7 +92,7 @@ Sa Mailgun → **Receiving → Routes**, palitan ang forward URL ng:
 - [ ] Dental chart → mag-save ng condition
 - [ ] Audit Log → tama ang IP Address (IP mo, hindi IP ng Render/Vercel)
 - [ ] Refresh sa `/patients/profile` → hindi 404 (SPA rewrite)
-- [ ] Mag-email ng X-ray sa Mailgun address → may "New" badge
+- [ ] Login bilang patient → My Record → X-rays → mag-upload → may "New" badge sa X-ray Inbox ng dentist
 
 ---
 

@@ -77,11 +77,3 @@ export function resetPortalAccountPassword(patientId, payload) {
 export function addTreatmentsBatch(patientId, treatments) {
   return api.post(`/patients/${patientId}/treatments/batch`, { treatments }).then((r) => r.data.treatments)
 }
-
-// Ibang patient na may parehong email (babala sa Register/Edit form).
-// exceptCode: ang patient na ine-edit.
-export function getEmailUsage(email, exceptCode) {
-  return api
-    .get('/patients/email-usage', { params: { email, exceptCode: exceptCode || undefined } })
-    .then((r) => r.data.patients)
-}
