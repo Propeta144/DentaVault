@@ -1623,3 +1623,9 @@ countdown + Stay signed in, sign out sa 15 min pati ibang tab, stale activity pa
 500 generated password lahat pasado; 0 console error). Walang naputol sa 320–1366px sa change password page. Build pasado.
 Ibinalik ang mga test account at nilinis ang test audit rows. **Naka-push na** (commit `e5483a8`, 2026-10-23). Walang migration.
 
+**Paper (parehong bersyon sa `Desktop\checking`):** idinagdag ang password policy, 15-minute auto sign-out, at last sign-in sa
+abstract, scope, limitations (bakit walang email verification), technical background, requirements, Security Implementation,
+version history, Table 5 (27/27 at 29/29), test cases TC-24/TC-25, User's Guide, at Recommendations (2FA para sa dentist). Buong
+bersyon: ginawa ulit ang Appendix B (173 files, 16,296 lines, 396 pages). Maikling bersyon: bagong Listing B5 `utils/passwordPolicy.js`
+(138 pages). Backup ng dati: `checking\backup\*_before-33.*`.
+
