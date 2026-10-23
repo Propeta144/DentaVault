@@ -1625,7 +1625,9 @@ Ibinalik ang mga test account at nilinis ang test audit rows. **Naka-push na** (
 
 **Paper (parehong bersyon sa `Desktop\checking`):** idinagdag ang password policy, 15-minute auto sign-out, at last sign-in sa
 abstract, scope, limitations (bakit walang email verification), technical background, requirements, Security Implementation,
-version history, Table 5 (27/27 at 29/29), test cases TC-24/TC-25, User's Guide, at Recommendations (2FA para sa dentist). Buong
+version history, Table 5 (27/27 at 29/29), test cases TC-24/TC-25, User's Guide, at Recommendations (2FA para sa dentist). Ang paliwanag kung bakit walang email verification ay nasa **Security
+Implementation** bilang lakas ng system (hindi sa Limitations, desisyon ng team). Wala na ring em dash sa prose ng paper, sa mga
+caption, at sa mga diagram (patakaran ng team: huwag gumamit ng em dash). Buong
 bersyon: ginawa ulit ang Appendix B (173 files, 16,296 lines, 396 pages). Maikling bersyon: bagong Listing B5 `utils/passwordPolicy.js`
 (138 pages). Backup ng dati: `checking\backup\*_before-33.*`.
 
