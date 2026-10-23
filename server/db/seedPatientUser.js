@@ -8,6 +8,7 @@ import 'dotenv/config'
 import bcrypt from 'bcryptjs'
 import pool from '../src/config/db.js'
 import { findPatientById } from '../src/models/patientModel.js'
+import { passwordProblems } from '../src/utils/passwordPolicy.js'
 
 async function run() {
   const [, , patientIdArg, email, password] = process.argv
@@ -23,8 +24,13 @@ async function run() {
     process.exit(1)
   }
 
-  const passwordHash = await bcrypt.hash(password, 12)
   const fullName = `${patient.first_name} ${patient.last_name}`
+  const problems = passwordProblems(password, { email, fullName })
+  if (problems.length) {
+    console.error(`Password is too weak:\n- ${problems.join('\n- ')}`)
+    process.exit(1)
+  }
+  const passwordHash = await bcrypt.hash(password, 12)
 
   await pool.execute(
     `INSERT INTO users (patient_id, role, email, password_hash, full_name)

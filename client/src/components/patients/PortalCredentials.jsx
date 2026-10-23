@@ -1,6 +1,7 @@
 import { useId, useState } from 'react'
 import { Copy, Check, Printer, RefreshCw } from 'lucide-react'
 import logoUrl from '../../assets/brand/teodosio-rufin-logo.png'
+import { PASSWORD_MIN_LENGTH, PASSWORD_MAX_LENGTH } from '../../utils/passwordPolicy'
 import { generatePassword } from '../../utils/generatePassword'
 
 // Shared ng CreatePortalAccountModal at ResetPortalPasswordModal (dati
@@ -116,7 +117,7 @@ export function TemporaryPasswordField({ label, value, onChange, error }) {
           type="text"
           autoComplete="off"
           spellCheck={false}
-          maxLength={72}
+          maxLength={PASSWORD_MAX_LENGTH}
           aria-invalid={error ? true : undefined}
           aria-describedby={`${id}-help`}
           value={value}
@@ -136,7 +137,8 @@ export function TemporaryPasswordField({ label, value, onChange, error }) {
         </button>
       </div>
       <p id={`${id}-help`} className={`mt-1 text-sm ${error ? 'text-red-600' : 'text-slate-500'}`}>
-        {error || 'At least 8 characters. Generated passwords avoid look-alike letters (I, l, O, 0).'}
+        {error ||
+          `At least ${PASSWORD_MIN_LENGTH} characters with a capital letter, small letter, number, and special character. Generated passwords avoid look-alike letters (I, l, O, 0).`}
       </p>
     </div>
   )

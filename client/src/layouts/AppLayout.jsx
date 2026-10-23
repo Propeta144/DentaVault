@@ -20,6 +20,7 @@ import DropdownMenu from '../components/common/DropdownMenu'
 import PageLoader from '../components/common/PageLoader'
 import { useAuth } from '../context/AuthContext'
 import { getUnreviewedXrayCount } from '../services/xrays'
+import SignInNotice from '../components/common/SignInNotice'
 import { PROFILE_PATH } from '../utils/selectedPatient'
 
 // Navigation:
@@ -290,6 +291,7 @@ export default function AppLayout() {
       <main className="lg:pl-64">
         <div className="mx-auto max-w-[1600px] px-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))] pt-4 sm:px-6 sm:pt-6 lg:pb-8">
           {/* Suspense DITO: habang dina-download ang page, kita pa rin ang navigation */}
+          <SignInNotice />
           <Suspense fallback={<PageLoader />}>
             <Outlet />
           </Suspense>

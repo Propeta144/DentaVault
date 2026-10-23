@@ -47,6 +47,13 @@ body {
   @apply bg-slate-50 text-slate-800 antialiased;
 }
 
+/* Sariling show/hide button ng Edge sa password fields: may sarili na tayong
+   button (login, change password), kaya dalawang "mata" ang lumalabas dati. */
+input[type='password']::-ms-reveal,
+input[type='password']::-ms-clear {
+  display: none;
+}
+
 @keyframes modal-in {
   from {
     opacity: 0;

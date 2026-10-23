@@ -2,16 +2,25 @@
 // after migrating. There is no public sign-up route for the dentist role —
 // per the proposal, only the dentist operates the system directly.
 //
-// Usage: node db/seed.js dentist@example.com "somePassword123"
+// Usage: node db/seed.js dentist@example.com "<strong password>"
+// Password: parehong patakaran ng app (#33): 12+ characters, may capital,
+// small letter, numero, at special character.
 import 'dotenv/config'
 import bcrypt from 'bcryptjs'
 import pool from '../src/config/db.js'
+import { passwordProblems } from '../src/utils/passwordPolicy.js'
 
 async function run() {
   const [, , email, password] = process.argv
 
   if (!email || !password) {
     console.error('Usage: node db/seed.js <email> <password>')
+    process.exit(1)
+  }
+
+  const problems = passwordProblems(password, { email, fullName: 'Dr. Nolita Reloj Teodosio-Rufin' })
+  if (problems.length) {
+    console.error(`Password is too weak:\n- ${problems.join('\n- ')}`)
     process.exit(1)
   }
 

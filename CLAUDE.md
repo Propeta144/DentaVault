@@ -1559,3 +1559,67 @@ X-ray Level 1, ERD, System Architecture, at mga screenshot ng X-ray Inbox at Set
 - `dentavault-capstone2nomailgun.docx`/`.pdf` (135 pages): maikling Appendix B gaya ng dati (4 listing; ang Mailgun listing ay
   pinalitan ng `utils/fileSignature.js`), at wala ring Mailgun sa version history.
 - Kapag binago pa ang code bago ang defense, kailangang gawin ulit ang Appendix B ng buong bersyon.
+
+---
+
+## 33. Mas Matibay na Accounts: Malakas na Password, Auto Sign-out, at "Last Sign-in"
+
+Galing sa usapan tungkol sa email verification (Oct 23, 2026). **Desisyon:** hindi kailangan ng email verification (walang
+self sign-up, walang email na pinapadala ang system, at personal na kinikilala ng clinic ang pasyente bago bigyan ng account).
+Sa halip, pinatibay ang mismong mga account (dentist at patient).
+
+### A. Malakas na password (lahat ng account)
+- **12–72 characters**, may **capital, small letter, numero, at symbol**, at **hindi** kasama ang sariling pangalan/email o
+  karaniwang salita (`password`, `qwerty`, `dentavault`, `teodosio`, `rufin`, `clinic`...).
+- Ipinapatupad sa **server** (`utils/passwordPolicy.js`): change password, temporary password ng portal account (create at
+  reset), at `seed.js` / `seedPatientUser.js`. Kapareho sa client para sa checklist.
+- **Checklist habang nagta-type** (`PasswordChecklist`): nagiging berde ang bawat patakaran. May tip: "join a few words...".
+- **Lumang mahinang password = sapilitang papalitan:** sa login (doon lang nakikita ng server ang tina-type, kasi naka-hash ang
+  naka-save), kapag hindi pasado, `must_change_password = 1` at "Choose a stronger password" (label: "Current password", hindi
+  "Temporary"). Parehong 403 block gaya ng temporary password (#15). Audit: `PASSWORD_UPGRADE_REQUIRED`.
+- **Generated temporary password** (12 characters): laging may tig-isa ng bawat uri, walang magkamukhang letra, symbols na
+  madaling i-type sa phone (`!@#$%&*?`).
+- Tinanggal ang dobleng "mata" ng Edge sa password fields (`::-ms-reveal` sa `index.css`).
+
+### B. Auto sign-out kapag 15 minutong walang galaw
+- Bawat click, type, scroll, o galaw ng mouse sa **kahit anong tab** ay itinatala (`localStorage`, isang beses bawat 5s).
+- Sa huling **60 segundo**: "Are you still there?" na may countdown, **Sign out** at **Stay signed in**. Hindi ito nawawala sa
+  paggalaw lang ng mouse (kailangang pindutin), para mabasa.
+- Pagka-15 minuto: sign out (pati sa server, kaya hindi na magagamit ang token) sa **lahat ng tab**, at sa login page: "You were
+  signed out after 15 minutes of inactivity."
+- Kapag isinara ang browser at binuksan pagkalipas ng 15 minuto: naka-sign out na agad.
+- **Limitasyon:** sa browser ang bilang ng idle time; ang server-side na limit ay ang 8-oras na token pa rin.
+
+### C. "Last sign-in" at babala sa maling login
+- Pagka-login: banner sa itaas ng page na may **huling matagumpay na pag-login** (oras; at IP para sa dentist lang).
+- Kapag may **maling subok mula noon** (o sa huling 30 araw kung unang login): amber na babala, may link sa **Audit Log**
+  (dentist) at **Change password**. Isang beses bawat login (X = hindi na lalabas, kahit i-refresh).
+- Galing sa `audit_logs` (`LOGIN_SUCCESS` / `LOGIN_FAILED`), kinukuha **bago** itala ang bagong login. Walang bagong table.
+
+> ⚠️ **Pagka-deploy:** ang dentist at mga patient na mahina ang password ay sapilitang papalitan ng password sa susunod na
+> login (isang beses lang). Walang migration.
+
+| Name | Type | Purpose |
+|---|---|---|
+| `server/src/utils/passwordPolicy.js` | **NEW** | `passwordProblems()`, `isStrongPassword()`, `PASSWORD_MIN_LENGTH` (12), `PASSWORD_MAX_LENGTH` (72). |
+| `server/src/services/authService.js` | MODIFIED | Login: sapilitang pagpalit kapag mahina, `signIn` summary sa response; changePassword: buong patakaran. |
+| `server/src/models/auditLogModel.js` | MODIFIED | `getSignInSummary(userId)`. |
+| `server/src/models/userModel.js` | MODIFIED | `requirePasswordChange(userId)`. |
+| `server/src/routes/{auth,patients}.routes.js` | MODIFIED | 12–72 sa change password; patakaran sa temporary password ng portal account. |
+| `server/db/{seed,seedPatientUser}.js` | MODIFIED | Tumatanggi sa mahinang password. |
+| `client/src/utils/passwordPolicy.js` | **NEW** | `PASSWORD_RULES` (checklist) at `passwordProblems()`. |
+| `client/src/components/common/{PasswordChecklist,IdleWarningModal,SignInNotice}.jsx` | **NEW** | Checklist, idle babala, last sign-in banner. |
+| `client/src/context/AuthContext.jsx` | MODIFIED | Idle timer (lahat ng tab), `signOutReason` ('ended' / 'idle'), `signInInfo`, sign out sa lahat ng tab. |
+| `client/src/pages/{ChangePassword,Login}Page.jsx` | MODIFIED | Checklist + "Choose a stronger password"; idle message. |
+| `client/src/components/patients/{CreatePortalAccountModal,ResetPortalPasswordModal,PortalCredentials}.jsx` | MODIFIED | Bagong patakaran sa temporary password. |
+| `client/src/utils/generatePassword.js` | MODIFIED | Laging pasado sa patakaran. |
+| `client/src/layouts/AppLayout.jsx`, `utils/auditAction.js`, `index.css` | MODIFIED | `SignInNotice`; label ng `PASSWORD_UPGRADE_REQUIRED`; walang Edge reveal icon. |
+| `DEPLOYMENT.md` | MODIFIED | Halimbawa ng malakas na password sa `seed.js`; Gotcha #9. |
+
+**Na-verify (local):** API **27/27** (lumang mahinang password → makakapasok pero 403 hanggang mapalitan, `/auth/me` naaalala,
+8 uri ng mahinang password = 422, malakas = OK, 2 maling login → "2 failed", reset sa 0, IP dentist lang, portal temp password
+mahina = 422, audit). UI sa Edge **29/29** (sapilitang pagpalit, checklist, inline error, banner + dismiss, idle babala +
+countdown + Stay signed in, sign out sa 15 min pati ibang tab, stale activity pagbukas, amber babala sa 390px, patient sa 360px,
+500 generated password lahat pasado; 0 console error). Walang naputol sa 320–1366px sa change password page. Build pasado.
+Ibinalik ang mga test account at nilinis ang test audit rows. **Hindi pa naka-push.**
+

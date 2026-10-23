@@ -90,6 +90,13 @@ export async function updatePasswordHash(userId, passwordHash, { mustChangePassw
   )
 }
 
+// Sapilitang pagpalit sa susunod na hakbang (#33): ang lumang password na
+// hindi pasado sa bagong patakaran. Hindi tinataasan ang token_version: ang
+// bagong token mismo ang may mustChangePassword.
+export async function requirePasswordChange(userId) {
+  await pool.execute('UPDATE users SET must_change_password = 1 WHERE id = :userId', { userId })
+}
+
 export async function createUser({ patientId, role, email, passwordHash, fullName, mustChangePassword = false }) {
   const [result] = await pool.execute(
     `INSERT INTO users (patient_id, role, email, password_hash, must_change_password, full_name)

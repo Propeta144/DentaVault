@@ -34,7 +34,7 @@ walang CORS, at walang binago sa frontend code (`/api` pa rin ang tinatawag).
    $env:DB_PASSWORD="..."; $env:DB_NAME="defaultdb"
    $env:DB_SSL_CA = Get-Content "C:\path\to\ca.pem" -Raw
    npm run migrate
-   node db/seed.js dentist@email.com "MalakasNaPassword"
+   node db/seed.js dentist@email.com "Ngipin#Malinis42x"   # halimbawa lang; 12+ characters, capital, small, numero, symbol (#33)
    ```
 
    Pagkatapos, isara ang PowerShell window para mawala ang `$env:` values.
@@ -117,6 +117,9 @@ walang CORS, at walang binago sa frontend code (`/api` pa rin ang tinatawag).
 8. **Bagong migration = patakbuhin din sa Aiven.** Hindi ito ginagawa ng Render nang kusa. Bago/kasabay ng push,
    sa `server/`: `$env:DOTENV_CONFIG_PATH=".env.aiven"; npm run migrate`. Kapag nauna ang code (hal. 010
    `must_change_password`), magkakaroon ng database error ang login hangga't wala ang column.
+9. **Mas mahigpit na password (#33).** Pagka-deploy, ang account na mahina ang password (kasama ang dentist) ay
+   sapilitang papalitan ng password sa susunod na login. Normal ito, isang beses lang. Ang `seed.js` ay tumatanggi na
+   rin sa mahinang password.
 
 ## Code changes para sa deployment
 

@@ -4,6 +4,7 @@ import Modal from '../common/Modal'
 import { resetPortalAccountPassword } from '../../services/patients'
 import { useToast } from '../../context/ToastContext'
 import { generatePassword } from '../../utils/generatePassword'
+import { passwordProblems } from '../../utils/passwordPolicy'
 import { PortalCredentials, TemporaryPasswordField } from './PortalCredentials'
 
 export default function ResetPortalPasswordModal({ patient, email, onClose }) {
@@ -18,8 +19,9 @@ export default function ResetPortalPasswordModal({ patient, email, onClose }) {
   async function handleSubmit(e) {
     e.preventDefault()
     setError('')
-    if (password.length < 8) {
-      setPasswordError('Use at least 8 characters')
+    const problems = passwordProblems(password, { email })
+    if (problems.length) {
+      setPasswordError(problems[0])
       return
     }
     setPasswordError('')

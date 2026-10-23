@@ -7,6 +7,7 @@ import { requireRole } from '../middleware/rbac.js'
 import { uploadImportFile } from '../config/importUpload.js'
 import { FIELD_LIMITS, notInFuture, stripPhoneFormatting, isValidToothNumber } from '../utils/validators.js'
 import { EXTRA_PATIENT_FIELDS } from '../utils/patientFields.js'
+import { passwordProblems } from '../utils/passwordPolicy.js'
 import { isValidSurfaceList, CONDITION_PROCEDURE } from '../utils/treatmentChart.js'
 
 const router = Router()
@@ -159,20 +160,28 @@ router.post('/:code/treatments/batch', requireRole('dentist'), patientsControlle
 
 router.get('/:code/summary', patientsController.summary)
 
+// Temporary password ng portal account: parehong patakaran (#33), kahit
+// papalitan din ito ng patient sa unang login.
+function strongTemporaryPassword(value, { req }) {
+  const problems = passwordProblems(value, { email: req.body.email })
+  if (problems.length) throw new Error(problems[0])
+  return true
+}
+
 router.get('/:code/portal-account', requireRole('dentist'), patientsController.getPortalAccount)
 router.post(
   '/:code/portal-account',
   requireRole('dentist'),
   [
     body('email').isEmail().withMessage('A valid email is required'),
-    body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
+    body('password').custom(strongTemporaryPassword),
   ],
   patientsController.createPortalAccount,
 )
 router.put(
   '/:code/portal-account/password',
   requireRole('dentist'),
-  [body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters')],
+  [body('password').custom(strongTemporaryPassword)],
   patientsController.resetPortalAccountPassword,
 )
 

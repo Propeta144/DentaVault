@@ -66,6 +66,7 @@ const ACTION_LABELS = {
   RESET_PATIENT_PORTAL_PASSWORD: { label: 'Reset patient portal password' },
   UPDATE_PORTAL_ACCOUNT_EMAIL: { label: 'Changed patient portal sign-in email' },
   CHANGE_OWN_PASSWORD: { label: 'Changed own password' },
+  PASSWORD_UPGRADE_REQUIRED: { label: 'Asked to choose a stronger password' },
   PRUNE_AUDIT_LOGS: { label: 'Archived old audit entries' },
 }
 

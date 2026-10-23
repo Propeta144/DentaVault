@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { body } from 'express-validator'
 import * as authController from '../controllers/auth.controller.js'
 import { authenticate } from '../middleware/auth.js'
+import { PASSWORD_MIN_LENGTH, PASSWORD_MAX_LENGTH } from '../utils/passwordPolicy.js'
 import { loginLimiterByIp, loginLimiterByEmail, changePasswordLimiter } from '../middleware/rateLimit.js'
 
 const router = Router()
@@ -27,9 +28,11 @@ router.post(
   changePasswordLimiter,
   [
     body('currentPassword').isLength({ min: 1 }).withMessage('Enter your current password'),
+    // Haba lang dito; ang buong patakaran (capital, numero, special, hindi
+    // pangalan/email) ay nasa authService.changePassword (kailangan ang account)
     body('newPassword')
-      .isLength({ min: 8, max: 72 }) // 72 = bcrypt limit; lampas doon, hindi na binabasa
-      .withMessage('New password must be 8 to 72 characters'),
+      .isLength({ min: PASSWORD_MIN_LENGTH, max: PASSWORD_MAX_LENGTH })
+      .withMessage(`New password must be ${PASSWORD_MIN_LENGTH} to ${PASSWORD_MAX_LENGTH} characters`),
   ],
   authController.changePassword,
 )

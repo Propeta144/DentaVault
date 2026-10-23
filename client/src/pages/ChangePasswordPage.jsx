@@ -4,6 +4,8 @@ import { Eye, EyeOff, KeyRound, LogOut } from 'lucide-react'
 import logoUrl from '../assets/brand/teodosio-rufin-logo.png'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
+import PasswordChecklist from '../components/common/PasswordChecklist'
+import { passwordProblems, PASSWORD_MAX_LENGTH } from '../utils/passwordPolicy'
 
 // Dalawang paraan papunta rito:
 // 1. SAPILITAN: temporary password pa ang gamit (ginawa/ni-reset ng dentist,
@@ -11,6 +13,9 @@ import { useToast } from '../context/ToastContext'
 //    napapalitan (ProtectedRoute + 403 sa server). Walang Cancel; may
 //    "Sign out" lang.
 // 2. KUSA: "Change password" sa account menu — may Cancel.
+// 3. SAPILITAN DIN (#33): tama ang lumang password pero hindi pasado sa bagong
+//    patakaran (12+ characters, capital, numero, special). Kanyang password
+//    pa rin ito, kaya "Current password" ang label, hindi "Temporary".
 function PasswordInput({ label, value, onChange, error, autoComplete, describedBy }) {
   const id = useId()
   const [show, setShow] = useState(false)
@@ -24,7 +29,7 @@ function PasswordInput({ label, value, onChange, error, autoComplete, describedB
           id={id}
           type={show ? 'text' : 'password'}
           autoComplete={autoComplete}
-          maxLength={72}
+          maxLength={PASSWORD_MAX_LENGTH}
           aria-invalid={error ? true : undefined}
           aria-describedby={[error && `${id}-error`, describedBy].filter(Boolean).join(' ') || undefined}
           value={value}
@@ -53,11 +58,13 @@ function PasswordInput({ label, value, onChange, error, autoComplete, describedB
 }
 
 export default function ChangePasswordPage() {
-  const { user, changePassword, logout } = useAuth()
+  const { user, changePassword, logout, signInInfo } = useAuth()
   const { showToast } = useToast()
   const navigate = useNavigate()
   const rulesId = useId()
   const forced = Boolean(user?.mustChangePassword)
+  const upgrade = forced && Boolean(signInInfo?.passwordUpgradeRequired)
+  const policyContext = { email: user?.email, fullName: user?.fullName }
   const [current, setCurrent] = useState('')
   const [next, setNext] = useState('')
   const [confirm, setConfirm] = useState('')
@@ -69,8 +76,9 @@ export default function ChangePasswordPage() {
     e.preventDefault()
     setServerError('')
     const found = {}
-    if (!current) found.current = forced ? 'Enter the temporary password from the clinic' : 'Enter your current password'
-    if (next.length < 8) found.next = 'Use at least 8 characters'
+    if (!current) found.current = forced && !upgrade ? 'Enter the temporary password from the clinic' : 'Enter your current password'
+    const problems = passwordProblems(next, policyContext)
+    if (problems.length) found.next = problems[0]
     else if (next === current) found.next = 'Choose a password different from the current one'
     if (confirm !== next) found.confirm = 'The two new passwords don’t match'
     setErrors(found)
@@ -95,17 +103,19 @@ export default function ChangePasswordPage() {
 
         <h1 className="flex items-center gap-2 text-2xl font-semibold text-slate-900">
           <KeyRound className="h-6 w-6 text-sky-600" />
-          {forced ? 'Set your own password' : 'Change password'}
+          {upgrade ? 'Choose a stronger password' : forced ? 'Set your own password' : 'Change password'}
         </h1>
         <p className="mb-6 mt-1 text-base text-slate-500">
-          {forced
-            ? 'You signed in with a temporary password from the clinic. Choose a new password only you know before continuing.'
-            : `Signed in as ${user?.email}.`}
+          {upgrade
+            ? 'The clinic now requires stronger passwords to protect patient records. Please choose a new one before continuing.'
+            : forced
+              ? 'You signed in with a temporary password from the clinic. Choose a new password only you know before continuing.'
+              : `Signed in as ${user?.email}.`}
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4" noValidate>
           <PasswordInput
-            label={forced ? 'Temporary password' : 'Current password'}
+            label={forced && !upgrade ? 'Temporary password' : 'Current password'}
             value={current}
             onChange={setCurrent}
             error={errors.current}
@@ -119,9 +129,10 @@ export default function ChangePasswordPage() {
             autoComplete="new-password"
             describedBy={rulesId}
           />
-          <p id={rulesId} className="-mt-2 text-sm text-slate-500">
-            At least 8 characters. A short phrase you can remember works well.
-          </p>
+          <div className="-mt-2 space-y-1.5">
+            <PasswordChecklist id={rulesId} password={next} context={policyContext} />
+            <p className="text-sm text-slate-500">Tip: join a few words you&apos;ll remember, then add a number and a symbol.</p>
+          </div>
           <PasswordInput
             label="Confirm new password"
             value={confirm}
@@ -136,8 +147,9 @@ export default function ChangePasswordPage() {
             </div>
           )}
 
-          {/* 320px na phone: nakasalansan (hindi kasya ang dalawang button nang magkatabi) */}
-          <div className="flex flex-col-reverse gap-2 pt-2 min-[360px]:flex-row">
+          {/* Phone na mas makitid sa 400px: nakasalansan (hindi kasya ang dalawang
+              button nang magkatabi; sa 360px, lumalampas sa card ang Save) */}
+          <div className="flex flex-col-reverse gap-2 pt-2 min-[400px]:flex-row">
             {forced ? (
               <button
                 type="button"

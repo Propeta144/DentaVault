@@ -4,6 +4,7 @@ import Modal from '../common/Modal'
 import { createPortalAccount } from '../../services/patients'
 import { useToast } from '../../context/ToastContext'
 import { generatePassword } from '../../utils/generatePassword'
+import { passwordProblems } from '../../utils/passwordPolicy'
 import { FIELD_LIMITS } from '../../constants/fieldLimits'
 import { PortalCredentials, TemporaryPasswordField } from './PortalCredentials'
 
@@ -23,7 +24,8 @@ export default function CreatePortalAccountModal({ patient, onClose, onCreated }
     setError('')
     const next = {}
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) next.email = 'Enter a valid email address'
-    if (password.length < 8) next.password = 'Use at least 8 characters'
+    const problems = passwordProblems(password, { email: email.trim() })
+    if (problems.length) next.password = problems[0]
     setFieldErrors(next)
     if (Object.keys(next).length) return
 

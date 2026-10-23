@@ -127,3 +127,27 @@ export async function listDistinctActions() {
   const [rows] = await pool.execute('SELECT DISTINCT action FROM audit_logs ORDER BY action ASC')
   return rows.map((r) => r.action)
 }
+
+// "Last sign-in" pagka-login (#33): ang huling matagumpay na pag-login BAGO
+// ang kasalukuyan, at ilang maling subok sa account na 'to mula noon. Kapag
+// wala pang naunang login, ang maling subok sa huling 30 araw ang binibilang.
+// Tinatawag bago itala ang bagong LOGIN_SUCCESS.
+export async function getSignInSummary(userId) {
+  const [[last]] = await pool.execute(
+    `SELECT created_at, ip_address FROM audit_logs
+     WHERE user_id = :userId AND action = 'LOGIN_SUCCESS'
+     ORDER BY created_at DESC, id DESC LIMIT 1`,
+    { userId },
+  )
+  const [[{ failed }]] = await pool.execute(
+    `SELECT COUNT(*) AS failed FROM audit_logs
+     WHERE user_id = :userId AND action = 'LOGIN_FAILED'
+       AND created_at > ${last ? ':since' : 'NOW() - INTERVAL 30 DAY'}`,
+    { userId, since: last?.created_at ?? null },
+  )
+  return {
+    lastSignInAt: last?.created_at ?? null,
+    lastSignInIp: last?.ip_address ?? null,
+    failedAttemptsSince: Number(failed),
+  }
+}
