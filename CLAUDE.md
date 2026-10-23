@@ -1621,5 +1621,5 @@ Sa halip, pinatibay ang mismong mga account (dentist at patient).
 mahina = 422, audit). UI sa Edge **29/29** (sapilitang pagpalit, checklist, inline error, banner + dismiss, idle babala +
 countdown + Stay signed in, sign out sa 15 min pati ibang tab, stale activity pagbukas, amber babala sa 390px, patient sa 360px,
 500 generated password lahat pasado; 0 console error). Walang naputol sa 320–1366px sa change password page. Build pasado.
-Ibinalik ang mga test account at nilinis ang test audit rows. **Hindi pa naka-push.**
+Ibinalik ang mga test account at nilinis ang test audit rows. **Naka-push na** (commit `e5483a8`, 2026-10-23). Walang migration.
 
