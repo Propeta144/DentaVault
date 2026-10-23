@@ -1651,10 +1651,11 @@ Nawawala pagdating ng sagot. Hindi nito pinapabilis ang server; ipinapaliwanag l
 | `client/src/pages/LoginPage.jsx` | MODIFIED | Mensahe sa ilalim ng Sign in kapag matagal. |
 | `client/src/components/common/{ProtectedRoute,PageLoader}.jsx` | MODIFIED | `hint` prop ng PageLoader; ginagamit habang naglo-load ang session. |
 | `client/src/pages/XrayInboxPage.jsx` | MODIFIED | Tinanggal ang "via Patient portal / via Email" sa bawat row: iisa na lang ang pinanggagalingan (patient portal) mula #32. |
+| `server/src/routes/index.js` | MODIFIED | `/api/health` ay nagpapatakbo na rin ng `SELECT 1` sa database: 200 `{ status, database: 'ok' }` o 503 `database: 'unreachable'` (walang detalye ng error). Gising ang server at database sa bawat ping, at may alert kapag may problema sa alinman. |
 
 **Na-verify (local, Edge, pinatagal ng test ang API nang 8 segundo):** **10/10** (walang mensahe bago 5s, lumalabas pagkalipas
 ng 5s, nawawala pagdating ng sagot, 1366 at 360px walang overflow, full-screen loader sa pagbukas ng app). X-ray Inbox **8/8**
 (walang "via", may laman ang listahan, 1366 at 390px walang overflow). Build pasado.
 **Live:** UptimeRobot na nagpi-ping sa `https://dentavault.onrender.com/api/health` bawat 5 minuto (alert sa Gmail ng team);
-bumaba ang unang sagot mula 32.6 s hanggang ~0.2 s. Paalala: hindi pa binibisita ng `/api/health` ang database. **Naka-push na** (commit `550e9f3`, 2026-10-23).
+bumaba ang unang sagot mula 32.6 s hanggang ~0.2 s. Mula sa sumunod na commit, binibisita na rin ng `/api/health` ang database (local test: 200 kapag okay, 503 kapag mali ang DB port). **Naka-push na** (commit `550e9f3`, 2026-10-23).
 
