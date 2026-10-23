@@ -1555,7 +1555,7 @@ patient Settings; 0 overflow, 0 console error). Build pasado. Nilinis ang test X
 **Paper (dalawang bersyon, nasa `Desktop\checking`, wala sa git):** parehong walang Mailgun sa text, Use Case, DFD Level 0 at
 X-ray Level 1, ERD, System Architecture, at mga screenshot ng X-ray Inbox at Settings (ginawa ulit).
 - `DENTAVAULT_CAPSTONE2.docx`/`.pdf` (386 pages): **buong source code** sa Appendix B, walang comments (168 files, 15,853 lines,
-  B.1 Server at B.2 Client), ayon sa hiling ng adviser. Backup ng dati: `checkingackup\`.
+  B.1 Server at B.2 Client), ayon sa hiling ng adviser. Backup ng dati: `checking\backup\`.
 - `dentavault-capstone2nomailgun.docx`/`.pdf` (135 pages): maikling Appendix B gaya ng dati (4 listing; ang Mailgun listing ay
   pinalitan ng `utils/fileSignature.js`), at wala ring Mailgun sa version history.
 - Kapag binago pa ang code bago ang defense, kailangang gawin ulit ang Appendix B ng buong bersyon.
