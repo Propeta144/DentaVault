@@ -1,15 +1,17 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import PageLoader from './PageLoader'
+import { useSlowAfter, SERVER_WAKING_MESSAGE } from '../../hooks/useSlowAfter'
 
 export const CHANGE_PASSWORD_PATH = '/change-password'
 
 export default function ProtectedRoute({ allowedRoles }) {
   const { user, loading } = useAuth()
   const location = useLocation()
+  const slow = useSlowAfter(loading)
 
   if (loading) {
-    return <PageLoader fullScreen />
+    return <PageLoader fullScreen hint={slow ? SERVER_WAKING_MESSAGE : null} />
   }
 
   if (!user) {

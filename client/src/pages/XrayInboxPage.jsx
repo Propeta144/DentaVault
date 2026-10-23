@@ -16,17 +16,12 @@ import { formatActivityTime, formatDate } from '../utils/formatDate'
 // - New: hindi pa nabubuksan; "Open" → diretso sa X-rays tab ng patient
 //   (doon nagiging "reviewed").
 // - Mark reviewed: kapag alam na ng dentist, hindi na kailangang buksan.
-// Dati may X-ray sa email din (Mailgun); tinanggal sa #32. Ang mga lumang
-// email X-ray ay lumalabas pa rin dito bilang "via Email".
+// Dati may X-ray sa email din (Mailgun); tinanggal sa #32. Iisa na lang ang
+// pinanggagalingan (patient portal), kaya wala nang "via ..." sa bawat row.
 const FILTERS = [
   { value: 'new', label: 'New' },
   { value: 'all', label: 'All received' },
 ]
-
-// Kung saan galing: patient portal, o lumang email X-ray (bago ang #32).
-function viaLabel(xray) {
-  return xray.source === 'patient_upload' ? 'Patient portal' : 'Email'
-}
 
 function StatusCell({ xray }) {
   if (!xray.reviewed_at) return <StatusBadge variant="amber">New</StatusBadge>
@@ -165,7 +160,7 @@ export default function XrayInboxPage() {
                   <StatusCell xray={x} />
                 </div>
                 <p className="mb-3 text-sm text-slate-500">
-                  Received {formatActivityTime(x.created_at)} · via {viaLabel(x)}
+                  Received {formatActivityTime(x.created_at)}
                 </p>
                 <div className="flex gap-2">
                   <button
@@ -210,7 +205,6 @@ export default function XrayInboxPage() {
                   <tr key={x.id} className="hover:bg-slate-50">
                     <td className="whitespace-nowrap px-4 py-3 text-slate-600">
                       {formatActivityTime(x.created_at)}
-                      <span className="block text-sm text-slate-500">via {viaLabel(x)}</span>
                     </td>
                     <td className="whitespace-nowrap px-4 py-3">
                       <Link

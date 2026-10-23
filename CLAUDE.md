@@ -1631,3 +1631,30 @@ caption, at sa mga diagram (patakaran ng team: huwag gumamit ng em dash). Buong
 bersyon: ginawa ulit ang Appendix B (173 files, 16,296 lines, 396 pages). Maikling bersyon: bagong Listing B5 `utils/passwordPolicy.js`
 (138 pages). Backup ng dati: `checking\backup\*_before-33.*`.
 
+---
+
+## 34. Mensahe Habang Nagigising ang Server (Render free)
+
+**Problema:** sa Render free, natutulog ang server pagkatapos ng 15 minutong walang request, at mga 30 segundo hanggang
+1 minuto bago magising. Sa unang login (hal. sa araw ng survey), mukhang sira o naka-hang ang app.
+
+**Ayos:** kapag lampas 5 segundo ang paghihintay sa server, lumalabas ang *"Starting up the server. This can take up to a
+minute the first time."*:
+- **Login page:** sa ilalim ng "Signing in..." na button, may spinner.
+- **Pagbukas ng app na naka-login na** (`/auth/me` sa ProtectedRoute): sa ilalim ng full-screen loader.
+Nawawala pagdating ng sagot. Hindi nito pinapabilis ang server; ipinapaliwanag lang. Ang tunay na lunas: keep-alive ping
+(hal. UptimeRobot sa `/api/health` bawat 10 minuto, sa labas ng code) o bayad na plan.
+
+| Name | Type | Purpose |
+|---|---|---|
+| `client/src/hooks/useSlowAfter.js` | **NEW** | `useSlowAfter(active, ms)` at `SERVER_WAKING_MESSAGE`. |
+| `client/src/pages/LoginPage.jsx` | MODIFIED | Mensahe sa ilalim ng Sign in kapag matagal. |
+| `client/src/components/common/{ProtectedRoute,PageLoader}.jsx` | MODIFIED | `hint` prop ng PageLoader; ginagamit habang naglo-load ang session. |
+| `client/src/pages/XrayInboxPage.jsx` | MODIFIED | Tinanggal ang "via Patient portal / via Email" sa bawat row: iisa na lang ang pinanggagalingan (patient portal) mula #32. |
+
+**Na-verify (local, Edge, pinatagal ng test ang API nang 8 segundo):** **10/10** (walang mensahe bago 5s, lumalabas pagkalipas
+ng 5s, nawawala pagdating ng sagot, 1366 at 360px walang overflow, full-screen loader sa pagbukas ng app). X-ray Inbox **8/8**
+(walang "via", may laman ang listahan, 1366 at 390px walang overflow). Build pasado.
+**Live:** UptimeRobot na nagpi-ping sa `https://dentavault.onrender.com/api/health` bawat 5 minuto (alert sa Gmail ng team);
+bumaba ang unang sagot mula 32.6 s hanggang ~0.2 s. Paalala: hindi pa binibisita ng `/api/health` ang database.
+

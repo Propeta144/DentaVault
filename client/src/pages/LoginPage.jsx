@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Eye, EyeOff, Lock, Mail, ClipboardList, ScanLine, ShieldCheck } from 'lucide-react'
+import { Eye, EyeOff, Lock, Mail, ClipboardList, ScanLine, ShieldCheck, Loader2 } from 'lucide-react'
 import BrandMark from '../components/common/BrandMark'
 import logoUrl from '../assets/brand/teodosio-rufin-logo.png'
 import { useAuth } from '../context/AuthContext'
+import { useSlowAfter, SERVER_WAKING_MESSAGE } from '../hooks/useSlowAfter'
 
 const HIGHLIGHTS = [
   { icon: ClipboardList, text: 'Treatment history and dental charting in one record' },
@@ -23,6 +24,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const slow = useSlowAfter(submitting)
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -166,6 +168,13 @@ export default function LoginPage() {
             >
               {submitting ? 'Signing in...' : 'Sign in'}
             </button>
+            {/* Natutulog na server (Render free): matagal ang unang login */}
+            {slow && (
+              <p role="status" className="mt-3 flex items-start gap-2 text-sm text-slate-500">
+                <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-sky-600" aria-hidden="true" />
+                {SERVER_WAKING_MESSAGE}
+              </p>
+            )}
           </form>
 
           {/* Dalawang magkaibang sitwasyon (dati iisang linya lang, kaya parang

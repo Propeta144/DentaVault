@@ -5,7 +5,8 @@ import { Loader2 } from 'lucide-react'
 // at habang kinukuha ng page ang data niya galing sa API. Dati iba-iba ang
 // itsura ng "Loading..." bawat page; ngayon pare-pareho na.
 // `fullScreen`: para sa mga page na walang sidebar (login, print pages).
-export default function PageLoader({ label = 'Loading...', fullScreen = false }) {
+// `hint`: dagdag na paliwanag sa ilalim (hal. habang nagigising ang server).
+export default function PageLoader({ label = 'Loading...', fullScreen = false, hint = null }) {
   return (
     <div
       role="status"
@@ -16,6 +17,7 @@ export default function PageLoader({ label = 'Loading...', fullScreen = false })
     >
       <Loader2 className="h-8 w-8 animate-spin text-sky-600" />
       <p className="text-sm font-medium">{label}</p>
+      {hint && <p className="max-w-xs px-4 text-center text-sm text-slate-500">{hint}</p>}
     </div>
   )
 }
