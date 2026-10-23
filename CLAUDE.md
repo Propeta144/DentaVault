@@ -1656,5 +1656,5 @@ Nawawala pagdating ng sagot. Hindi nito pinapabilis ang server; ipinapaliwanag l
 ng 5s, nawawala pagdating ng sagot, 1366 at 360px walang overflow, full-screen loader sa pagbukas ng app). X-ray Inbox **8/8**
 (walang "via", may laman ang listahan, 1366 at 390px walang overflow). Build pasado.
 **Live:** UptimeRobot na nagpi-ping sa `https://dentavault.onrender.com/api/health` bawat 5 minuto (alert sa Gmail ng team);
-bumaba ang unang sagot mula 32.6 s hanggang ~0.2 s. Paalala: hindi pa binibisita ng `/api/health` ang database.
+bumaba ang unang sagot mula 32.6 s hanggang ~0.2 s. Paalala: hindi pa binibisita ng `/api/health` ang database. **Naka-push na** (commit `550e9f3`, 2026-10-23).
 
