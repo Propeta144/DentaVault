@@ -1550,4 +1550,12 @@ protection ng #20 at #26). Wala na ring public endpoint na walang login.
 email-usage at holds = 404, inbox walang `held`/`unmatched` at may lumang email X-rays, badge, Settings, Dashboard, patient
 upload → "New" sa inbox → patient remove 204. UI sa Edge **18/18** (1366 at 390px: inbox, Settings, Register, Dashboard,
 patient Settings; 0 overflow, 0 console error). Build pasado. Nilinis ang test X-ray (DB + Cloudinary).
-**Para sa paper:** inalis ang Mailgun sa scope, tech stack, at ERD; patient portal upload na ang paraan.
+**Naka-push na** (commit `e04418f`, 2026-10-23). Napatakbo muna ang migration 018 sa Aiven bago ang push.
+
+**Paper (dalawang bersyon, nasa `Desktop\checking`, wala sa git):** parehong walang Mailgun sa text, Use Case, DFD Level 0 at
+X-ray Level 1, ERD, System Architecture, at mga screenshot ng X-ray Inbox at Settings (ginawa ulit).
+- `DENTAVAULT_CAPSTONE2.docx`/`.pdf` (386 pages): **buong source code** sa Appendix B, walang comments (168 files, 15,853 lines,
+  B.1 Server at B.2 Client), ayon sa hiling ng adviser. Backup ng dati: `checkingackup\`.
+- `dentavault-capstone2nomailgun.docx`/`.pdf` (135 pages): maikling Appendix B gaya ng dati (4 listing; ang Mailgun listing ay
+  pinalitan ng `utils/fileSignature.js`), at wala ring Mailgun sa version history.
+- Kapag binago pa ang code bago ang defense, kailangang gawin ulit ang Appendix B ng buong bersyon.
