@@ -1729,7 +1729,7 @@ ang lahat ng nakita (3 P1, 2 P2, minor, at mga puna sa itsura). **Hindi ginalaw 
 profile, alert strip sa 2 modal, 32 keyboard na ngipin, picker 44px at nagpapalit ng surface, Escape, tab arrows, audit
 toggle, skip link, Ctrl+K birthday, Register order, patient X-rays; 0 overflow, 0 console error). API: walang numeric id sa
 `recentPatients`, 0 routine entries kapag nakatago. Impeccable detector: clean. Build pasado. Walang data na binago
-(maliban sa password ng 2 local test account, nasa `ui-review-login.txt`). **Hindi pa naka-push. Walang migration.**
+(maliban sa password ng 2 local test account, nasa `ui-review-login.txt`). **Naka-push na** (commit `fe721fe`, 2026-10-25). Walang migration.
 
 ---
 
@@ -1763,7 +1763,7 @@ Critique #2 (Oct 25, 2026): **28/40** pa rin, pero iba na ang mga isyu (detector
 
 **Na-verify (local, Edge via Playwright, 1366 at 768):** 26 checks: 25 PASS + 1 kilalang limitasyon (42px sa tablet, tingnan
 sa itaas). Ang 3D "draws after choosing" ay pumalya lang sa unang script (umikot ang model sa mga naunang drag); sa malinis
-na test: gumuguhit, "F Filled" sa modal, na-Discard. 0 console error. Build pasado. **Walang na-save na data. Hindi pa naka-push.**
+na test: gumuguhit, "F Filled" sa modal, na-Discard. 0 console error. Build pasado. **Walang na-save na data. Naka-push na** (commit `fe721fe`, 2026-10-25).
 
 ### 36a. Distill: Add Treatment
 - **Sticky footer** (Cancel / Save Treatment) sa loob ng modal: laging kita, kahit mag-scroll. Inayos nito ang regression
@@ -1841,7 +1841,7 @@ CLINIC" sa malalapad na puting letra), at ang clinic info ng print header. Walan
 | `client/src/pages/{Dashboard,Settings,AuditLog,Migration}Page.jsx` | MODIFIED | Tingnan sa itaas. |
 
 **Na-verify:** 33/33 sa 1366, 1024, 390px + patient (sidebar account kita pa rin sa 768px na taas, logo, clinic card, day
-headings, walang "DENTIST", migration steps, 0 overflow, 0 console error). Build pasado. **Hindi pa naka-push.**
+headings, walang "DENTIST", migration steps, 0 overflow, 0 console error). Build pasado. **Naka-push na** (commit `fe721fe`, 2026-10-25).
 
 ### 36e. Polish: Huling Pass
 - **Sweep:** 17 screen × 4 lapad (360, 768, 1024, 1366) = **68 screen**, dentist at patient: **0 page overflow, 0 naputol na
