@@ -3,13 +3,24 @@ import Modal from './Modal'
 
 // Babala bago ang auto sign-out (#33): lumalabas sa huling 60 segundo ng
 // 15 minutong walang galaw. X / Escape = manatiling naka-sign in.
+//
+// Screen reader: dati binabasa ang countdown BAWAT segundo (aria-live sa
+// mismong numero). Ngayon hiwalay na live region na nagbabago lang nang
+// dalawang beses: pagbukas (~1 minuto) at sa huling 10 segundo.
 export default function IdleWarningModal({ secondsLeft, onStay, onSignOut }) {
+  const announcement =
+    secondsLeft > 10
+      ? 'You will be signed out in about a minute because of inactivity. Choose Stay signed in to continue.'
+      : 'About 10 seconds left before you are signed out.'
   return (
     <Modal title="Are you still there?" onClose={onStay} maxWidth="max-w-md">
       <div className="space-y-4">
+        <p className="sr-only" role="status" aria-live="polite">
+          {announcement}
+        </p>
         <div className="flex items-start gap-3 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-base text-amber-900">
           <Clock className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
-          <p role="timer" aria-live="polite">
+          <p aria-hidden="true">
             For your patients&apos; privacy, you&apos;ll be signed out in{' '}
             <span className="font-semibold tabular-nums">{secondsLeft}</span> second{secondsLeft === 1 ? '' : 's'} because
             there has been no activity for a while.

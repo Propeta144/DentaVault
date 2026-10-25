@@ -37,7 +37,7 @@ export default function MonthlyTrendChart({ data }) {
   const [active, setActive] = useState(null)
 
   if (!data || data.every((d) => d.newPatients === 0 && d.treatments === 0)) {
-    return <p className="py-8 text-center text-sm text-slate-400">No activity in the last 6 months yet.</p>
+    return <p className="py-8 text-center text-sm text-slate-500">No activity in the last 6 months yet.</p>
   }
 
   const max = Math.max(...data.flatMap((d) => [d.newPatients, d.treatments]), 1)
@@ -65,7 +65,7 @@ export default function MonthlyTrendChart({ data }) {
           {ticks.map((t) => (
             <span
               key={t}
-              className="absolute right-0 -translate-y-1/2 text-xs tabular-nums text-slate-400"
+              className="absolute right-0 -translate-y-1/2 text-xs tabular-nums text-slate-500"
               style={{ top: CHART_HEIGHT - (t / top) * CHART_HEIGHT }}
             >
               {t}

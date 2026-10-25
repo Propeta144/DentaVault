@@ -22,7 +22,7 @@ instead of inventing a new pattern.
 - `sky-*` = brand purple accent. `sky-600` = **#6F2DBD** (primary), `sky-400` = **#A663CC**.
 - `slate-*` = purple-tinted neutrals. `slate-50` = #FBFBFB (page bg), `slate-950` = #171123.
 
-So: **write `sky-*` for brand/accent and `slate-*` for neutrals.** Never introduce `purple-*`,
+So: **write `sky-*` for brand/accent and `slate-*` for neutrals.** **Text contrast (WCAG AA):** never `text-slate-400` for text (2.7:1 on white because of the remap); secondary text = `slate-500` on white/slate-50, `slate-600` on slate-100 or tinted backgrounds. Placeholder and focus ring are themed globally in `index.css`. Never introduce `purple-*`,
 `violet-*`, `indigo-*`, `gray-*`, or `zinc-*`: they bypass the brand mapping.
 
 Semantic colors keep stock Tailwind meaning:
@@ -82,7 +82,7 @@ Reuse `Field` / `SectionHeading` pattern from `components/patients/PatientForm.j
 **Badges:** use `components/common/StatusBadge.jsx` (`variant`: slate | sky | emerald | amber | red, optional `icon`).
 Don't hand-roll pill spans. For audit actions, use `utils/auditAction.js` `actionVariant()`.
 
-**Modals:** always wrap in `components/common/Modal.jsx` (`title`, `onClose`, optional `maxWidth`).
+**Modals:** always wrap in `components/common/Modal.jsx` (`title`, `onClose`, optional `maxWidth`, optional `notice` = fixed strip under the title). Any modal that records something on a patient (treatment, chart) passes `notice={<PatientAlertStrip allergies medicalHistory />}` from `MedicalAlertBadge.jsx`; lists use `<AllergyFlag />`. No em dash in titles (use `·` or "for").
 It already handles Escape, backdrop blur, animation, scroll. Modal footer = two `flex-1` buttons
 (Cancel secondary + action) inside `flex gap-2`, buttons `py-3`.
 Destructive modals follow `DeletePatientModal.jsx`: red alert box with `AlertTriangle` + type-the-name-to-confirm.

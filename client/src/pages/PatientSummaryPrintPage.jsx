@@ -94,7 +94,7 @@ export default function PatientSummaryPrintPage() {
                         <td className="py-1 pr-2 align-top">{q.question}</td>
                         <td className="w-1/3 py-1 align-top font-medium">
                           {yesNoLabel(patient[q.column])}
-                          {more ? ` — ${more}` : ''}
+                          {more ? ` · ${more}` : ''}
                         </td>
                       </tr>
                     )
@@ -134,7 +134,7 @@ export default function PatientSummaryPrintPage() {
       </table>
 
       <p className="mt-8 text-xs text-slate-400">
-        Generated {formatDateTime(new Date())} — DentaVault
+        Generated {formatDateTime(new Date())} · DentaVault
       </p>
     </div>
   )

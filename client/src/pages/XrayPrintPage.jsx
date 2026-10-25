@@ -95,7 +95,7 @@ export default function XrayPrintPage() {
       </div>
 
       <p className="mt-8 text-xs text-slate-400">
-        Generated {formatDateTime(new Date())} — DentaVault
+        Generated {formatDateTime(new Date())} · DentaVault
       </p>
     </div>
   )

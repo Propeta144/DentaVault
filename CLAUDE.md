@@ -1659,3 +1659,202 @@ ng 5s, nawawala pagdating ng sagot, 1366 at 360px walang overflow, full-screen l
 **Live:** UptimeRobot na nagpi-ping sa `https://dentavault.onrender.com/api/health` bawat 5 minuto (alert sa Gmail ng team);
 bumaba ang unang sagot mula 32.6 s hanggang ~0.2 s. Mula sa sumunod na commit, binibisita na rin ng `/api/health` ang database (local test: 200 kapag okay, 503 kapag mali ang DB port). **Naka-push na** (commit `550e9f3`, 2026-10-23).
 
+
+---
+
+## 35. UI Critique (impeccable) at mga Ayos: Chairside Safety, Accessibility, Patient-first Dashboard
+
+Galing sa `/impeccable critique` ng lahat ng page (Oct 25, 2026): **28/40** (snapshot sa `.impeccable/critique/`). Inayos
+ang lahat ng nakita (3 P1, 2 P2, minor, at mga puna sa itsura). **Hindi ginalaw (desisyon ng team):** ang layout ng
+3D chart at print pages, at ang `slate-*` remap sa `index.css`. Maliban sa (hiling pagkatapos): allergy strip sa chart modal ng
+**3D pen**, at walang em dash sa 3D pen hint at sa "Generated ... · DentaVault" footer ng 4 na print page. May bagong `PRODUCT.md` (product context para sa impeccable).
+
+### A. Chairside safety (P1)
+- **2D chart:** 7 hanggang 9px lang ang bawat surface sa tablet. Ngayon, sa chart modal pinipili/itinatama ang surface:
+  malaking picker (Whole Tooth + 5 surface, 44px, may kulay at letter code ng kasalukuyang marka). Kapag lumipat sa
+  surface na walang marka, Healthy ang default (parang direktang tinapik).
+- **Allergy strip** sa Add/Edit Treatment at chart entry modal (laging kita sa ilalim ng title), at allergy flag at
+  birthday sa Ctrl+K results. Dati natatakpan ng modal ang allergies.
+- **Allergies at Medical History** ay kasunod na agad ng Personal Information sa Register/Edit (dati nasa dulo, pagkatapos
+  ng Blood Pressure). Nauuna ang Allergies.
+- Magkaiba na ang bigat: **pula** ang allergies, **amber** ang medical history, putol-putol na amber na gilid ang "Not
+  recorded". Tinanggal ang pulang stripe at 10px na "ALERT" chip.
+
+### B. Accessibility, WCAG 2.2 AA (P1)
+- Bawat ngipin sa 2D chart ay `role="button"` (Tab, Enter/Space, `aria-label` hal. "Tooth 26: Decayed (Caries)") na may
+  focus ring. Dati onClick lang (hindi maabot ng keyboard).
+- **Skip link** ("Skip to main content"), tabs na may ←/→/Home/End at `role="tabpanel"`, h2 bawat tab (dati h1 → h3).
+- `Modal`: `role="dialog"`, `aria-modal`, focus papasok at pabalik.
+- **Contrast:** `text-slate-400` (2.7:1) → `slate-500`/`600` sa lahat ng UI (hindi sa print pages); placeholder at focus
+  ring sa `index.css` (`@layer base`), brand na text selection.
+
+### C. Patient-first Dashboard (P2, desisyon ng team)
+- Itaas: **Recently seen** (6, isang tap sa record, may birthday at allergy flag) at **Needs attention** (bagong X-ray,
+  mga record na "Allergies not recorded").
+- Ibaba: **Clinic overview**: maikling hanay ng bilang (dating 4 na KPI tile), charts na walang 0 rows (may "Show all"),
+  `minScale` para hindi pinalalaki ang maliliit na bilang, Recent activity na walang password events.
+
+### D. Copy at ingay (P2) + minor
+- Walang em dash sa UI copy (modal titles, toast, pager, CompareView, BulkImportWizard). Ang `'—'` sa bakanteng cell ay
+  pinapayagan pa rin (skill).
+- **Audit Log:** default = records lang; "Show sign-ins and page views" checkbox (`routine=hide` sa server; nasa database pa rin lahat).
+- **Last sign-in:** maliit na linya na lang, kusang nawawala pagkalipat ng page, walang `::1`. Ang may maling subok
+  (amber) ay nananatili hanggang isara.
+- Patient X-rays: upload form na ang nasa itaas; walang compare checkbox; "Tap to choose" sa phone; kumikislap na loading
+  at error state sa thumbnail.
+- Manual Entry → Register → **bumabalik sa Manual Entry na napili na ang bagong patient** (`returnTo`).
+- Periodontitis stages: isa lang ang puwede (Early/Moderate/Advanced); hiwalay ang Gingivitis. Mas malaking checkbox.
+- Birthday sa Patients list; bottom tab bar: purple na "pill" sa active icon (dati lumulutang na guhit); Settings nakagitna;
+  walang placeholder sa Migration; walang paulit-ulit na "by Dr. ..." (iisa ang dentist account); card-in-card tinanggal
+  (treatment list, odontogram, Intraoral Examination).
+
+| Name | Type | Purpose |
+|---|---|---|
+| `PRODUCT.md` | **NEW** | Product context (users, constraints, WCAG 2.2 AA) para sa impeccable. |
+| `client/src/components/chart/{ChartEntryModal,Tooth,Odontogram2D,IntraoralExam}.jsx` | MODIFIED | Surface picker, alerts, keyboard, walang card-in-card, stage exclusivity. |
+| `client/src/components/common/MedicalAlertBadge.jsx` | MODIFIED | `tone`, `medicalStatus()`, `PatientAlertStrip`, `AllergyFlag`. |
+| `client/src/components/common/{Modal,PatientSearchPalette,SignInNotice,DropdownMenu}.jsx` | MODIFIED | `notice` prop + dialog a11y; birthday/allergy; compact sign-in; focus style. |
+| `client/src/layouts/AppLayout.jsx`, `index.css` | MODIFIED | Skip link, `TabIcon`; focus/placeholder/selection. |
+| `client/src/pages/{Dashboard,PatientProfile,AuditLog,PatientsList,Migration,PatientRegister,Settings}Page.jsx` | MODIFIED | Tingnan A–D. |
+| `client/src/components/dashboard/HorizontalBarChart.jsx` | MODIFIED | `minScale`. |
+| `client/src/components/dashboard/StatTile.jsx` | **BINURA** | Wala nang gumagamit. |
+| `client/src/components/xray/{PatientXraysSection,XrayGallery,XrayThumbnail,UploadXrayForm,CompareView}.jsx` | MODIFIED | Tingnan D. |
+| `client/src/components/{patients/PatientForm,migration/LegacyTreatmentEntry}.jsx`, `services/auditLogs.js` | MODIFIED | Section order; `initialPatient`; `showRoutine`. |
+| Iba pang `client/src/**` (contrast lang) | MODIFIED | `text-slate-400` → `slate-500`. |
+| `client/src/components/chart/Odontogram3D.jsx`, `pages/*PrintPage.jsx` (4) | MODIFIED | `alerts` prop papunta sa ChartEntryModal; em dash sa hint at footer. |
+| `server/src/controllers/{dashboard,auditLog}.controller.js`, `models/{dashboard,patient}Model.js` | MODIFIED | `recentPatients`, `getAllergiesNotRecorded`, `ROUTINE_ACTIONS`, allergies sa list. |
+| `.claude/skills/dentavault-ui/SKILL.md` | MODIFIED | Text contrast rule (walang `text-slate-400` sa text), `Modal notice` + `PatientAlertStrip`. |
+
+**Na-verify (local, Edge via Playwright):** **62/62** (+ 3D pen → Save Mark: may allergy strip, walang surface picker, hindi sine-save; 3D print footer OK) sa 1366, 768, 390px + patient sa 390px (dashboard, sign-in notice,
+profile, alert strip sa 2 modal, 32 keyboard na ngipin, picker 44px at nagpapalit ng surface, Escape, tab arrows, audit
+toggle, skip link, Ctrl+K birthday, Register order, patient X-rays; 0 overflow, 0 console error). API: walang numeric id sa
+`recentPatients`, 0 routine entries kapag nakatago. Impeccable detector: clean. Build pasado. Walang data na binago
+(maliban sa password ng 2 local test account, nasa `ui-review-login.txt`). **Hindi pa naka-push. Walang migration.**
+
+---
+
+## 36. Critique #2 → Harden: Walang Tahimik na Default sa Pag-chart + Keyboard/Screen Reader
+
+Critique #2 (Oct 25, 2026): **28/40** pa rin, pero iba na ang mga isyu (detector 59 → 14, 0 contrast failure). Ito ang
+`/impeccable harden` na bahagi ng plano (#1 at #4). Susunod pa: distill, layout, clarify, bolder, polish.
+
+- **2D chart modal:** kapag walang marka ang surface, **walang naka-select** na kondisyon (dati "Present / Healthy" agad,
+  kaya isang pindot sa Save = finding na hindi pinili). Naka-disable ang Save + "Choose a condition above to save." Prefill
+  lang kapag may dati nang marka (pati sa paglipat ng surface sa picker).
+- **3D pen:** walang naka-select na kulay sa simula (dati "D Decayed" kahit naka-off ang pen). Hindi makakaguhit hangga't
+  walang napili ("Choose a condition first, then draw on a tooth."). Ang napili ang lumalabas sa modal. Walang binago sa
+  3D model, drawing, o pag-save.
+- **Keyboard (2D chart):** iisang Tab stop na lang (roving tabindex, dati 32): ←/→ sa hilera, ↑/↓ sa katapat na ngipin,
+  Home/End. Pagkasara ng modal (Escape o Save), **bumabalik ang focus sa parehong ngipin**. Tahimik na ang reload pagka-save
+  (walang loader na nagtatanggal sa chart).
+- **Idle warning:** hindi na binabasa ng screen reader bawat segundo; dalawang anunsyo lang (pagbukas at huling 10 segundo).
+- **Touch:** mas malaking tap area ng bawat ngipin (hanggang kalahati ng puwang); 2D/3D toggle 44px.
+  ⚠️ Sa 768px tablet, **42px** pa rin ang lapad: 16 na ngipin sa ~670px (42px ang pagitan), kaya hindi aabot sa 44px nang
+  walang horizontal scroll o nagpapatong na tap area. Pasado sa WCAG 2.5.8 (24px), at ang surface picker ang nagtatama ng mali.
+
+| Name | Type | Purpose |
+|---|---|---|
+| `client/src/components/chart/ChartEntryModal.jsx` | MODIFIED | `conditionCode` null kapag walang marka; disabled Save + hint. |
+| `client/src/components/chart/Odontogram3D.jsx` | MODIFIED | `activeCondition` null, `aria-pressed`, paint lang kapag may napili. |
+| `client/src/components/chart/Odontogram2D.jsx` | MODIFIED | Roving tabindex + arrow keys, focus pabalik, tahimik na reload. |
+| `client/src/components/chart/Tooth.jsx` | MODIFIED | `tabIndex`/`onFocus`/`id` props, mas malaking hit rect. |
+| `client/src/components/common/IdleWarningModal.jsx` | MODIFIED | Hiwalay na `sr-only` live region (2 anunsyo). |
+| `client/src/pages/PatientProfilePage.jsx` | MODIFIED | 2D/3D toggle `min-h-11`. |
+
+**Na-verify (local, Edge via Playwright, 1366 at 768):** 26 checks: 25 PASS + 1 kilalang limitasyon (42px sa tablet, tingnan
+sa itaas). Ang 3D "draws after choosing" ay pumalya lang sa unang script (umikot ang model sa mga naunang drag); sa malinis
+na test: gumuguhit, "F Filled" sa modal, na-Discard. 0 console error. Build pasado. **Walang na-save na data. Hindi pa naka-push.**
+
+### 36a. Distill: Add Treatment
+- **Sticky footer** (Cancel / Save Treatment) sa loob ng modal: laging kita, kahit mag-scroll. Inayos nito ang regression
+  ng #35 (naputol ang Save sa 1366×768 dahil sa allergy strip).
+- **17 procedures naka-grupo** ayon sa `PROCEDURE_CATEGORIES` (Diagnostic → Cosmetic), sa CSS columns (2 sa phone, 3 sa
+  tablet, 4 sa laptop); bawat grupo buo sa iisang column. `role="group"` bawat category sa loob ng radiogroup.
+- Tooth dropdown: "Select..." (dati "Select a tooth...", naputol sa 390px).
+
+| Name | Type | Purpose |
+|---|---|---|
+| `client/src/components/patients/AddTreatmentForm.jsx` | MODIFIED | Grouped procedures, sticky footer, maikling placeholder. |
+
+**Na-verify:** 32/32 sa 1366, 768, 390, 360px (Save kita nang hindi nag-i-scroll at pagkatapos mag-scroll, 8 grupo / 17
+procedures, validation, 0 overflow, 0 console error). Build pasado. Walang na-save na data.
+
+### 36b. Layout: Chart sa Unang Tingin
+- **Compact header sa Dental Chart at X-rays tab:** avatar, pangalan, edad/kasarian, allergy strip (`PatientAlertStrip`) +
+  health questions, at Add Treatment / Edit / ⋯. **Sticky** sa tablet pataas (sa ilalim ng top bar below lg); hindi sticky sa
+  phone (para hindi kainin ang screen). Ang Treatment History tab ay may buong header pa rin.
+- **Contact details** ay nasa ilalim ng tabs kapag compact ang header (pati sa laptop).
+- **Upload form ng X-ray:** hindi na card sa loob ng card (border + shadow → `bg-slate-50` panel).
+
+Resulta (1366×768): header 74px (dati ~310px); 2D chart y=294–580 (dati 530–764, putol); 3D canvas y=531 (dati ~740).
+
+| Name | Type | Purpose |
+|---|---|---|
+| `client/src/pages/PatientProfilePage.jsx` | MODIFIED | `compactHeader`, sticky summary, contact details sa ibaba. |
+| `client/src/components/xray/UploadXrayForm.jsx` | MODIFIED | Walang card styling. |
+
+**Na-verify:** 27/27 sa 1366, 768, 390px + patient 390px (compact header sa chart, buong header sa history, allergies sa header,
+chart sa itaas ng fold, sticky sa 1366 at 768, contact details nandiyan pa, upload form hindi card, walang dentist buttons sa
+patient, 0 overflow, 0 console error). Build pasado.
+
+### 36c. Clarify: Copy at Consistency
+- **Allergy flag sa Patients list** (table at cards), gaya ng Dashboard at Ctrl+K; buong listahan sa tooltip.
+- Dashboard: **"Recent patients"** (dating "Recently seen") at **"Last visit 2 days ago"** (dating "Seen ..."); ang lumang
+  "Crown / Bridge" ay **"Crown / Bridge (old)"** na may paliwanag sa tooltip.
+- **Iisang pangalan ng procedure:** ang Bulk Import guide ay gumagamit na ng parehong maikling pangalan ng Add Treatment
+  (tinatanggap pa rin ang buong pangalan at alias); idinagdag ang alias na "ortho adjustment" sa server.
+- Bulk Import: 3 pangunahing tagubilin lang ang kita; ang iba ay nasa "More tips" (nakatiklop).
+- **Audit Log:** "Show sign-ins and page opens" + paliwanag na laging kita ang pagbukas ng patient record at X-ray. Sa phone,
+  nakatiklop ang filters sa "Filters" button (may bilang ng aktibo).
+- **Patient portal:** "Shown on your dental chart" (dating "On chart"), "Your health information" (dating "Patient
+  Information Record"), `text-pretty` sa bati (walang salitang mag-isa sa huling linya).
+- Minor: "e.g. Dr. Santos" placeholder (dating "Dr." na mukhang value), "15 MB" (dating "15.0 MB"), Migration CTA na may
+  arrow at kulay ng brand, wala nang "Only the dentist can update the chart." sa 2D print page.
+
+| Name | Type | Purpose |
+|---|---|---|
+| `client/src/pages/{PatientsList,Dashboard,AuditLog,Migration,PatientProfile}Page.jsx` | MODIFIED | Tingnan sa itaas. |
+| `client/src/components/common/MedicalAlertBadge.jsx` | MODIFIED | Tooltip ng `AllergyFlag`. |
+| `client/src/components/migration/BulkImportWizard.jsx` | MODIFIED | Maikling guide + "More tips", parehong procedure names. |
+| `client/src/components/patients/{PatientForm,PatientInfoRecord}.jsx` | MODIFIED | Placeholder; `forPatient` na pamagat. |
+| `client/src/components/xray/UploadXrayForm.jsx`, `components/chart/Odontogram2D.jsx` | MODIFIED | "15 MB"; walang hint sa print. |
+| `server/src/services/patientImportService.js` | MODIFIED | Alias "ortho adjustment". |
+
+**Na-verify:** 29/29 sa 1366 at 390px + patient + 2D print (0 overflow, 0 console error). Build pasado.
+
+### 36d. Bolder: Shell na "Para sa Clinic"
+Ginamit ang sariling bokabularyo ng brand: ang **official logo** (TEODOSIO RUFIN wordmark + purple na band na "DENTAL
+CLINIC" sa malalapad na puting letra), at ang clinic info ng print header. Walang bagong kulay, font, o library.
+- **Sidebar (lg+):** buong official logo sa itaas (gaya ng karatula nila), "DENTAVAULT" sa ilalim. Phone/tablet: mark pa rin.
+- **Dashboard:** ang "Clinic overview" ay purple band na kahawig ng "DENTAL CLINIC" band ng logo (bg `sky-700`, malalapad na
+  puting caps, 3 bilang). Pumalit sa maliit na hanay ng bilang.
+- **Settings:** bagong **Clinic** card sa itaas: logo, address, Smart/Globe (napipindot na `tel:`), email (`mailto:`).
+  Dentist: "This is the header printed on every ... printout." Patient: "Call or text the clinic for appointments."
+- **Audit Log:** naka-grupo ayon sa **araw** ("Today, Oct 25, 2026 · 29 events"), oras na lang sa row; **Patient** ang
+  unang column (dating User); "By" sa dulo; wala nang "DENTIST" sa bawat row (role lang kapag Patient).
+- **Migration cards:** nakatuon sa papel na folder ("From one patient's paper folder...", "For many folders typed into a
+  spreadsheet first.") + 3 maikling hakbang bawat isa.
+
+| Name | Type | Purpose |
+|---|---|---|
+| `client/src/layouts/AppLayout.jsx` | MODIFIED | Official logo sa sidebar. |
+| `client/src/pages/{Dashboard,Settings,AuditLog,Migration}Page.jsx` | MODIFIED | Tingnan sa itaas. |
+
+**Na-verify:** 33/33 sa 1366, 1024, 390px + patient (sidebar account kita pa rin sa 768px na taas, logo, clinic card, day
+headings, walang "DENTIST", migration steps, 0 overflow, 0 console error). Build pasado. **Hindi pa naka-push.**
+
+### 36e. Polish: Huling Pass
+- **Sweep:** 17 screen × 4 lapad (360, 768, 1024, 1366) = **68 screen**, dentist at patient: **0 page overflow, 0 naputol na
+  element, 0 console error**. Hinanap din ang tap target na kulang sa 40px.
+- **Inayos:** "None" chip, dropdown toggle, at Replace/Keep list sa Allergies/Medical History (36 → 44px); numero ng
+  clinic sa Settings (24 → 44px hanggang tablet). Ang pangalan sa Patients card sa phone ay 24px pero buong card ang
+  napipindot (hindi problema).
+- **Code:** walang hindi ginagamit na import sa lahat ng binagong file (sinuri gamit ang script). Impeccable detector:
+  clean. Build pasado.
+- Ang critique snapshot ay hindi na "current" (nagbago ang mga file), kaya hiwalay na pass ito; ang susunod na
+  `/impeccable critique` ang magbibigay ng bagong score.
+
+| Name | Type | Purpose |
+|---|---|---|
+| `client/src/components/common/ComboboxListInput.jsx` | MODIFIED | 44px na None chip, toggle, at confirm buttons. |
+| `client/src/pages/SettingsPage.jsx` | MODIFIED | 44px na `tel:` links hanggang `lg`. |

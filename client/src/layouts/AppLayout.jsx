@@ -15,6 +15,8 @@ import {
   MoreHorizontal,
 } from 'lucide-react'
 import BrandMark from '../components/common/BrandMark'
+import clinicLogoUrl from '../assets/brand/teodosio-rufin-logo.png'
+import { CLINIC_INFO } from '../constants/clinic'
 import Avatar from '../components/common/Avatar'
 import DropdownMenu from '../components/common/DropdownMenu'
 import PageLoader from '../components/common/PageLoader'
@@ -56,6 +58,26 @@ function NavBadge({ count }) {
   )
 }
 
+// Icon ng bottom tab: may purple na "pill" sa likod kapag aktibo. Dati
+// manipis na guhit sa itaas ng tab, na mukhang lumulutang at hindi
+// nakakabit sa tab (critique 2026-10-25).
+function TabIcon({ icon: Icon, active, badge }) {
+  return (
+    <span
+      className={`relative flex h-8 w-14 items-center justify-center rounded-full transition-colors ${
+        active ? 'bg-sky-100' : ''
+      }`}
+    >
+      <Icon className="h-6 w-6" aria-hidden="true" />
+      {!!badge && (
+        <span className="absolute -top-1 right-0.5">
+          <NavBadge count={badge} />
+        </span>
+      )}
+    </span>
+  )
+}
+
 // Phone/tablet: laman ng "More" tab (bumubukas sa ibabaw ng tab bar)
 function MoreMenu({ items }) {
   const [open, setOpen] = useState(false)
@@ -90,12 +112,11 @@ function MoreMenu({ items }) {
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className={`relative flex h-16 w-full flex-col items-center justify-center gap-1 text-xs font-medium transition-colors ${
-          active || open ? 'text-sky-700' : 'text-slate-500'
+        className={`flex h-16 w-full flex-col items-center justify-center gap-0.5 text-xs font-medium transition-colors ${
+          active || open ? 'text-sky-700' : 'text-slate-600'
         }`}
       >
-        {active && <span className="absolute inset-x-4 top-0 h-0.5 rounded-full bg-sky-600" />}
-        <MoreHorizontal className="h-6 w-6" />
+        <TabIcon icon={MoreHorizontal} active={active || open} />
         More
       </button>
       {open && (
@@ -202,9 +223,30 @@ export default function AppLayout() {
 
   return (
     <div className="min-h-screen bg-slate-50">
+      {/* Skip link (keyboard): lumalabas lang kapag naka-focus. Dati 7 Tab
+          muna (search + menu) bago makarating sa laman ng page. */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[60] focus:rounded-md focus:bg-white focus:px-4 focus:py-3 focus:text-base focus:font-semibold focus:text-sky-700 focus:shadow-lg"
+      >
+        Skip to main content
+      </a>
+
       {/* ===== Sidebar (lg pataas) ===== */}
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-slate-200 bg-white lg:flex">
-        <div className="flex h-16 items-center border-b border-slate-100 px-4">{brand}</div>
+        {/* Buong official logo ng clinic (parehong itsura ng karatula nila at ng
+            header ng printouts), hindi generic na icon + pangalan ng app
+            (critique 2026-10-25: generic ang shell). "DentaVault" sa ilalim. */}
+        <Link
+          to="/"
+          aria-label={`${CLINIC_INFO.name}, DentaVault home`}
+          className="block border-b border-slate-100 px-5 pb-3 pt-5"
+        >
+          <img src={clinicLogoUrl} alt="" className="h-auto w-full" />
+          <span className="mt-2 block text-center text-xs font-semibold uppercase tracking-[0.25em] text-slate-600">
+            DentaVault
+          </span>
+        </Link>
 
         {isDentist && (
           <div className="px-3 pt-4">
@@ -212,11 +254,11 @@ export default function AppLayout() {
               type="button"
               onClick={() => setSearchOpen(true)}
               aria-label="Find a patient"
-              className="flex min-h-11 w-full items-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-slate-500 transition-colors hover:border-slate-400 hover:text-slate-800"
+              className="flex min-h-11 w-full items-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-slate-600 transition-colors hover:border-slate-400 hover:text-slate-900"
             >
               <Search className="h-4 w-4 shrink-0" />
               <span className="whitespace-nowrap text-base">Find patient</span>
-              <kbd className="ml-auto rounded border border-slate-200 px-1.5 text-xs text-slate-400">Ctrl K</kbd>
+              <kbd className="ml-auto rounded border border-slate-200 bg-slate-50 px-1.5 text-xs text-slate-600">Ctrl K</kbd>
             </button>
           </div>
         )}
@@ -252,7 +294,7 @@ export default function AppLayout() {
                   <span className="block truncate text-sm font-medium text-slate-800">{user?.fullName}</span>
                   <span className="block text-xs capitalize text-slate-500">{user?.role}</span>
                 </span>
-                <ChevronsUpDown className="h-4 w-4 shrink-0 text-slate-400" />
+                <ChevronsUpDown className="h-4 w-4 shrink-0 text-slate-500" />
               </>
             }
             header={accountHeader}
@@ -288,7 +330,7 @@ export default function AppLayout() {
       </header>
 
       {/* pb sa phone/tablet: espasyo para sa bottom tab bar (h-16 + safe area) */}
-      <main className="lg:pl-64">
+      <main id="main-content" tabIndex={-1} className="focus:outline-none lg:pl-64">
         <div className="mx-auto max-w-[1600px] px-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))] pt-4 sm:px-6 sm:pt-6 lg:pb-8">
           {/* Suspense DITO: habang dina-download ang page, kita pa rin ang navigation */}
           <SignInNotice />
@@ -309,22 +351,14 @@ export default function AppLayout() {
               key={item.to}
               to={item.to}
               className={({ isActive }) =>
-                `relative flex h-16 flex-col items-center justify-center gap-1 text-xs font-medium transition-colors ${
-                  isActive ? 'text-sky-700' : 'text-slate-500'
+                `flex h-16 flex-col items-center justify-center gap-0.5 text-xs font-medium transition-colors ${
+                  isActive ? 'text-sky-700' : 'text-slate-600'
                 }`
               }
             >
               {({ isActive }) => (
                 <>
-                  {isActive && <span className="absolute inset-x-4 top-0 h-0.5 rounded-full bg-sky-600" />}
-                  <span className="relative">
-                    <item.icon className="h-6 w-6" />
-                    {!!item.badge && (
-                      <span className="absolute -right-3 -top-1.5">
-                        <NavBadge count={item.badge} />
-                      </span>
-                    )}
-                  </span>
+                  <TabIcon icon={item.icon} active={isActive} badge={item.badge} />
                   <span className="whitespace-nowrap">{item.short || item.label}</span>
                 </>
               )}

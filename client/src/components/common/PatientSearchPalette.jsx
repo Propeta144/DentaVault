@@ -3,9 +3,10 @@ import { useNavigate } from 'react-router-dom'
 import { Search, CornerDownLeft } from 'lucide-react'
 import { listPatients } from '../../services/patients'
 import { PROFILE_PATH, profileState } from '../../utils/selectedPatient'
-import { listName, sexLabel } from '../../utils/patientName'
-import { calculateAge, formatRelativeDay } from '../../utils/formatDate'
+import { listName } from '../../utils/patientName'
+import { calculateAge, formatDate, formatRelativeDay } from '../../utils/formatDate'
 import Avatar from './Avatar'
+import { AllergyFlag } from './MedicalAlertBadge'
 
 // Mabilisang paghahanap ng patient mula sa KAHIT ANONG page (button sa
 // sidebar, o Ctrl+K / ⌘K). Dati: kailangang pumunta muna sa Patients page,
@@ -83,7 +84,7 @@ export default function PatientSearchPalette({ onClose }) {
         className="w-full max-w-lg animate-[modal-in_150ms_ease-out] overflow-hidden rounded-xl bg-white shadow-2xl"
       >
         <div className="flex items-center gap-3 border-b border-slate-200 px-4">
-          <Search className="h-5 w-5 shrink-0 text-slate-400" />
+          <Search className="h-5 w-5 shrink-0 text-slate-500" />
           <input
             ref={inputRef}
             type="text"
@@ -94,16 +95,16 @@ export default function PatientSearchPalette({ onClose }) {
             aria-label="Search patients by name"
             aria-controls="patient-search-results"
             aria-activedescendant={results[active] ? `patient-search-${results[active].patient_code}` : undefined}
-            className="min-h-14 flex-1 bg-transparent text-base text-slate-900 placeholder:text-slate-400 focus:outline-none"
+            className="min-h-14 flex-1 bg-transparent text-base text-slate-900 placeholder:text-slate-500 focus:outline-none"
           />
-          <kbd className="hidden rounded border border-slate-200 px-1.5 py-0.5 text-xs text-slate-400 sm:block">Esc</kbd>
+          <kbd className="hidden rounded border border-slate-200 px-1.5 py-0.5 text-xs text-slate-600 sm:block">Esc</kbd>
         </div>
 
         <div className="max-h-[60vh] overflow-y-auto p-2">
-          <p className="px-2 pb-1 pt-1 text-xs font-semibold uppercase tracking-wide text-slate-400">{heading}</p>
+          <p className="px-2 pb-1 pt-1 text-sm font-semibold text-slate-600">{heading}</p>
           {error && <p className="px-2 py-4 text-sm text-red-600">{error}</p>}
           {!error && !loading && results.length === 0 && (
-            <p className="px-2 py-6 text-center text-sm text-slate-400">
+            <p className="px-2 py-6 text-center text-sm text-slate-600">
               {query.trim() ? `No patients match "${query.trim()}".` : 'No patients yet.'}
             </p>
           )}
@@ -126,10 +127,13 @@ export default function PatientSearchPalette({ onClose }) {
                   <Avatar firstName={p.first_name} lastName={p.last_name} size="sm" />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-base font-medium text-slate-900">{listName(p)}</span>
-                    <span className="block truncate text-sm text-slate-500">
-                      {calculateAge(p.date_of_birth)} yrs · {sexLabel(p.sex)} · Last visit:{' '}
+                    {/* Birthday: para matukoy ang magkapangalan (hal. dalawang
+                        "Dela Cruz, Juan"). Allergy: kita bago pa buksan ang record. */}
+                    <span className="block truncate text-sm text-slate-600">
+                      Born {formatDate(p.date_of_birth)} ({calculateAge(p.date_of_birth)} yrs) · Last visit:{' '}
                       {formatRelativeDay(p.last_treatment_date, 'none yet').toLowerCase()}
                     </span>
+                    <AllergyFlag allergies={p.allergies} />
                   </span>
                   {i === active && <CornerDownLeft className="h-4 w-4 shrink-0 text-sky-600" aria-hidden="true" />}
                 </button>

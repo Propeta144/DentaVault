@@ -4,18 +4,29 @@ import asyncHandler from '../utils/asyncHandler.js'
 import { getRetentionConfig } from '../services/auditRetentionService.js'
 import { queryText, queryInt } from '../utils/query.js'
 
+// Pang-araw-araw na ingay: pagbukas ng mga page at matagumpay na
+// pag-sign in/out. Nakatago sa default view ng Audit Log (critique
+// 2026-10-25: halos puro "Opened the dashboard" / "Signed in" ang laman), pero
+// nandiyan pa rin sa database at lumalabas sa "Show sign-ins and page views"
+// o kapag pinili mismo sa Action filter. Ang LOGIN_FAILED at pagpalit ng
+// password ay hindi kasama rito (seguridad).
+const ROUTINE_ACTIONS = ['VIEW_DASHBOARD', 'VIEW_AUDIT_LOG', 'VIEW_XRAY_INBOX', 'LOGIN_SUCCESS', 'LOGOUT']
+
 export const list = asyncHandler(async (req, res) => {
   const page = queryInt(req.query.page, { min: 1, max: 100000, fallback: 1 })
   const limit = queryInt(req.query.limit, { min: 1, max: 100, fallback: 50 })
   const offset = (page - 1) * limit
+  const action = queryText(req.query.action)
+  const hideRoutine = queryText(req.query.routine) === 'hide' && !action
 
   const { rows, total } = await auditLogModel.listAuditLogs({
     limit,
     offset,
     search: queryText(req.query.search),
-    action: queryText(req.query.action),
+    action,
     dateFrom: queryText(req.query.dateFrom),
     dateTo: queryText(req.query.dateTo),
+    excludeActions: hideRoutine ? ROUTINE_ACTIONS : [],
   })
 
   // Yung pag-view ng audit trail mismo, kabilang na rin sa klase ng

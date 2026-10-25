@@ -13,3 +13,5 @@ server/archives/
 !server/uploads/xrays/.gitkeep
 .DS_Store
 ui-review-login.txt
+# Impeccable (design tool): local cache at critique snapshots, hindi kino-commit
+.impeccable/

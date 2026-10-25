@@ -18,6 +18,7 @@ import { listPatients, getPatient, exportPatientsCsv } from '../services/patient
 import EditPatientModal from '../components/patients/EditPatientModal'
 import DeletePatientModal from '../components/patients/DeletePatientModal'
 import StatusBadge from '../components/common/StatusBadge'
+import { AllergyFlag } from '../components/common/MedicalAlertBadge'
 import Avatar from '../components/common/Avatar'
 import DropdownMenu from '../components/common/DropdownMenu'
 import EmptyState from '../components/common/EmptyState'
@@ -50,7 +51,7 @@ function ImportedBadge({ patient }) {
 
 // "5 days ago" + eksaktong petsa sa tooltip
 function LastVisit({ date }) {
-  if (!date) return <span className="text-slate-400">No visits yet</span>
+  if (!date) return <span className="text-slate-500">No visits yet</span>
   return (
     <time dateTime={date} title={formatDate(date)}>
       {formatRelativeDay(date)}
@@ -183,7 +184,7 @@ export default function PatientsListPage() {
 
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative max-w-md flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
           <input
             type="search"
             placeholder="Search by name..."
@@ -268,9 +269,13 @@ export default function PatientsListPage() {
                     >
                       {listName(p)}
                     </Link>
-                    <p className="text-sm text-slate-500">
-                      {calculateAge(p.date_of_birth)} yrs · {sexLabel(p.sex)}
+                    {/* Birthday: para matukoy ang magkapangalan (hal. dalawang "Dela Cruz, Juan") */}
+                    <p className="text-sm text-slate-600">
+                      {calculateAge(p.date_of_birth)} yrs · {sexLabel(p.sex)} · Born {formatDate(p.date_of_birth)}
                     </p>
+                    {/* Allergy (principle #1): kita na bago pa buksan ang record,
+                        gaya ng Dashboard at Ctrl+K (critique 2026-10-25) */}
+                    <AllergyFlag allergies={p.allergies} />
                     <div className="mt-1">
                       <ImportedBadge patient={p} />
                     </div>
@@ -279,11 +284,11 @@ export default function PatientsListPage() {
                 </div>
                 <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1 border-t border-slate-100 pt-3 text-sm">
                   <div>
-                    <dt className="text-xs uppercase tracking-wide text-slate-400">Contact</dt>
+                    <dt className="text-xs uppercase tracking-wide text-slate-500">Contact</dt>
                     <dd className="text-slate-700">{p.contact_number || '—'}</dd>
                   </div>
                   <div>
-                    <dt className="text-xs uppercase tracking-wide text-slate-400">Last visit</dt>
+                    <dt className="text-xs uppercase tracking-wide text-slate-500">Last visit</dt>
                     <dd className="text-slate-700">
                       <LastVisit date={p.last_treatment_date} />
                     </dd>
@@ -329,6 +334,10 @@ export default function PatientsListPage() {
                           >
                             {listName(p)}
                           </Link>
+                          {/* max-w: mahabang listahan ng allergy = putol (buo sa profile) */}
+                          <div className="max-w-[16rem]">
+                            <AllergyFlag allergies={p.allergies} />
+                          </div>
                           <div>
                             <ImportedBadge patient={p} />
                           </div>
@@ -337,6 +346,7 @@ export default function PatientsListPage() {
                     </td>
                     <td className="whitespace-nowrap px-4 py-2.5 text-slate-600">
                       {calculateAge(p.date_of_birth)} / {sexLabel(p.sex)}
+                      <span className="block text-xs text-slate-500">Born {formatDate(p.date_of_birth)}</span>
                     </td>
                     <td className="whitespace-nowrap px-4 py-2.5 text-slate-600">{p.contact_number || '—'}</td>
                     <td className="whitespace-nowrap px-4 py-2.5 text-slate-600">
@@ -361,7 +371,7 @@ export default function PatientsListPage() {
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm text-slate-500">
           <p>
             {data.total} patient{data.total === 1 ? '' : 's'}
-            {data.totalPages > 1 && ` — page ${data.page} of ${data.totalPages}`}
+            {data.totalPages > 1 && ` · Page ${data.page} of ${data.totalPages}`}
           </p>
           {/* Dati walang pagination: 20 lang ang lumalabas kahit marami pa */}
           {data.totalPages > 1 && (

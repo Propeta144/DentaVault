@@ -147,7 +147,7 @@ export default function DropdownMenu({
               className={`flex min-h-11 w-full items-center gap-2.5 px-4 text-left text-base transition-colors focus:outline-none disabled:opacity-50 ${
                 item.danger
                   ? 'text-red-700 hover:bg-red-50 focus:bg-red-50'
-                  : 'text-slate-700 hover:bg-slate-50 focus:bg-slate-50'
+                  : 'text-slate-700 hover:bg-slate-50 focus:bg-sky-50 focus:text-sky-900'
               }`}
             >
               {item.icon && <item.icon className="h-4 w-4 shrink-0" />}

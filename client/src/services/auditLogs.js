@@ -1,8 +1,11 @@
 import api from './api'
 
-export function listAuditLogs({ page = 1, limit = 50, search, action, dateFrom, dateTo } = {}) {
+// showRoutine: false = nakatago ang pagbukas ng page at matagumpay na sign-in/out
+export function listAuditLogs({ page = 1, limit = 50, search, action, dateFrom, dateTo, showRoutine = true } = {}) {
   return api
-    .get('/audit-logs', { params: { page, limit, search, action, dateFrom, dateTo } })
+    .get('/audit-logs', {
+      params: { page, limit, search, action, dateFrom, dateTo, routine: showRoutine ? undefined : 'hide' },
+    })
     .then((r) => r.data)
 }
 

@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Settings, KeyRound, ShieldCheck, Inbox, ScrollText, Upload } from 'lucide-react'
+import { Settings, KeyRound, ShieldCheck, Inbox, ScrollText, Upload, MapPin, Phone, Mail } from 'lucide-react'
+import clinicLogoUrl from '../assets/brand/teodosio-rufin-logo.png'
+import { CLINIC_INFO } from '../constants/clinic'
 import { getSettings } from '../services/settings'
 import { useAuth } from '../context/AuthContext'
 import { PROFILE_PATH, profileState } from '../utils/selectedPatient'
@@ -52,16 +54,65 @@ export default function SettingsPage() {
   const lastName = rest[rest.length - 1] || ''
 
   return (
-    <div className="max-w-3xl">
+    // mx-auto: nakagitna (dati nakadikit sa kaliwa, ~300px na bakante sa kanan
+    // ng laptop). Iba ang subtitle ng dentist at patient.
+    <div className="mx-auto max-w-3xl">
       <div className="mb-6">
         <h1 className="flex items-center gap-2 text-2xl font-semibold text-slate-900">
           <Settings className="h-6 w-6 text-sky-600" />
           Settings
         </h1>
-        <p className="text-base text-slate-500">Your account and how to send X-rays to the clinic.</p>
+        <p className="text-base text-slate-600">
+          {isDentist
+            ? 'Your account, X-rays from patients, and how long the audit log is kept.'
+            : 'Your account and how to send X-rays to the clinic.'}
+        </p>
       </div>
 
       <div className="space-y-4">
+        {/* Ang clinic mismo muna (bolder, critique 2026-10-25): logo at contact
+            info, parehong nakalimbag sa header ng bawat printout (PrintHeader).
+            Para sa pasyente: dito makikita kung paano kontakin ang clinic. */}
+        <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm" aria-labelledby="settings-clinic">
+          <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:gap-6 sm:p-5">
+            <img src={clinicLogoUrl} alt="" className="h-auto w-48 shrink-0" />
+            <div className="min-w-0">
+              <h2 id="settings-clinic" className="text-base font-semibold text-slate-900">{CLINIC_INFO.name}</h2>
+              <ul className="mt-2 space-y-1.5 text-base text-slate-700">
+                <li className="flex items-start gap-2">
+                  <MapPin className="mt-1 h-4 w-4 shrink-0 text-slate-500" aria-hidden="true" />
+                  {CLINIC_INFO.address}
+                </li>
+                {/* Pantay ang hanay ng mga numero (icon sa kaliwa, numero
+                    magkasunod/nakasalansan); 44px ang tap area sa phone */}
+                <li className="flex items-start gap-2">
+                  <Phone className="mt-1 h-4 w-4 shrink-0 text-slate-500 max-lg:mt-3.5" aria-hidden="true" />
+                  <span className="flex flex-col sm:flex-row sm:flex-wrap sm:gap-x-4">
+                    {CLINIC_INFO.phones.map((p) => (
+                      <a
+                        key={p.number}
+                        href={`tel:${p.number.replace(/\s/g, '')}`}
+                        className="inline-flex min-h-11 items-center font-medium text-sky-700 hover:underline lg:min-h-0"
+                      >
+                        {p.number} <span className="ml-1 font-normal text-slate-600">({p.network})</span>
+                      </a>
+                    ))}
+                  </span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <Mail className="h-4 w-4 shrink-0 text-slate-500" aria-hidden="true" />
+                  <a href={`mailto:${CLINIC_INFO.email}`} className="break-all font-medium text-sky-700 hover:underline">
+                    {CLINIC_INFO.email}
+                  </a>
+                </li>
+              </ul>
+              <p className="mt-2 text-sm text-slate-600">
+                {isDentist ? 'This is the header printed on every summary, chart, and X-ray printout.' : 'Call or text the clinic for appointments.'}
+              </p>
+            </div>
+          </div>
+        </section>
+
         <Card icon={KeyRound} title="Account">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex min-w-0 items-center gap-3">

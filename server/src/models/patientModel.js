@@ -37,7 +37,7 @@ export async function listPatients({ search, sort, limit, offset }) {
 
   const [rows] = await pool.execute(
     `SELECT p.id, p.patient_code, p.first_name, p.last_name, p.sex, p.date_of_birth, p.contact_number, p.email,
-            p.is_legacy_migrated, p.created_at, lt.last_treatment_date
+            p.allergies, p.medical_history, p.is_legacy_migrated, p.created_at, lt.last_treatment_date
      FROM patients p
      LEFT JOIN (
        SELECT patient_id, MAX(treatment_date) AS last_treatment_date

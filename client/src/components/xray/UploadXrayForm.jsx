@@ -7,7 +7,9 @@ import { todayISO } from '../../utils/formatDate'
 const ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf']
 
 function formatSize(bytes) {
-  return bytes >= 1024 * 1024 ? `${(bytes / (1024 * 1024)).toFixed(1)} MB` : `${Math.round(bytes / 1024)} KB`
+  // "15 MB" (hindi "15.0 MB"): decimal lang kapag kailangan
+  if (bytes >= 1024 * 1024) return `${Number((bytes / (1024 * 1024)).toFixed(1))} MB`
+  return `${Math.round(bytes / 1024)} KB`
 }
 
 // Bago sa form na 'to:
@@ -97,7 +99,9 @@ export default function UploadXrayForm({
     'w-full rounded-md border border-slate-300 px-3 py-2.5 text-base text-slate-900 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-100'
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm" noValidate>
+    // Hindi na card (border + shadow) sa loob ng card ng tabs: kulay na lang
+    // ang naghihiwalay (critique 2026-10-25, nested-cards)
+    <form onSubmit={handleSubmit} className="space-y-3 rounded-lg bg-slate-50 p-4 sm:p-5" noValidate>
       <h3 className="flex items-center gap-2 text-base font-semibold text-slate-800">
         <ScanLine className="h-4 w-4 text-sky-600" />
         {title}
@@ -122,7 +126,7 @@ export default function UploadXrayForm({
             {previewUrl ? (
               <img src={previewUrl} alt="Selected X-ray preview" className="h-20 w-20 shrink-0 rounded-md bg-slate-900 object-contain" />
             ) : (
-              <span className="flex h-20 w-20 shrink-0 items-center justify-center rounded-md bg-white text-slate-400">
+              <span className="flex h-20 w-20 shrink-0 items-center justify-center rounded-md bg-white text-slate-500">
                 <FileText className="h-8 w-8" />
               </span>
             )}
@@ -139,7 +143,7 @@ export default function UploadXrayForm({
               type="button"
               onClick={() => setFile(null)}
               aria-label="Remove selected file"
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-700"
             >
               <X className="h-5 w-5" />
             </button>
@@ -162,8 +166,12 @@ export default function UploadXrayForm({
             }`}
           >
             <span className="flex items-center gap-2 text-base font-medium text-slate-700">
-              <Upload className="h-5 w-5 text-slate-400" />
-              Tap to choose, or drop an X-ray here
+              <Upload className="h-5 w-5 text-slate-500" />
+              {/* Phone/tablet (walang mouse): walang "drop", hindi iyon magagawa roon */}
+              <span className="[@media(hover:hover)_and_(pointer:fine)]:hidden">Tap to choose an X-ray</span>
+              <span className="hidden [@media(hover:hover)_and_(pointer:fine)]:inline">
+                Click to choose, or drop an X-ray here
+              </span>
             </span>
             <span className="text-sm text-slate-500">JPEG, PNG, WebP, or PDF · up to {formatSize(MAX_XRAY_FILE_BYTES)}</span>
           </label>
@@ -179,7 +187,7 @@ export default function UploadXrayForm({
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
           <label htmlFor={ids.date} className="mb-1 block text-base font-medium text-slate-700">
-            Date taken <span className="font-normal text-slate-400">(optional)</span>
+            Date taken <span className="font-normal text-slate-500">(optional)</span>
           </label>
           <input
             id={ids.date}
@@ -192,7 +200,7 @@ export default function UploadXrayForm({
         </div>
         <div>
           <label htmlFor={ids.notes} className="mb-1 block text-base font-medium text-slate-700">
-            Notes <span className="font-normal text-slate-400">(optional)</span>
+            Notes <span className="font-normal text-slate-500">(optional)</span>
           </label>
           <input
             id={ids.notes}

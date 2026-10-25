@@ -45,11 +45,10 @@ export default function PatientXraysSection({ patientId }) {
         <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-base text-red-700">{error}</div>
       )}
 
-      <XrayGallery xrays={xrays} onOpen={setViewing} onCompare={setComparing} canUpload viewerRole={user.role} />
-
-      {isDentist ? (
-        <UploadXrayForm onUpload={handleUpload} />
-      ) : (
+      {/* Patient: ang pagpapadala ng X-ray ang pangunahing gagawin niya rito,
+          kaya nasa itaas ang form (dati nasa ilalim ng buong gallery,
+          critique 2026-10-25). Dentist: gallery muna (pagbabasa ang madalas). */}
+      {!isDentist && (
         <UploadXrayForm
           onUpload={handleUpload}
           title="Send an X-ray to the clinic"
@@ -57,6 +56,10 @@ export default function PatientXraysSection({ patientId }) {
           successMessage="X-ray sent. It will show “Waiting for review” until the dentist opens it."
         />
       )}
+
+      <XrayGallery xrays={xrays} onOpen={setViewing} onCompare={setComparing} canUpload viewerRole={user.role} />
+
+      {isDentist && <UploadXrayForm onUpload={handleUpload} />}
 
       {viewing && (
         <XrayViewer

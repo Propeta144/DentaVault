@@ -57,7 +57,7 @@ const STANDARD_PROCEDURES = [
   { value: 'Tooth Extraction', wholeMouth: false, aliases: ['extraction', 'bunot'] },
   { value: 'Root Canal Treatment', wholeMouth: false, aliases: ['root canal', 'rct'] },
   { value: 'Braces Installation', wholeMouth: true, aliases: ['braces', 'braces installation'] },
-  { value: 'Orthodontic Adjustment', wholeMouth: false, aliases: ['adjustment', 'braces adjustment'] },
+  { value: 'Orthodontic Adjustment', wholeMouth: false, aliases: ['adjustment', 'braces adjustment', 'ortho adjustment'] },
   { value: 'Crown', wholeMouth: false, aliases: ['jacket crown', 'jacket'] },
   { value: 'Bridge', wholeMouth: false, aliases: ['fixed bridge'] },
   { value: 'Denture', wholeMouth: false, aliases: ['dentures', 'removable denture', 'pustiso'] },

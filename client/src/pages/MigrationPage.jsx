@@ -1,5 +1,6 @@
 import { Suspense, lazy, useState } from 'react'
-import { PenLine, FileSpreadsheet, ArchiveRestore } from 'lucide-react'
+import { useLocation } from 'react-router-dom'
+import { PenLine, FileSpreadsheet, ArchiveRestore, ArrowRight, Check } from 'lucide-react'
 import PageLoader from '../components/common/PageLoader'
 
 // Lazy (Feature #9): ang napiling paraan LANG ang dina-download — hindi
@@ -18,20 +19,27 @@ const MODES = [
     value: 'manual',
     icon: PenLine,
     title: 'Manual Entry',
-    description: 'Encode paper records one patient at a time.',
+    // Nakatuon sa papel na folder ng clinic (bolder, critique 2026-10-25)
+    description: "From one patient's paper folder: their chart and past visits.",
+    steps: ['Find or register the patient', 'Add each past visit', 'Save them all at once'],
     cta: 'Start manual entry',
   },
   {
     value: 'bulk',
     icon: FileSpreadsheet,
     title: 'Bulk Import (Excel or CSV)',
-    description: 'Upload a spreadsheet of many patient records at once.',
+    description: 'For many folders typed into a spreadsheet first.',
+    steps: ['Download the Excel template', 'Type one row per visit', 'Check it, then import'],
     cta: 'Import a file',
   },
 ]
 
 export default function MigrationPage() {
-  const [mode, setMode] = useState(null)
+  // Galing sa Register (Manual Entry → "Register the patient"): bukas na ang
+  // Manual Entry at napili na ang bagong patient
+  const location = useLocation()
+  const returned = location.state?.mode === 'manual' ? location.state : null
+  const [mode, setMode] = useState(returned ? 'manual' : null)
 
   return (
     <div>
@@ -68,9 +76,30 @@ export default function MigrationPage() {
               </span>
               <span className="min-w-0">
                 <span className="block text-base font-semibold text-slate-900">{m.title}</span>
-                <span className="block text-sm text-slate-500">{m.description}</span>
-                <span className={`mt-2 block text-sm font-semibold ${selected ? 'text-sky-700' : 'text-slate-600'}`}>
-                  {selected ? 'Selected' : m.cta}
+                <span className="block text-sm text-slate-600">{m.description}</span>
+                {/* Maikling hakbang: alam agad kung ano ang mangyayari */}
+                <span className="mt-2 block space-y-0.5 text-sm text-slate-700">
+                  {m.steps.map((step, i) => (
+                    <span key={step} className="flex items-baseline gap-2">
+                      <span className="w-4 shrink-0 text-right font-semibold tabular-nums text-sky-700">{i + 1}</span>
+                      {step}
+                    </span>
+                  ))}
+                </span>
+                {/* Mukhang action (kulay ng brand + arrow), hindi plain na text
+                    (critique 2026-10-25) */}
+                <span className="mt-2 flex items-center gap-1 text-sm font-semibold text-sky-700">
+                  {selected ? (
+                    <>
+                      <Check className="h-4 w-4" aria-hidden="true" />
+                      Selected
+                    </>
+                  ) : (
+                    <>
+                      {m.cta}
+                      <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                    </>
+                  )}
                 </span>
               </span>
             </button>
@@ -79,14 +108,11 @@ export default function MigrationPage() {
       </div>
 
       <Suspense fallback={<PageLoader label="Loading..." />}>
-        {mode === 'manual' && <LegacyTreatmentEntry />}
+        {mode === 'manual' && <LegacyTreatmentEntry initialPatient={returned?.patient ?? null} />}
         {mode === 'bulk' && <BulkImportWizard />}
       </Suspense>
-      {!mode && (
-        <p className="rounded-xl border border-dashed border-slate-300 bg-white px-6 py-10 text-center text-base text-slate-500">
-          Choose how you want to bring in the old records.
-        </p>
-      )}
+      {/* Walang placeholder na kahon kapag wala pang napili: inuulit lang
+          nito ang dalawang card sa itaas (critique 2026-10-25) */}
     </div>
   )
 }

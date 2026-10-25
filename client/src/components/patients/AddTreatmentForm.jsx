@@ -2,6 +2,7 @@ import { useId, useLayoutEffect, useRef, useState } from 'react'
 import { ClipboardPlus, Grid3x3, Save } from 'lucide-react'
 import {
   PROCEDURES,
+  PROCEDURE_CATEGORIES,
   ALL_TEETH,
   TOOTH_SELECT_GROUPS,
   SURFACES,
@@ -196,26 +197,40 @@ export default function AddTreatmentForm({ onSubmit, guard, treatment }) {
           aria-required="true"
           aria-invalid={errors.procedureName ? true : undefined}
           aria-describedby={errors.procedureName ? `${ids.procedure}-error` : undefined}
-          // 17 na ang procedures (client visit): maikling pangalan (`short`,
-          // buo sa tooltip) at 2–5 column, para kita pa rin ang Save nang
-          // hindi nag-i-scroll sa laptop (1366×768). Nakaayos ayon sa grupo
-          // (Diagnostic → Cosmetic), tignan PROCEDURES sa dental.js.
-          className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5"
+          // 17 procedures (client visit), NAKA-GRUPO ayon sa category
+          // (Diagnostic → Cosmetic, PROCEDURE_CATEGORIES). Dati iisang patag na
+          // grid ng 17 button, kaya kailangang basahin lahat bago makita ang
+          // hinahanap (critique 2026-10-25). CSS columns: bawat grupo buo sa
+          // iisang column (break-inside-avoid), halos parehong taas ng dati.
+          className="columns-2 gap-x-3 sm:columns-3 lg:columns-4"
         >
-          {PROCEDURES.map((p, i) => (
-            <button
-              key={p.value}
-              ref={i === 0 ? firstProcedureRef : undefined}
-              type="button"
-              role="radio"
-              aria-checked={procedureName === p.value}
-              title={p.short ? p.value : undefined}
-              onClick={() => handleProcedureChange(p.value)}
-              className={choiceClass(procedureName === p.value, errors.procedureName)}
-            >
-              {p.short || p.value}
-            </button>
-          ))}
+          {PROCEDURE_CATEGORIES.map((cat) => {
+            const items = PROCEDURES.filter((p) => p.category === cat.code)
+            if (items.length === 0) return null
+            return (
+              <div key={cat.code} role="group" aria-label={cat.label} className="mb-3 break-inside-avoid">
+                <p className="mb-1 text-sm font-semibold text-slate-600" aria-hidden="true">
+                  {cat.label}
+                </p>
+                <div className="flex flex-col gap-1.5">
+                  {items.map((p) => (
+                    <button
+                      key={p.value}
+                      ref={p.value === PROCEDURES[0].value ? firstProcedureRef : undefined}
+                      type="button"
+                      role="radio"
+                      aria-checked={procedureName === p.value}
+                      title={p.short ? p.value : undefined}
+                      onClick={() => handleProcedureChange(p.value)}
+                      className={choiceClass(procedureName === p.value, errors.procedureName)}
+                    >
+                      {p.short || p.value}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )
+          })}
         </div>
         {/* Lumang procedure na wala na sa listahan (hal. "Crown / Bridge" o
             galing import): ipinapakita pa rin kapag ine-edit */}
@@ -256,8 +271,9 @@ export default function AddTreatmentForm({ onSubmit, guard, treatment }) {
               setErrors((prev) => ({ ...prev, toothNumber: undefined }))
             }}
           >
+            {/* Maikli: sa 390px, kalahati lang ng lapad ang field (katabi ng Date) */}
             <option value="" disabled>
-              Select a tooth...
+              Select...
             </option>
             <option value={ALL_TEETH}>All Teeth / Full Mouth</option>
             {TOOTH_SELECT_GROUPS.map((group) => (
@@ -307,7 +323,7 @@ export default function AddTreatmentForm({ onSubmit, guard, treatment }) {
         {needsSurfaces && (
           <div className="col-span-2 lg:col-span-1">
             <p id={ids.surfaces} className="mb-2 block text-base font-medium text-slate-700">
-              Surfaces <span className="font-normal text-slate-400">(for the chart)</span>
+              Surfaces <span className="font-normal text-slate-500">(for the chart)</span>
             </p>
             <div role="group" aria-labelledby={ids.surfaces} className="flex flex-wrap gap-2">
               {CHART_SURFACES.map((sf) => (
@@ -329,7 +345,7 @@ export default function AddTreatmentForm({ onSubmit, guard, treatment }) {
         {hasReasonChoice && (
           <div className="col-span-2 lg:col-span-1">
             <p id={ids.reason} className="mb-2 block text-base font-medium text-slate-700">
-              Reason <span className="font-normal text-slate-400">(for the chart)</span>
+              Reason <span className="font-normal text-slate-500">(for the chart)</span>
             </p>
             <div role="radiogroup" aria-labelledby={ids.reason} className="flex flex-wrap gap-2">
               {chartMap.conditions.map((code) => {
@@ -366,7 +382,7 @@ export default function AddTreatmentForm({ onSubmit, guard, treatment }) {
 
       <div>
         <label htmlFor={ids.notes} className="mb-1 block text-base font-medium text-slate-700">
-          Notes <span className="font-normal text-slate-400">(optional)</span>
+          Notes <span className="font-normal text-slate-500">(optional)</span>
         </label>
         <textarea
           id={ids.notes}
@@ -397,10 +413,15 @@ export default function AddTreatmentForm({ onSubmit, guard, treatment }) {
         </div>
       )}
 
+      {/* Sticky footer: laging kita ang Save/Cancel habang nag-i-scroll sa
+          loob ng modal (dati naputol ang Save sa 1366×768 nang madagdagan ang
+          allergy strip, critique 2026-10-25). Negative margin = padding ng
+          body ng Modal (px-4/sm:px-6, pb-4/sm:pb-5). */}
+      <div className="sticky -bottom-4 z-10 -mx-4 -mb-4 border-t border-slate-200 bg-white px-4 py-3 sm:-bottom-5 sm:-mx-6 sm:-mb-5 sm:px-6">
       {guard?.confirming ? (
         <DiscardChangesBar guard={guard} />
       ) : (
-        <div className="flex gap-2 pt-1">
+        <div className="flex gap-2">
           <button
             type="button"
             onClick={guard?.requestClose}
@@ -418,6 +439,7 @@ export default function AddTreatmentForm({ onSubmit, guard, treatment }) {
           </button>
         </div>
       )}
+      </div>
     </form>
   )
 }

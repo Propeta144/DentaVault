@@ -1,5 +1,6 @@
 import * as dashboardModel from '../models/dashboardModel.js'
 import * as auditLogModel from '../models/auditLogModel.js'
+import { listPatients } from '../models/patientModel.js'
 import { countUnreviewedEmailXrays } from '../models/xrayModel.js'
 import { recordAuditLog } from '../models/auditLogModel.js'
 import asyncHandler from '../utils/asyncHandler.js'
@@ -18,6 +19,8 @@ export const get = asyncHandler(async (req, res) => {
     conditionBreakdown,
     monthlyTrend,
     recentActivity,
+    recentPatients,
+    allergiesNotRecorded,
   ] = await Promise.all([
     dashboardModel.getActivePatientCount(),
     dashboardModel.getTreatmentsThisMonthCount(),
@@ -36,8 +39,17 @@ export const get = asyncHandler(async (req, res) => {
     auditLogModel.listAuditLogs({
       limit: 20,
       offset: 0,
-      excludeActions: ['VIEW_DASHBOARD', 'VIEW_AUDIT_LOG', 'LOGIN_SUCCESS', 'LOGOUT'],
+      excludeActions: [
+        'VIEW_DASHBOARD', 'VIEW_AUDIT_LOG', 'LOGIN_SUCCESS', 'LOGOUT',
+        // Account events, hindi records (dati puro "Changed own password")
+        'CHANGE_OWN_PASSWORD', 'PASSWORD_UPGRADE_REQUIRED',
+      ],
     }),
+    // Patient-first na simula (critique 2026-10-25): "sino ang susunod sa
+    // upuan" ang unang tanong ng dentist, hindi "kumusta ang clinic". Parehong
+    // "Recently seen" ng Ctrl+K (pinakabagong treatment muna).
+    listPatients({ sort: 'last_visit', limit: 6, offset: 0 }),
+    dashboardModel.getAllergiesNotRecorded({ limit: 5 }),
   ])
 
   await recordAuditLog({
@@ -52,5 +64,8 @@ export const get = asyncHandler(async (req, res) => {
     conditionBreakdown,
     monthlyTrend,
     recentActivity: recentActivity.rows,
+    // Walang numeric id sa response (Feature #7): patient_code lang
+    recentPatients: recentPatients.rows.map(({ id, ...rest }) => rest),
+    allergiesNotRecorded,
   })
 })

@@ -55,7 +55,7 @@ export default function LoginPage() {
           <BrandMark className="h-10 w-10 text-sky-300" />
           <div>
             <p className="text-lg font-semibold leading-tight">DentaVault</p>
-            <p className="text-sm text-slate-400">Teodosio-Rufin Dental Clinic</p>
+            <p className="text-sm text-slate-500">Teodosio-Rufin Dental Clinic</p>
           </div>
         </div>
 
@@ -123,7 +123,7 @@ export default function LoginPage() {
               Email
             </label>
             <div className="relative mb-4">
-              <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
               <input
                 id="login-email"
                 type="email"
@@ -139,7 +139,7 @@ export default function LoginPage() {
               Password
             </label>
             <div className="relative mb-6">
-              <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
               <input
                 id="login-password"
                 type={showPassword ? 'text' : 'password'}
@@ -155,7 +155,7 @@ export default function LoginPage() {
                 onClick={() => setShowPassword((v) => !v)}
                 aria-label={showPassword ? 'Hide password' : 'Show password'}
                 aria-pressed={showPassword}
-                className="absolute right-0 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-md text-slate-400 transition-colors hover:text-slate-700"
+                className="absolute right-0 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-md text-slate-500 transition-colors hover:text-slate-700"
               >
                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
@@ -188,7 +188,7 @@ export default function LoginPage() {
               <span className="font-medium text-slate-600">Forgot your password?</span> Contact the clinic for a
               temporary password. You&apos;ll set a new one right after you sign in.
             </p>
-            <p className="text-slate-400">To change a password you know, sign in and open your account menu.</p>
+            <p className="text-slate-500">To change a password you know, sign in and open your account menu.</p>
           </div>
         </div>
       </main>

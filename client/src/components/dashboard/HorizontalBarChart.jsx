@@ -9,12 +9,15 @@
 // ang nagsasabi kung ano 'yon, sunod sa "single series needs no legend box"
 // na rule. `legend` ({ label, color }[]): sariling legend kapag ang kulay
 // ay para sa GRUPO at hindi sa bawat bar (hal. procedure categories).
-export default function HorizontalBarChart({ data, showLegend = false, legend }) {
+// `minScale`: pinakamababang dulo ng scale. Dati ang pinakamalaking bilang
+// ang dulo, kaya kapag 2 ang max, kalahati na ng bar ang "1" (pinalalaki ang
+// maliliit na bilang, critique 2026-10-25).
+export default function HorizontalBarChart({ data, showLegend = false, legend, minScale = 1 }) {
   if (!data || data.length === 0 || data.every((d) => d.value === 0)) {
-    return <p className="text-sm text-slate-400">No data yet.</p>
+    return <p className="text-sm text-slate-600">No data yet.</p>
   }
 
-  const max = Math.max(...data.map((d) => d.value), 1)
+  const max = Math.max(...data.map((d) => d.value), minScale)
   const legendEntries = legend
     ? legend.map((l) => [l.label, l.color])
     : showLegend

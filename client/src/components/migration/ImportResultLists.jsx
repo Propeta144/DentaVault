@@ -63,7 +63,7 @@ export function ImportDetails({ result, dryRun, show = ['errors', 'created', 'tr
           {result.created.map((c) => (
             <li key={c.row}>
               Row {c.row}: {c.name}
-              {c.treatmentAdded && <span className="text-slate-400"> (with treatment)</span>}
+              {c.treatmentAdded && <span className="text-slate-500"> (with treatment)</span>}
             </li>
           ))}
         </Group>

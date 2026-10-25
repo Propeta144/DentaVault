@@ -32,7 +32,7 @@ export function healthAlerts(patient) {
 function Row({ label, value }) {
   return (
     <div className="min-w-0">
-      <dt className="text-xs font-medium uppercase tracking-wide text-slate-400">{label}</dt>
+      <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</dt>
       <dd className="break-words text-base text-slate-800">{value || '—'}</dd>
     </div>
   )
@@ -50,7 +50,8 @@ function Group({ title, children }) {
 // Buong "Patient Information Record" (papel na form ng clinic) sa profile.
 // Nakatiklop (`<details>`) para hindi humaba ang page; nasa summary ang mga
 // babala para kita kahit nakatiklop.
-export default function PatientInfoRecord({ patient }) {
+// forPatient: mas simpleng pamagat kapag ang pasyente mismo ang tumitingin
+export default function PatientInfoRecord({ patient, forPatient = false }) {
   const alerts = healthAlerts(patient)
   const questions = HEALTH_QUESTIONS.filter((q) => !q.womenOnly || patient.sex === 'female')
 
@@ -58,7 +59,9 @@ export default function PatientInfoRecord({ patient }) {
     <details className="group rounded-xl border border-slate-200 bg-white shadow-sm">
       <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 p-4 sm:px-6 [&::-webkit-details-marker]:hidden">
         <div className="min-w-0">
-          <h2 className="text-base font-semibold text-slate-900">Patient Information Record</h2>
+          <h2 className="text-base font-semibold text-slate-900">
+            {forPatient ? 'Your health information' : 'Patient Information Record'}
+          </h2>
           {alerts.length > 0 ? (
             <p className="mt-0.5 flex items-start gap-1.5 text-sm text-amber-800">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
@@ -68,7 +71,7 @@ export default function PatientInfoRecord({ patient }) {
             <p className="mt-0.5 text-sm text-slate-500">Personal details, dental history, physician, and health questions</p>
           )}
         </div>
-        <ChevronDown className="h-5 w-5 shrink-0 text-slate-400 transition-transform group-open:rotate-180" />
+        <ChevronDown className="h-5 w-5 shrink-0 text-slate-500 transition-transform group-open:rotate-180" />
       </summary>
 
       <div className="space-y-6 border-t border-slate-100 p-4 sm:p-6">
@@ -101,7 +104,7 @@ export default function PatientInfoRecord({ patient }) {
                 <li key={q.key} className="flex flex-col gap-1 px-3 py-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
                   <span className="text-base text-slate-700">{q.question}</span>
                   <span className="shrink-0 text-base font-medium text-slate-900 sm:text-right">
-                    {answer || <span className="font-normal text-slate-400">Not asked</span>}
+                    {answer || <span className="font-normal text-slate-500">Not asked</span>}
                     {details && <span className="block text-sm font-normal text-slate-600">{details}</span>}
                   </span>
                 </li>

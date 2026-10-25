@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { UserPlus } from 'lucide-react'
 import PatientForm from '../components/patients/PatientForm'
 import { createPatient } from '../services/patients'
@@ -8,9 +8,12 @@ import { PROFILE_PATH, profileState } from '../utils/selectedPatient'
 
 export default function PatientRegisterPage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { showToast } = useToast()
+  // Galing sa Migration → Manual Entry: babalik doon pagkatapos (o pag-Cancel)
+  const fromMigration = location.state?.returnTo === 'migration-manual'
   // Babala bago mawala ang na-type (Cancel, o pagsara/refresh ng tab)
-  const guard = useDiscardGuard(() => navigate('/patients'), { warnOnUnload: true })
+  const guard = useDiscardGuard(() => navigate(fromMigration ? '/migration' : '/patients'), { warnOnUnload: true })
 
   async function handleSubmit(form, { allowDuplicate }) {
     try {
@@ -18,6 +21,10 @@ export default function PatientRegisterPage() {
       showToast(`${patient.first_name} ${patient.last_name} registered successfully.`, {
         type: 'success',
       })
+      if (fromMigration) {
+        navigate('/migration', { state: { mode: 'manual', patient } })
+        return
+      }
       navigate(PROFILE_PATH, { state: profileState(patient.patient_code) })
     } catch (err) {
       // 409 duplicate: ipinapakita na ng PatientForm bilang babala (hindi error)
@@ -35,8 +42,9 @@ export default function PatientRegisterPage() {
           <UserPlus className="h-6 w-6 text-sky-600" />
           Register New Patient
         </h1>
-        <p className="text-base text-slate-500">
+        <p className="text-base text-slate-600">
           Fields marked <span className="text-red-600">*</span> are required.
+          {fromMigration && ' After saving, you’ll go back to Manual Entry to add their past visits.'}
         </p>
       </div>
       <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">

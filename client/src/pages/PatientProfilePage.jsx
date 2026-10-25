@@ -37,7 +37,7 @@ import EmptyState from '../components/common/EmptyState'
 import StatusBadge from '../components/common/StatusBadge'
 import Odontogram2D from '../components/chart/Odontogram2D'
 import { ALL_TEETH, surfaceLetters } from '../constants/dental'
-import MedicalAlertBadge from '../components/common/MedicalAlertBadge'
+import MedicalAlertBadge, { PatientAlertStrip } from '../components/common/MedicalAlertBadge'
 import PageLoader from '../components/common/PageLoader'
 import { useSelectedPatientCode, openPrintTab, profileState, PROFILE_PATH } from '../utils/selectedPatient'
 import { fullName, sexLabel } from '../utils/patientName'
@@ -57,7 +57,7 @@ function PatientDetails({ patient, portalAccount, showPortal }) {
     { icon: MapPin, label: 'Address', value: patient.address },
     {
       icon: Contact,
-      label: 'Emergency Contact',
+      label: 'Emergency contact',
       value: patient.emergency_contact_name
         ? `${patient.emergency_contact_name}${patient.emergency_contact_phone ? ` · ${patient.emergency_contact_phone}` : ''}`
         : null,
@@ -66,7 +66,7 @@ function PatientDetails({ patient, portalAccount, showPortal }) {
   if (showPortal) {
     items.push({
       icon: KeyRound,
-      label: 'Patient Portal',
+      label: 'Patient portal',
       value: portalAccount === undefined ? '…' : portalAccount ? portalAccount.email : 'No account yet',
       truncate: true,
     })
@@ -82,14 +82,16 @@ function PatientDetails({ patient, portalAccount, showPortal }) {
           break-words ang email sa gitna ng salita sa makitid na column */}
       {items.map(({ icon: Icon, label, value, truncate }) => (
         <div key={label} className="flex min-w-0 items-start gap-2.5">
-          <Icon className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" aria-hidden="true" />
+          <Icon className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" aria-hidden="true" />
           <div className="min-w-0">
-            <dt className="text-xs font-medium uppercase tracking-wide text-slate-400">{label}</dt>
+            {/* Sentence case at mas madilim (dati maliit na uppercase sa
+                slate-400, 2.7:1 lang ang contrast) */}
+            <dt className="text-sm text-slate-600">{label}</dt>
             <dd
-              className={`text-base text-slate-800 ${truncate ? 'truncate' : 'break-words'}`}
+              className={`text-base ${value ? 'text-slate-900' : 'text-slate-500'} ${truncate ? 'truncate' : 'break-words'}`}
               title={truncate && value ? value : undefined}
             >
-              {value || '—'}
+              {value || 'Not provided'}
             </dd>
           </div>
         </div>
@@ -199,8 +201,35 @@ export default function PatientProfilePage() {
 
   const tabClass = (name) =>
     `flex min-h-11 flex-1 items-center justify-center gap-1.5 whitespace-nowrap border-b-2 px-1 pb-2 text-base font-medium transition-colors sm:flex-none ${
-      tab === name ? 'border-sky-600 text-sky-700' : 'border-transparent text-slate-500 hover:text-slate-700'
+      tab === name ? 'border-sky-600 text-sky-700' : 'border-transparent text-slate-600 hover:text-slate-900'
     }`
+
+  // Tabs (WAI-ARIA): ←/→ (at Home/End) para lumipat, isang Tab stop lang
+  // ang buong tablist (critique 2026-10-25: dati bawat tab ay hiwalay na stop).
+  const TAB_ORDER = ['history', 'chart', 'xrays']
+  function handleTabKeyDown(e) {
+    const i = TAB_ORDER.indexOf(tab)
+    let next = null
+    if (e.key === 'ArrowRight') next = TAB_ORDER[(i + 1) % TAB_ORDER.length]
+    else if (e.key === 'ArrowLeft') next = TAB_ORDER[(i - 1 + TAB_ORDER.length) % TAB_ORDER.length]
+    else if (e.key === 'Home') next = TAB_ORDER[0]
+    else if (e.key === 'End') next = TAB_ORDER[TAB_ORDER.length - 1]
+    if (!next) return
+    e.preventDefault()
+    setTab(next)
+    document.getElementById(`profile-tab-${next}`)?.focus()
+  }
+  const tabProps = (name) => ({
+    id: `profile-tab-${name}`,
+    type: 'button',
+    role: 'tab',
+    'aria-selected': tab === name,
+    'aria-controls': 'profile-tabpanel',
+    tabIndex: tab === name ? 0 : -1,
+    className: tabClass(name),
+    onClick: () => setTab(name),
+  })
+  const alerts = { allergies: patient.allergies, medicalHistory: patient.medical_history }
 
   const moreActions = [
     portalAccount === null && {
@@ -227,20 +256,70 @@ export default function PatientProfilePage() {
     </button>
   )
 
+  // Chart at X-rays tab: maikling header (critique 2026-10-25). Dati ~310px
+  // ang buong header (allergies + 5 contact) sa bawat tab, kaya nasa ilalim
+  // ng fold ang mga ngipin sa 1366×768. Ang contact details ay nasa ibaba.
+  const compactHeader = tab !== 'history'
+  const healthNotes = healthAlerts(patient)
+
   return (
     <div className="w-full space-y-6">
-      {/* ================= HEADER: buod ng patient + actions =================
+      {compactHeader ? (
+        // Sticky (tablet pataas): laging kita ang pangalan at allergies habang
+        // nag-chart. Tablet: nasa ilalim ng top bar (h-16). Phone: hindi
+        // sticky, dahil kakainin nito ang maliit na screen.
+        <section
+          aria-label="Patient summary"
+          className="z-20 rounded-xl border border-slate-200 bg-white/95 px-4 py-3 shadow-sm backdrop-blur md:sticky md:top-[4.5rem] lg:top-4"
+        >
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+            <div className="flex min-w-0 items-center gap-3">
+              <Avatar firstName={patient.first_name} lastName={patient.last_name} size="sm" />
+              <div className="min-w-0">
+                <h1 className="truncate text-lg font-semibold text-slate-900">{fullName(patient)}</h1>
+                <p className="text-sm text-slate-600">
+                  {age !== null && `${age} yrs · `}
+                  {sexLabel(patient.sex)}
+                </p>
+              </div>
+            </div>
+            <div className="min-w-0 flex-1 basis-60">
+              <PatientAlertStrip {...alerts} />
+              {healthNotes.length > 0 && (
+                <p className="mt-1 text-sm text-amber-900">
+                  <span className="font-semibold">Health:</span> {healthNotes.join(' · ')}
+                </p>
+              )}
+            </div>
+            {isDentist && (
+              <div className="flex items-center gap-2">
+                {addTreatmentButton()}
+                <button
+                  type="button"
+                  onClick={() => setEditing(true)}
+                  aria-label="Edit patient details"
+                  className="flex h-11 w-11 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-700 transition-colors hover:bg-slate-50"
+                >
+                  <Pencil className="h-4 w-4" />
+                </button>
+                <DropdownMenu label="More patient actions" items={moreActions} />
+              </div>
+            )}
+          </div>
+        </section>
+      ) : (
+      /* ================= HEADER: buod ng patient + actions =================
           Dati pangalan lang ang header; nasa kaliwang kahon ang edad,
           kasarian, at allergies, at nasa ilalim pa ang mga action. Ngayon
           isang tingin lang: sino, ilang taon, may allergy ba, at ano ang
-          puwedeng gawin. */}
+          puwedeng gawin. (Treatment History tab lang; tingnan compactHeader) */
       <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex min-w-0 items-center gap-4">
             <Avatar firstName={patient.first_name} lastName={patient.last_name} size="lg" />
             <div className="min-w-0">
               {!isDentist && (
-                <p className="text-sm font-medium text-sky-700">Hi, {patient.first_name}! This is your dental record.</p>
+                <p className="text-pretty text-sm font-medium text-sky-700">Hi, {patient.first_name}! This is your dental record.</p>
               )}
               <h1 className="break-words text-2xl font-semibold text-slate-900">{fullName(patient)}</h1>
               <p className="mt-0.5 text-base text-slate-500">
@@ -280,15 +359,15 @@ export default function PatientProfilePage() {
             treatment (pula kapag may laman). */}
         <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
           <MedicalAlertBadge label="Allergies" value={patient.allergies} />
-          <MedicalAlertBadge label="Medical History" value={patient.medical_history} />
+          <MedicalAlertBadge label="Medical history" value={patient.medical_history} tone="caution" />
         </div>
         {/* Mahahalagang sagot sa Health Questions (hal. buntis, umiinom ng
             gamot), para kita bago mag-treatment kahit nakatiklop ang record */}
-        {healthAlerts(patient).length > 0 && (
+        {healthNotes.length > 0 && (
           <p className="mt-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
             <span>
-              <span className="font-semibold">Health questions:</span> {healthAlerts(patient).join(' · ')}
+              <span className="font-semibold">Health questions:</span> {healthNotes.join(' · ')}
             </span>
           </p>
         )}
@@ -297,42 +376,55 @@ export default function PatientProfilePage() {
           <PatientDetails patient={patient} portalAccount={portalAccount} showPortal={isDentist} />
         </div>
       </section>
+      )}
 
       {/* ================= TABS: buong lapad =================
           Dati 8/12 lang ng lapad (may Patient Details sa kaliwa), kaya
           maliit ang Dental Chart sa laptop. */}
       <section className="min-h-[420px] rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
         {/* 320px: mas maliit na gap at walang icon para kasya ang 3 tab nang walang scroll */}
-        <div className="mb-6 flex gap-2 overflow-x-auto border-b border-slate-200 min-[360px]:gap-4 sm:gap-6" role="tablist">
-          <button type="button" role="tab" aria-selected={tab === 'history'} className={tabClass('history')} onClick={() => setTab('history')}>
-            <ClipboardList className="hidden h-4 w-4 min-[360px]:block" />
-            {/* Maikling label sa phone para kasya ang 3 tab — dati natatago ang X-rays */}
+        <div
+          className="mb-6 flex gap-2 overflow-x-auto border-b border-slate-200 min-[360px]:gap-4 sm:gap-6"
+          role="tablist"
+          aria-label="Patient record"
+          onKeyDown={handleTabKeyDown}
+        >
+          <button {...tabProps('history')}>
+            <ClipboardList className="hidden h-4 w-4 min-[360px]:block" aria-hidden="true" />
+            {/* Maikling label sa phone para kasya ang 3 tab (dati natatago ang X-rays) */}
             <span className="sm:hidden">History</span>
             <span className="hidden sm:inline">Treatment History</span>
           </button>
-          <button type="button" role="tab" aria-selected={tab === 'chart'} className={tabClass('chart')} onClick={() => setTab('chart')}>
-            <Grid3x3 className="hidden h-4 w-4 min-[360px]:block" />
+          <button {...tabProps('chart')}>
+            <Grid3x3 className="hidden h-4 w-4 min-[360px]:block" aria-hidden="true" />
             <span className="sm:hidden">Chart</span>
             <span className="hidden sm:inline">Dental Chart</span>
           </button>
-          <button type="button" role="tab" aria-selected={tab === 'xrays'} className={tabClass('xrays')} onClick={() => setTab('xrays')}>
-            <ScanLine className="hidden h-4 w-4 min-[360px]:block" />
+          <button {...tabProps('xrays')}>
+            <ScanLine className="hidden h-4 w-4 min-[360px]:block" aria-hidden="true" />
             X-rays
           </button>
         </div>
+
+        <div id="profile-tabpanel" role="tabpanel" aria-labelledby={`profile-tab-${tab}`}>
+        {/* Heading ng bawat tab (para sa screen reader; ang tab mismo ang
+            nakikitang pamagat). Dati h1 → h3 agad (walang h2). */}
+        <h2 className="sr-only">
+          {tab === 'history' ? 'Treatment History' : tab === 'chart' ? 'Dental Chart' : 'X-rays'}
+        </h2>
 
         {/* Tab 1: Treatment History */}
         {tab === 'history' && (
           <div className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-sm text-slate-500">
+              <p className="text-sm text-slate-600">
                 {treatments.length} treatment{treatments.length === 1 ? '' : 's'} on record
               </p>
               {treatments.length > 0 && (
                 <button
                   type="button"
                   onClick={() => openPrintTab(`${PROFILE_PATH}/summary`, profileState(id))}
-                  className="flex min-h-11 items-center gap-1.5 rounded-md px-2 text-base font-medium text-slate-500 transition-colors hover:bg-slate-50 hover:text-sky-700"
+                  className="flex min-h-11 items-center gap-1.5 rounded-md px-2 text-base font-medium text-slate-600 transition-colors hover:bg-slate-50 hover:text-sky-700"
                 >
                   <Printer className="h-4 w-4" />
                   Print Summary
@@ -353,16 +445,14 @@ export default function PatientProfilePage() {
                 action={isDentist && addTreatmentButton()}
               />
             ) : (
-              // Timeline: petsa sa kaliwa (desktop), pinakabago sa itaas
-              <ol className="space-y-3">
+              // Timeline: petsa sa kaliwa (desktop), pinakabago sa itaas.
+              // Guhit sa pagitan, hindi card bawat isa (card-in-card dati).
+              <ol className="divide-y divide-slate-100 border-y border-slate-100">
                 {treatments.map((t) => (
-                  <li
-                    key={t.id}
-                    className="flex flex-col gap-1 rounded-lg border border-slate-200 bg-white p-4 sm:flex-row sm:gap-5"
-                  >
+                  <li key={t.id} className="flex flex-col gap-1 py-4 sm:flex-row sm:gap-5">
                     <time
                       dateTime={t.treatment_date}
-                      className="shrink-0 text-sm font-medium text-slate-500 sm:w-28 sm:pt-0.5"
+                      className="shrink-0 text-sm font-medium tabular-nums text-slate-600 sm:w-28 sm:pt-0.5"
                     >
                       {formatDate(t.treatment_date)}
                     </time>
@@ -375,15 +465,17 @@ export default function PatientProfilePage() {
                             {t.surfaces ? ` · ${surfaceLetters(t.surfaces)}` : ''}
                           </StatusBadge>
                         )}
-                        {/* Naka-sync sa 2D/3D chart (Feature #30) */}
+                        {/* Naka-sync sa 2D/3D chart (Feature #30). Sa patient, buong
+                            salita ("On chart" ay jargon para sa kanya, critique 2026-10-25) */}
                         {Number(t.chart_entry_count) > 0 && (
                           <StatusBadge variant="slate" icon={Grid3x3}>
-                            On chart
+                            {isDentist ? 'On chart' : 'Shown on your dental chart'}
                           </StatusBadge>
                         )}
                       </div>
-                      {t.notes && <p className="mt-1 text-base text-slate-600">{t.notes}</p>}
-                      <p className="mt-1 text-sm text-slate-400">by {t.dentist_name}</p>
+                      {t.notes && <p className="mt-1 text-base text-slate-700">{t.notes}</p>}
+                      {/* Walang "by Dr. ...": iisa lang ang dentist account, kaya
+                          paulit-ulit lang ito sa bawat entry (critique 2026-10-25) */}
                     </div>
                     {isDentist && (
                       <div className="-mr-2 -mt-2 self-end sm:self-start">
@@ -417,8 +509,9 @@ export default function PatientProfilePage() {
                     }
                     setChartView('2d')
                   }}
-                  className={`flex min-h-9 items-center gap-1.5 rounded-md px-3 text-sm font-medium transition-colors ${
-                    chartView === '2d' ? 'bg-white text-sky-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                  aria-pressed={chartView === '2d'}
+                  className={`flex min-h-11 items-center gap-1.5 rounded-md px-3 text-sm font-medium transition-colors ${
+                    chartView === '2d' ? 'bg-white text-sky-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
                   <LayoutGrid className="h-4 w-4" />
@@ -427,8 +520,9 @@ export default function PatientProfilePage() {
                 <button
                   type="button"
                   onClick={() => setChartView('3d')}
-                  className={`flex min-h-9 items-center gap-1.5 rounded-md px-3 text-sm font-medium transition-colors ${
-                    chartView === '3d' ? 'bg-white text-sky-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                  aria-pressed={chartView === '3d'}
+                  className={`flex min-h-11 items-center gap-1.5 rounded-md px-3 text-sm font-medium transition-colors ${
+                    chartView === '3d' ? 'bg-white text-sky-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
                   <Box className="h-4 w-4" />
@@ -441,7 +535,7 @@ export default function PatientProfilePage() {
                 onClick={() =>
                   openPrintTab(`${PROFILE_PATH}/chart/${chartView === '3d' ? 'print-3d' : 'print'}`, profileState(id))
                 }
-                className="flex min-h-11 items-center gap-1.5 rounded-md px-2 text-base font-medium text-slate-500 transition-colors hover:bg-slate-50 hover:text-sky-700"
+                className="flex min-h-11 items-center gap-1.5 rounded-md px-2 text-base font-medium text-slate-600 transition-colors hover:bg-slate-50 hover:text-sky-700"
               >
                 <Printer className="h-4 w-4" />
                 Print Chart
@@ -450,10 +544,10 @@ export default function PatientProfilePage() {
 
             <div className="overflow-x-auto">
               {chartView === '2d' ? (
-                <Odontogram2D patientId={id} canEdit={isDentist} />
+                <Odontogram2D patientId={id} canEdit={isDentist} alerts={alerts} />
               ) : (
                 <Suspense fallback={<PageLoader label="Loading 3D chart..." />}>
-                  <Odontogram3D patientId={id} canEdit={isDentist} onPendingChange={setHas3DPendingDrawing} />
+                  <Odontogram3D patientId={id} canEdit={isDentist} onPendingChange={setHas3DPendingDrawing} alerts={alerts} />
                 </Suspense>
               )}
             </div>
@@ -464,25 +558,30 @@ export default function PatientProfilePage() {
 
         {/* Tab 3: X-rays */}
         {tab === 'xrays' && <PatientXraysSection patientId={id} />}
+        </div>
       </section>
 
-      {/* Phone lang: contact details sa ilalim ng tabs */}
-      <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm lg:hidden">
+      {/* Contact details sa ilalim ng tabs: sa phone/tablet palagi, at sa
+          laptop kapag maikli ang header (Chart / X-rays tab) */}
+      <section className={`rounded-xl border border-slate-200 bg-white p-4 shadow-sm ${compactHeader ? '' : 'lg:hidden'}`}>
         <h2 className="mb-4 text-base font-semibold text-slate-900">Contact Details</h2>
         <PatientDetails patient={patient} portalAccount={portalAccount} showPortal={isDentist} />
       </section>
 
       {/* Buong Patient Information Record (papel na form ng clinic): nakatiklop */}
-      <PatientInfoRecord patient={patient} />
+      <PatientInfoRecord patient={patient} forPatient={!isDentist} />
 
       {/* MODALS */}
       {addingTreatment && (
         // max-w-4xl: 5 column ng procedure buttons (17 procedures), kaya kasya
         // ang buong form (pati Save) sa 768px na taas ng laptop
+        // notice: allergies/medical history laging kita habang nagre-record
+        // (dati natatakpan ng modal ang header ng profile)
         <Modal
-          title={`Add Treatment — ${fullName(patient)}`}
+          title={`Add Treatment for ${fullName(patient)}`}
           onClose={addTreatmentGuard.requestClose}
           maxWidth="max-w-4xl"
+          notice={<PatientAlertStrip {...alerts} />}
         >
           <AddTreatmentForm onSubmit={handleAddTreatment} guard={addTreatmentGuard} />
         </Modal>
@@ -490,9 +589,10 @@ export default function PatientProfilePage() {
 
       {editingTreatment && (
         <Modal
-          title={`Edit Treatment — ${fullName(patient)}`}
+          title={`Edit Treatment for ${fullName(patient)}`}
           onClose={editTreatmentGuard.requestClose}
           maxWidth="max-w-4xl"
+          notice={<PatientAlertStrip {...alerts} />}
         >
           <AddTreatmentForm treatment={editingTreatment} onSubmit={handleEditTreatment} guard={editTreatmentGuard} />
         </Modal>

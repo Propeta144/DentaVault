@@ -5,6 +5,7 @@ import { useToast } from '../../context/ToastContext'
 import { formatDate } from '../../utils/formatDate'
 
 const EMPTY = { items: [], molarClass: '', appliancesOther: '' }
+const PERIODONTITIS_STAGES = ['early_periodontitis', 'moderate_periodontitis', 'advanced_periodontitis']
 
 function toForm(exam) {
   if (!exam) return EMPTY
@@ -48,8 +49,17 @@ export default function IntraoralExam({ patientId, canEdit, printMode = false })
   const dirty = JSON.stringify(form) !== JSON.stringify(saved)
   const hasAny = INTRAORAL_GROUPS.some((g) => groupSummary(g, saved).length > 0)
 
+  // Ang tatlong stage ng periodontitis ay iisa lang ang puwede (hindi puwedeng
+  // sabay "Early" at "Advanced"): ang pag-check ng isa ay nag-aalis ng iba.
+  // Hiwalay pa rin ang Gingivitis.
   function toggle(code) {
-    setForm((f) => ({ ...f, items: f.items.includes(code) ? f.items.filter((i) => i !== code) : [...f.items, code] }))
+    setForm((f) => {
+      if (f.items.includes(code)) return { ...f, items: f.items.filter((i) => i !== code) }
+      const others = PERIODONTITIS_STAGES.includes(code)
+        ? f.items.filter((i) => !PERIODONTITIS_STAGES.includes(i))
+        : f.items
+      return { ...f, items: [...others, code] }
+    })
   }
 
   async function save() {
@@ -86,16 +96,14 @@ export default function IntraoralExam({ patientId, canEdit, printMode = false })
   }
 
   return (
-    <section className="mt-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5" aria-labelledby={`${formId}-title`}>
+    // Hindi na hiwalay na card: nasa loob na ito ng card ng tabs (card-in-card
+    // dati, critique 2026-10-25). Guhit na lang ang naghihiwalay sa chart.
+    <section className="mt-6 border-t border-slate-200 pt-5" aria-labelledby={`${formId}-title`}>
       <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-        <h3 id={`${formId}-title`} className="text-base font-semibold text-slate-900">
+        <h3 id={`${formId}-title`} className="text-lg font-semibold text-slate-900">
           Intraoral Examination
         </h3>
-        {exam && (
-          <p className="text-sm text-slate-400">
-            Updated {formatDate(exam.updated_at)} by {exam.updated_by_name}
-          </p>
-        )}
+        {exam && <p className="text-sm text-slate-600">Updated {formatDate(exam.updated_at)}</p>}
       </div>
 
       {!canEdit ? (
@@ -103,7 +111,7 @@ export default function IntraoralExam({ patientId, canEdit, printMode = false })
           <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {INTRAORAL_GROUPS.map((g) => (
               <div key={g.code}>
-                <dt className="text-xs font-medium uppercase tracking-wide text-slate-400">{g.label}</dt>
+                <dt className="text-sm font-medium text-slate-600">{g.label}</dt>
                 <dd className="text-base text-slate-800">{groupSummary(g, saved).join(', ') || '—'}</dd>
               </div>
             ))}
@@ -125,7 +133,7 @@ export default function IntraoralExam({ patientId, canEdit, printMode = false })
                       onChange={(e) => setForm((f) => ({ ...f, molarClass: e.target.value }))}
                       className="min-h-11 rounded-md border border-slate-300 bg-white px-2 text-base text-slate-900 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-100"
                     >
-                      <option value="">—</option>
+                      <option value="">Not set</option>
                       {MOLAR_CLASSES.map((c) => (
                         <option key={c} value={c}>
                           Class {c}
@@ -140,7 +148,7 @@ export default function IntraoralExam({ patientId, canEdit, printMode = false })
                       type="checkbox"
                       checked={form.items.includes(item.code)}
                       onChange={() => toggle(item.code)}
-                      className="h-5 w-5 accent-sky-600"
+                      className="h-6 w-6 shrink-0 accent-sky-600"
                     />
                     {item.label}
                   </label>
@@ -152,7 +160,7 @@ export default function IntraoralExam({ patientId, canEdit, printMode = false })
                     value={form.appliancesOther}
                     maxLength={150}
                     onChange={(e) => setForm((f) => ({ ...f, appliancesOther: e.target.value }))}
-                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2.5 text-base text-slate-900 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2.5 text-base text-slate-900 placeholder:text-slate-500 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-100"
                   />
                 )}
               </fieldset>

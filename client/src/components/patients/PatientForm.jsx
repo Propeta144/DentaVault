@@ -194,7 +194,7 @@ function YesNoQuestion({ number, question, value, onChange, children }) {
     <div className="rounded-lg border border-slate-200 px-3 py-2.5">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <p id={labelId} className="text-base text-slate-700">
-          <span className="mr-1 text-slate-400">{number}.</span>
+          <span className="mr-1 text-slate-500">{number}.</span>
           {question}
         </p>
         <div role="radiogroup" aria-labelledby={labelId} className="grid shrink-0 grid-cols-2 gap-2 sm:w-44">
@@ -416,6 +416,34 @@ export default function PatientForm({
         </Field>
       )}
 
+      {/* Allergies + Medical History: kasunod agad ng pangalan (critique
+          2026-10-25). Dati nasa pinakadulo, pagkatapos ng ~30 field at Blood
+          Pressure, kahit ito lang ang required na pang-kaligtasan. Nauuna ang
+          Allergies (puwedeng anaphylaxis). */}
+      <SectionHeading icon={ClipboardList}>Allergies &amp; Medical History</SectionHeading>
+
+      {/* Dropdown na may listahan (constants/medicalOptions.js) at puwede ring
+          mag-type ng wala sa listahan. May sariling label/id ang component. */}
+      <ComboboxListInput
+        label="Allergies"
+        required
+        error={fieldErrors.allergies}
+        value={form.allergies}
+        onChange={(val) => update('allergies', val)}
+        groups={ALLERGY_OPTIONS}
+        hint='Pick from the list or type your own. Tap "None" if the patient has no known allergies.'
+        maxLength={FIELD_LIMITS.allergies}
+      />
+
+      <ComboboxListInput
+        label="Medical History"
+        value={form.medicalHistory}
+        onChange={(val) => update('medicalHistory', val)}
+        groups={MEDICAL_HISTORY_OPTIONS}
+        hint="Pick from the list or type your own and press Enter. You can add more than one."
+        maxLength={FIELD_LIMITS.medicalHistory}
+      />
+
       <SectionHeading icon={Phone}>Contact Details</SectionHeading>
 
       {/* autoComplete="off" sa mga detalye ng PATIENT: ang dentist ang
@@ -515,7 +543,7 @@ export default function PatientForm({
             maxLength={FIELD_LIMITS.previousDentist}
             autoComplete="off"
             autoCapitalize="words"
-            placeholder="Dr."
+            placeholder="e.g. Dr. Santos"
             onChange={(e) => update('previousDentist', e.target.value)}
           />
         </Field>
@@ -534,7 +562,7 @@ export default function PatientForm({
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {[
-          ['physicianName', 'Name of Physician', 'words', 'Dr.'],
+          ['physicianName', 'Name of Physician', 'words', 'e.g. Dr. Reyes'],
           ['physicianSpecialty', 'Specialty, if applicable', 'words'],
           ['physicianOfficeAddress', 'Office Address', 'words'],
           ['physicianOfficeNumber', 'Office Number', 'none'],
@@ -622,30 +650,6 @@ export default function PatientForm({
           />
         </Field>
       </div>
-
-      <SectionHeading icon={ClipboardList}>Medical</SectionHeading>
-
-      {/* Dropdown na may listahan (constants/medicalOptions.js) at puwede ring
-          mag-type ng wala sa listahan. May sariling label/id ang component. */}
-      <ComboboxListInput
-        label="Medical History"
-        value={form.medicalHistory}
-        onChange={(val) => update('medicalHistory', val)}
-        groups={MEDICAL_HISTORY_OPTIONS}
-        hint="Pick from the list or type your own and press Enter. You can add more than one."
-        maxLength={FIELD_LIMITS.medicalHistory}
-      />
-
-      <ComboboxListInput
-        label="Allergies"
-        required
-        error={fieldErrors.allergies}
-        value={form.allergies}
-        onChange={(val) => update('allergies', val)}
-        groups={ALLERGY_OPTIONS}
-        hint='Pick from the list or type your own. Tap "None" if the patient has no known allergies.'
-        maxLength={FIELD_LIMITS.allergies}
-      />
 
       {/* stickyFooter (Register page lang): laging kita ang Save/Cancel
           habang nag-i-scroll sa mahabang form. Ang negative margins ay

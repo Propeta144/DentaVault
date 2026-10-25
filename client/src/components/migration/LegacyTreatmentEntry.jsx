@@ -50,7 +50,7 @@ function PatientPicker({ onPick }) {
         Whose paper record is this?
       </label>
       <div className="relative">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
         <input
           id={searchId}
           type="search"
@@ -65,7 +65,7 @@ function PatientPicker({ onPick }) {
         <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200">
           {loading && results.length === 0 && <li className="px-4 py-3 text-sm text-slate-500">Searching...</li>}
           {!loading && results.length === 0 && (
-            <li className="px-4 py-3 text-sm text-slate-500">No patient with that name yet. Register them first.</li>
+            <li className="px-4 py-3 text-sm text-slate-600">No patient with that name yet. Register them below.</li>
           )}
           {results.map((p) => (
             <li key={p.patient_code}>
@@ -81,28 +81,36 @@ function PatientPicker({ onPick }) {
                     {calculateAge(p.date_of_birth)} yrs · Born {formatDate(p.date_of_birth)}
                   </span>
                 </span>
-                <ArrowRight className="h-4 w-4 text-slate-400" />
+                <ArrowRight className="h-4 w-4 text-slate-500" />
               </button>
             </li>
           ))}
         </ul>
       )}
-      <p className="text-sm text-slate-500">
+      {/* returnTo: pagka-register, babalik dito na napili na ang bagong
+          patient (dati: "Register first, then come back here", kailangang
+          tandaan at hanapin ulit, critique 2026-10-25) */}
+      <p className="text-sm text-slate-600">
         Not in DentaVault yet?{' '}
-        <Link to="/patients/new" className="inline-flex min-h-11 items-center gap-1 font-medium text-sky-700 hover:underline">
+        <Link
+          to="/patients/new"
+          state={{ returnTo: 'migration-manual' }}
+          className="inline-flex min-h-11 items-center gap-1 font-medium text-sky-700 hover:underline"
+        >
           <UserPlus className="h-4 w-4" />
-          Register the patient first
-        </Link>
-        , then come back here.
+          Register the patient
+        </Link>{' '}
+        and you&apos;ll come right back here to add their visits.
       </p>
     </div>
   )
 }
 
-export default function LegacyTreatmentEntry() {
+// initialPatient: galing sa Register (returnTo), napili na agad
+export default function LegacyTreatmentEntry({ initialPatient = null }) {
   const { showToast } = useToast()
   const baseId = useId()
-  const [patient, setPatient] = useState(null)
+  const [patient, setPatient] = useState(initialPatient)
   const [rows, setRows] = useState(() => [emptyRow()])
   const [errors, setErrors] = useState({})
   const [serverError, setServerError] = useState('')
@@ -220,7 +228,7 @@ export default function LegacyTreatmentEntry() {
                         type="button"
                         onClick={() => setRows((prev) => prev.filter((x) => x.key !== r.key))}
                         aria-label={`Remove visit ${i + 1}`}
-                        className="flex h-11 w-11 items-center justify-center rounded-md text-slate-400 hover:bg-red-50 hover:text-red-700"
+                        className="flex h-11 w-11 items-center justify-center rounded-md text-slate-500 hover:bg-red-50 hover:text-red-700"
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>

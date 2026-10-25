@@ -47,7 +47,7 @@ export function ToastProvider({ children }) {
               type="button"
               onClick={() => dismiss(t.id)}
               aria-label="Dismiss notification"
-              className="-m-2.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-slate-400 hover:text-slate-600"
+              className="-m-2.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-slate-500 hover:text-slate-600"
             >
               <X className="h-4 w-4" />
             </button>

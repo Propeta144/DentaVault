@@ -30,7 +30,7 @@ export default function CompareView({ xrays, onClose }) {
         {xrays.map((xray, i) => (
           <div key={xray.id} className="flex-1 overflow-auto text-center">
             <p className="mb-2 text-sm text-slate-300">
-              {formatDate(xray.taken_date || xray.created_at)} — {xray.original_filename}
+              {formatDate(xray.taken_date || xray.created_at)} · {xray.original_filename}
             </p>
             {urls[i] && (
               <img src={urls[i]} alt={xray.original_filename} className="mx-auto max-w-full" />

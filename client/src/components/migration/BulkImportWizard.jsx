@@ -70,10 +70,10 @@ function Stepper({ step }) {
               >
                 {done ? <Check className="h-4 w-4" /> : i + 1}
               </span>
-              <span className="mt-1 block text-xs text-slate-400">Step {i + 1}</span>
+              <span className="mt-1 block text-xs text-slate-500">Step {i + 1}</span>
               <span
                 className={`block text-sm font-medium leading-tight ${
-                  done ? 'text-emerald-700' : current ? 'text-sky-700' : 'text-slate-400'
+                  done ? 'text-emerald-700' : current ? 'text-sky-700' : 'text-slate-500'
                 }`}
               >
                 {label}
@@ -197,7 +197,7 @@ export default function BulkImportWizard() {
             }}
             className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-slate-300 bg-slate-50 px-4 py-10 text-center transition-colors hover:border-sky-400 hover:bg-sky-50"
           >
-            <Upload className="h-7 w-7 text-slate-400" />
+            <Upload className="h-7 w-7 text-slate-500" />
             <span className="text-base font-medium text-slate-700">
               {busy ? 'Reading file...' : 'Choose an Excel or CSV file, or drag it here'}
             </span>
@@ -226,6 +226,9 @@ export default function BulkImportWizard() {
           </div>
           {/* Blangko na ang template (header row lang), kaya dito ang paliwanag
               kung paano punan. Nasa header mismo ang * at ang format. */}
+          {/* Tatlong pangunahing tagubilin ang kita; ang iba ay nakatiklop
+              (dati 7 siksik na bullet, kasama ang buong listahan ng 17
+              procedure, critique 2026-10-25) */}
           <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
             <p className="mb-1.5 font-semibold text-slate-700">Filling in the template</p>
             <ul className="list-disc space-y-1 pl-5">
@@ -241,6 +244,12 @@ export default function BulkImportWizard() {
                 One row per patient. For past visits, add one row per visit and repeat the patient's name, sex, and date
                 of birth.
               </li>
+            </ul>
+            <details className="mt-2">
+              <summary className="flex min-h-11 cursor-pointer items-center font-medium text-sky-700">
+                More tips: allergies, Yes/No questions, procedures, Excel
+              </summary>
+            <ul className="list-disc space-y-1 pl-5">
               <li>
                 Separate several medical conditions or allergies with a comma. Write <span className="font-medium">None</span>{' '}
                 if the patient has no allergies.
@@ -249,9 +258,11 @@ export default function BulkImportWizard() {
                 Yes/No questions from the patient form (for example, Pregnant? or Taking Medication?) accept Yes, No,
                 Oo, or Hindi. Leave the cell blank if the question was not answered.
               </li>
+              {/* Parehong pangalan ng nasa Add Treatment (short), para iisa ang
+                  bokabularyo; tinatanggap pa rin ang buong pangalan at alias */}
               <li>
-                Procedure must be one of: {PROCEDURES.map((p) => p.value).join(', ')}. Common short names also work, such
-                as Cleaning, Filling, Pasta, Extraction, Bunot, Root Canal, Braces, or Whitening.
+                Procedure: use the same names as in Add Treatment ({PROCEDURES.map((p) => p.short || p.value).join(', ')}).
+                Full names (such as Tooth Extraction) and local words (such as Bunot or Pasta) also work.
               </li>
               <li>
                 In the Excel template, Sex and the Yes/No questions have a dropdown, and phone numbers keep their leading
@@ -259,6 +270,7 @@ export default function BulkImportWizard() {
                 Excel Workbook (.xlsx).
               </li>
             </ul>
+            </details>
           </div>
         </div>
       )}
@@ -309,7 +321,7 @@ export default function BulkImportWizard() {
                             : 'border-slate-300 focus:border-sky-500 focus:ring-sky-100'
                         }`}
                       >
-                        <option value="">— Not in this file —</option>
+                        <option value="">Not in this file</option>
                         {preview.headers.map((h) => (
                           <option key={h} value={h}>
                             {h}

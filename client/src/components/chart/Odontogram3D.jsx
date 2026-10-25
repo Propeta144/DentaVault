@@ -30,13 +30,16 @@ const NO_CHART = {}
 // PatientProfilePage covers all of Three.js/R3F/drei in one chunk, per the
 // proposal's "lazy loading for resource-intensive modules such as the 3D
 // dental chart" requirement.
-export default function Odontogram3D({ patientId, canEdit, onPendingChange }) {
+// alerts: { allergies, medicalHistory }, ipinapakita sa chart entry modal (pati sa 3D pen)
+export default function Odontogram3D({ patientId, canEdit, onPendingChange, alerts }) {
   const [entries, setEntries] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [selection, setSelection] = useState(null) // { toothNumber, surface }
   const [highlightedTooth, setHighlightedTooth] = useState(null)
-  const [activeCondition, setActiveCondition] = useState('caries')
+  // Walang napiling kondisyon sa simula (dati "D Decayed" agad, kahit naka-off
+  // pa ang pen; critique 2026-10-25). Hindi makakaguhit hangga't walang napili.
+  const [activeCondition, setActiveCondition] = useState(null)
   // Pen starts off so the model is safe to orbit/inspect by default —
   // dragging across a tooth only paints once the dentist explicitly turns
   // drawing on, instead of every rotate-attempt risking an accidental mark.
@@ -138,17 +141,23 @@ export default function Odontogram3D({ patientId, canEdit, onPendingChange }) {
               <PenLine className="h-4 w-4" />
               {penActive ? 'Pen: On' : 'Pen: Off'}
             </button>
-            <p className="text-sm text-slate-400">
-              {penActive
-                ? 'Draw directly on a tooth to mark it, then Save.'
-                : 'Turn the pen on to mark teeth — drag freely to rotate for now.'}
+            <p
+              className={`text-sm ${penActive && !activeCondition ? 'font-medium text-amber-800' : 'text-slate-600'}`}
+              aria-live="polite"
+            >
+              {!penActive
+                ? 'Turn the pen on to mark teeth. For now, drag freely to rotate.'
+                : activeCondition
+                  ? 'Draw directly on a tooth to mark it, then Save.'
+                  : 'Choose a condition first, then draw on a tooth.'}
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2" role="group" aria-label="Pen condition">
             {PEN_CONDITIONS.map((c) => (
               <button
                 key={c.code}
                 type="button"
+                aria-pressed={activeCondition === c.code}
                 onClick={() => setActiveCondition(c.code)}
                 className={`flex min-h-11 items-center gap-1.5 rounded-md border px-3 text-sm font-medium transition-all ${
                   activeCondition === c.code
@@ -166,7 +175,7 @@ export default function Odontogram3D({ patientId, canEdit, onPendingChange }) {
           {pending && (
             <div className="mt-3 flex flex-wrap items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2">
               <span className="text-sm text-amber-800">
-                Unsaved mark on tooth {pending.toothNumber} — {pending.strokes.length} stroke
+                Unsaved mark on tooth {pending.toothNumber}: {pending.strokes.length} stroke
                 {pending.strokes.length === 1 ? '' : 's'}. Other teeth are locked until this is saved or discarded.
               </span>
               <div className="ml-auto flex gap-2">
@@ -260,7 +269,7 @@ export default function Odontogram3D({ patientId, canEdit, onPendingChange }) {
                   chartState={chartByTooth[toothNumber] || NO_CHART}
                   labelY={labelY}
                   canEdit={canEdit}
-                  paintEnabled={canEdit && penActive && (!pending || isPendingTooth)}
+                  paintEnabled={canEdit && penActive && Boolean(activeCondition) && (!pending || isPendingTooth)}
                   pendingStrokes={isPendingTooth ? pending.strokes : NO_STROKES}
                   onStrokeComplete={(stroke) => handleStrokeComplete(toothNumber, stroke)}
                   position={position}
@@ -285,7 +294,7 @@ export default function Odontogram3D({ patientId, canEdit, onPendingChange }) {
       </div>
 
       {!canEdit && (
-        <p className="mt-3 text-sm text-slate-400">Read-only view — only the dentist can update the chart.</p>
+        <p className="mt-3 text-sm text-slate-600">Only the dentist can update the chart.</p>
       )}
 
       {selection && (
@@ -296,6 +305,7 @@ export default function Odontogram3D({ patientId, canEdit, onPendingChange }) {
           currentEntry={chartByTooth[selection.toothNumber]?.[selection.surface]}
           defaultConditionCode={activeCondition}
           strokes={selection.strokes}
+          alerts={alerts}
           onClose={() => setSelection(null)}
           onSubmit={handleSaveEntry}
         />

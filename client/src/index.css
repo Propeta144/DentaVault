@@ -47,6 +47,27 @@ body {
   @apply bg-slate-50 text-slate-800 antialiased;
 }
 
+/* Browser defaults na kasama sa design (critique 2026-10-25):
+   - Focus ring: dati 1px na default ng browser, halos hindi kita sa purple na
+     button. Keyboard lang (focus-visible), hindi sa pag-click. Ang inputs ay
+     may sariling ring (focus:ring-*), kaya utilities pa rin ang nananaig.
+   - Placeholder: default ng browser ay ~2.3:1; slate-500 ay 4.6:1 (AA).
+   - Text selection: kulay ng brand. */
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--color-sky-600);
+    outline-offset: 2px;
+  }
+  ::placeholder {
+    color: var(--color-slate-500);
+    opacity: 1;
+  }
+  ::selection {
+    background-color: var(--color-sky-200);
+    color: var(--color-slate-950);
+  }
+}
+
 /* Sariling show/hide button ng Edge sa password fields: may sarili na tayong
    button (login, change password), kaya dalawang "mata" ang lumalabas dati. */
 input[type='password']::-ms-reveal,

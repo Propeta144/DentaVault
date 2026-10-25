@@ -65,7 +65,7 @@ export default function ChartPrintPage() {
       <ChartFindings entries={entries} />
 
       <p className="mt-8 text-xs text-slate-400">
-        Generated {formatDateTime(new Date())} — DentaVault
+        Generated {formatDateTime(new Date())} · DentaVault
       </p>
     </div>
   )

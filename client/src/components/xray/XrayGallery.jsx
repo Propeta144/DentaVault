@@ -41,7 +41,7 @@ export default function XrayGallery({ xrays, onOpen, onCompare, canUpload = fals
           !canUpload
             ? 'X-rays taken at the clinic will appear here.'
             : viewerRole === 'patient'
-              ? 'X-rays from the clinic will appear here. You can also send one with the form below.'
+              ? 'X-rays from the clinic will appear here. You can also send one with the form above.'
               : 'Upload the first X-ray with the form below. X-rays the patient uploads in the patient portal also appear here automatically.'
         }
       />
@@ -67,7 +67,12 @@ export default function XrayGallery({ xrays, onOpen, onCompare, canUpload = fals
             key={xray.id}
             className="group relative aspect-square overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm"
           >
-            <button type="button" onClick={() => onOpen(xray)} className="h-full w-full">
+            <button
+              type="button"
+              onClick={() => onOpen(xray)}
+              aria-label={`Open X-ray from ${xrayDate(xray)}`}
+              className="h-full w-full"
+            >
               <XrayThumbnail xray={xray} />
             </button>
             {/* Dati: "compare" label sa kaliwa at Email/Manual badge sa kanan,
@@ -75,20 +80,24 @@ export default function XrayGallery({ xrays, onOpen, onCompare, canUpload = fals
                 Ngayon: checkbox lang (44px touch target, may aria-label) sa
                 itaas-kaliwa, "New" lang sa itaas-kanan (yun ang kailangang
                 pansinin), at ang source ay lumipat sa bottom bar kasama ng petsa. */}
-            <label
-              title="Select to compare"
-              className={`absolute left-1 top-1 flex h-11 w-11 cursor-pointer items-center justify-center rounded-md shadow-sm transition-colors ${
-                selected.includes(xray.id) ? 'bg-sky-600' : 'bg-white/95 hover:bg-white'
-              }`}
-            >
-              <input
-                type="checkbox"
-                aria-label={`Select X-ray from ${xrayDate(xray)} to compare`}
-                checked={selected.includes(xray.id)}
-                onChange={() => toggleSelect(xray.id)}
-                className="h-5 w-5 cursor-pointer accent-sky-600"
-              />
-            </label>
+            {/* Compare: para sa dentist lang (critique 2026-10-25: nakikita ito
+                ng patient sa phone, pero hindi niya ito kailangan) */}
+            {viewerRole !== 'patient' && (
+              <label
+                title="Select to compare"
+                className={`absolute left-1 top-1 flex h-11 w-11 cursor-pointer items-center justify-center rounded-md shadow-sm transition-colors ${
+                  selected.includes(xray.id) ? 'bg-sky-600' : 'bg-white/95 hover:bg-white'
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  aria-label={`Select X-ray from ${xrayDate(xray)} to compare`}
+                  checked={selected.includes(xray.id)}
+                  onChange={() => toggleSelect(xray.id)}
+                  className="h-5 w-5 cursor-pointer accent-sky-600"
+                />
+              </label>
+            )}
             {REVIEWABLE_SOURCES.includes(xray.source) && !xray.reviewed_at && viewerRole !== 'patient' && (
               <div className="absolute right-1 top-1">
                 <StatusBadge variant="amber">New</StatusBadge>

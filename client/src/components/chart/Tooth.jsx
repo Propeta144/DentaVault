@@ -51,6 +51,10 @@ export default function Tooth({
   highlighted,
   onSurfaceClick,
   onWholeClick,
+  // Roving tabindex (Odontogram2D): iisang ngipin lang ang nasa Tab order;
+  // arrow keys ang paglipat sa ibang ngipin
+  tabIndex = 0,
+  onFocus,
 }) {
   const orientation = toothOrientation(toothNumber)
   const positionToSurface = {
@@ -78,18 +82,71 @@ export default function Tooth({
     return entry ? conditionColor(entry.condition_code) : UNMARKED_COLOR
   }
 
+  // Keyboard (critique 2026-10-25): dati onClick lang ang bawat surface, kaya
+  // hindi maabot ng Tab ang buong chart (WCAG 2.1.1). Ngayon bawat ngipin ay
+  // isang button: Enter/Space → modal (doon pinipili ang surface).
+  const findings = codes.filter((c) => c !== 'healthy').map(conditionLabel)
+  const ariaLabel = `Tooth ${toothNumber}${findings.length ? `: ${findings.join(', ')}` : ', no findings'}`
+
+  function handleKeyDown(e) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      if (isMissing) onWholeClick(toothNumber)
+      else onSurfaceClick(toothNumber, 'occlusal')
+    }
+  }
+
   return (
     <g
       transform={`translate(${x},${y}) scale(${scale})`}
       filter="url(#tooth-shadow)"
-      className={highlighted ? 'animate-[pulse_1s_ease-in-out_2]' : ''}
+      className={`group outline-none ${highlighted ? 'animate-[pulse_1s_ease-in-out_2]' : ''}`}
+      {...(canEdit
+        ? {
+            id: `tooth-${toothNumber}`,
+            role: 'button',
+            tabIndex,
+            'aria-label': ariaLabel,
+            onKeyDown: handleKeyDown,
+            onFocus,
+          }
+        : { role: 'img', 'aria-label': ariaLabel })}
     >
+      {/* Mas malaking tap area (hanggang kalahati ng puwang sa katabing
+          ngipin): sa tablet ~42px lang ang lapad ng ngipin. Ang pagtapik sa
+          gilid ay bubukas sa Occlusal; sa modal itinatama ang surface. */}
+      {canEdit && (
+        <rect
+          x={-4}
+          y={-4}
+          width={SIZE + 8}
+          height={SIZE + 8}
+          fill="transparent"
+          onClick={() => (isMissing ? onWholeClick(toothNumber) : onSurfaceClick(toothNumber, 'occlusal'))}
+          className="cursor-pointer"
+        />
+      )}
+      {/* Focus ring (keyboard lang): SVG ay walang maaasahang CSS outline */}
+      {canEdit && (
+        <rect
+          x={-5}
+          y={-5}
+          width={SIZE + 10}
+          height={SIZE + 10}
+          rx={10}
+          fill="none"
+          stroke="#6f2dbd"
+          strokeWidth={3}
+          pointerEvents="none"
+          className="opacity-0 group-focus-visible:opacity-100"
+        />
+      )}
       {isMissing ? (
         <g
           onClick={() => canEdit && onWholeClick(toothNumber)}
           className={canEdit ? 'cursor-pointer transition-all duration-150 hover:brightness-90' : ''}
         >
-          <title>{`Tooth ${toothNumber} — ${conditionLabel(wholeEntry.condition_code)}`}</title>
+          <title>{`Tooth ${toothNumber}: ${conditionLabel(wholeEntry.condition_code)}`}</title>
           <polygon
             points={shape.outline}
             fill={conditionColor(wholeEntry.condition_code)}
@@ -130,7 +187,7 @@ export default function Tooth({
                 onClick={() => canEdit && onSurfaceClick(toothNumber, surfaceCode)}
                 className={canEdit ? 'cursor-pointer transition-all duration-150 hover:brightness-90' : ''}
               >
-                {canEdit && <title>{`Tooth ${toothNumber} — ${surfaceLabel(surfaceCode)}`}</title>}
+                {canEdit && <title>{`Tooth ${toothNumber}, ${surfaceLabel(surfaceCode)}`}</title>}
               </polygon>
             )
           })}

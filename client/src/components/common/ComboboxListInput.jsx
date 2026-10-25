@@ -192,7 +192,7 @@ export default function ComboboxListInput({
           aria-pressed={none}
           aria-label={`None (no ${label.toLowerCase()})`}
           onClick={handleNone}
-          className={`min-h-9 rounded-full border px-3 text-sm font-medium transition-colors ${
+          className={`min-h-11 rounded-full border px-4 text-sm font-medium transition-colors ${
             none
               ? 'border-sky-300 bg-sky-100 text-sky-800'
               : 'border-slate-200 bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -217,14 +217,14 @@ export default function ComboboxListInput({
                 setConfirmNone(false)
                 onChange('None')
               }}
-              className="min-h-9 rounded-md bg-amber-600 px-3 font-semibold text-white hover:bg-amber-700"
+              className="min-h-11 rounded-md bg-amber-600 px-3 font-semibold text-white hover:bg-amber-700"
             >
               Replace
             </button>
             <button
               type="button"
               onClick={() => setConfirmNone(false)}
-              className="min-h-9 rounded-md border border-amber-300 bg-white px-3 font-medium text-amber-800 hover:bg-amber-100"
+              className="min-h-11 rounded-md border border-amber-300 bg-white px-3 font-medium text-amber-800 hover:bg-amber-100"
             >
               Keep list
             </button>
@@ -277,13 +277,13 @@ export default function ComboboxListInput({
             onFocus={() => setOpen(true)}
             onClick={() => setOpen(true)}
             onKeyDown={handleKeyDown}
-            className="min-h-9 min-w-[10rem] flex-1 bg-transparent px-1 text-base text-slate-900 placeholder:text-slate-400 focus:outline-none"
+            className="min-h-9 min-w-[10rem] flex-1 bg-transparent px-1 text-base text-slate-900 placeholder:text-slate-500 focus:outline-none"
           />
           <button
             type="button"
             onClick={() => setOpen((o) => !o)}
             aria-label={open ? `Hide ${label} options` : `Show ${label} options`}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100"
           >
             <ChevronDown className={`h-5 w-5 transition-transform ${open ? 'rotate-180' : ''}`} />
           </button>
