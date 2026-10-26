@@ -263,7 +263,7 @@ export default function XrayViewer({ xray, patientCode, canAnnotate, canDelete =
                 title="Save Annotations"
                 onClick={handleSave}
                 disabled={saving}
-                className="flex min-h-11 items-center gap-1.5 rounded bg-emerald-600 px-3 text-sm font-semibold transition-colors hover:bg-emerald-500 disabled:opacity-50"
+                className="flex min-h-11 items-center gap-1.5 rounded bg-emerald-700 px-3 text-sm font-semibold transition-colors hover:bg-emerald-800 disabled:opacity-50"
               >
                 <Save className="h-4 w-4" />
                 {saving ? 'Saving...' : 'Save Annotations'}

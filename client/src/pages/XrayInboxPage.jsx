@@ -107,7 +107,7 @@ export default function XrayInboxPage() {
           >
             {f.label}
             {f.value === 'new' && data?.unreviewedCount > 0 && (
-              <span className="rounded-full bg-amber-500 px-1.5 py-0.5 text-[11px] font-semibold leading-none text-white">
+              <span className="rounded-full bg-amber-700 px-1.5 py-0.5 text-xs font-semibold leading-none text-white">
                 {data.unreviewedCount}
               </span>
             )}

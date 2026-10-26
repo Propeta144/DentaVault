@@ -47,6 +47,8 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen bg-white">
       {/* Brand panel: lg pataas lang */}
+      {/* Madilim na panel: slate-400 ang secondary text dito (6.8:1 sa slate-950).
+          Ang slate-500 ay 3.85:1 lang sa madilim (audit 2026-10-26). */}
       <aside className="relative hidden w-[44%] max-w-xl flex-col justify-between overflow-hidden bg-slate-950 p-10 text-white lg:flex">
         {/* Malaking mark sa likod, dekorasyon lang */}
         <BrandMark className="pointer-events-none absolute -right-24 -bottom-24 h-[28rem] w-[28rem] text-sky-600/25" />
@@ -55,7 +57,7 @@ export default function LoginPage() {
           <BrandMark className="h-10 w-10 text-sky-300" />
           <div>
             <p className="text-lg font-semibold leading-tight">DentaVault</p>
-            <p className="text-sm text-slate-500">Teodosio-Rufin Dental Clinic</p>
+            <p className="text-sm text-slate-400">Teodosio-Rufin Dental Clinic</p>
           </div>
         </div>
 
@@ -79,7 +81,7 @@ export default function LoginPage() {
           </ul>
         </div>
 
-        <p className="relative text-sm text-slate-500">
+        <p className="relative text-sm text-slate-400">
           For clinic staff and registered patients only.
         </p>
       </aside>

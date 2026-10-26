@@ -100,7 +100,7 @@ export default function Tooth({
     <g
       transform={`translate(${x},${y}) scale(${scale})`}
       filter="url(#tooth-shadow)"
-      className={`group outline-none ${highlighted ? 'animate-[pulse_1s_ease-in-out_2]' : ''}`}
+      className={`group outline-none ${highlighted ? 'motion-safe:animate-[pulse_1s_ease-in-out_2]' : ''}`}
       {...(canEdit
         ? {
             id: `tooth-${toothNumber}`,

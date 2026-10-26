@@ -270,7 +270,9 @@ export default function PatientForm({
     if (!submitAttempt || !formRef.current) return
     const first = formRef.current.querySelector('[aria-invalid="true"]')
     if (!first) return
-    first.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    // Walang smooth scroll kapag naka-on ang "reduce motion" ng device
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    first.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'center' })
     const focusTarget = first.getAttribute('role') === 'radiogroup' ? first.querySelector('button') : first
     focusTarget?.focus({ preventScroll: true })
   }, [submitAttempt])

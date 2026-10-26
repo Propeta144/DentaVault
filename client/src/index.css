@@ -85,3 +85,18 @@ input[type='password']::-ms-clear {
     transform: translateY(0) scale(1);
   }
 }
+
+/* "Reduce motion" ng device (audit 2026-10-26): fade na lang ang modal, menu,
+   at search (walang galaw), para kita pa rin na may bumukas. Sa mga class:
+   `motion-safe:animate-pulse` sa skeleton at sa ngiping kaka-save. Ang spinner
+   ng loader ay iniwan (palatandaan ito na may hinihintay). */
+@media (prefers-reduced-motion: reduce) {
+  @keyframes modal-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+}

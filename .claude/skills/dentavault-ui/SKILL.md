@@ -22,7 +22,7 @@ instead of inventing a new pattern.
 - `sky-*` = brand purple accent. `sky-600` = **#6F2DBD** (primary), `sky-400` = **#A663CC**.
 - `slate-*` = purple-tinted neutrals. `slate-50` = #FBFBFB (page bg), `slate-950` = #171123.
 
-So: **write `sky-*` for brand/accent and `slate-*` for neutrals.** **Text contrast (WCAG AA):** never `text-slate-400` for text (2.7:1 on white because of the remap); secondary text = `slate-500` on white/slate-50, `slate-600` on slate-100 or tinted backgrounds. Placeholder and focus ring are themed globally in `index.css`. Never introduce `purple-*`,
+So: **write `sky-*` for brand/accent and `slate-*` for neutrals.** **Text contrast (WCAG AA):** never `text-slate-400` for text on light backgrounds (2.7:1 on white because of the remap; on `slate-900`/`950` dark panels it is the right secondary text, 6.8:1, while `slate-500` fails there at 3.85:1); white text on status colors needs the 700 shade (`amber-700`, `emerald-700`; `red-600` is OK); secondary text = `slate-500` on white/slate-50, `slate-600` on slate-100 or tinted backgrounds. Placeholder and focus ring are themed globally in `index.css`. Never introduce `purple-*`,
 `violet-*`, `indigo-*`, `gray-*`, or `zinc-*`: they bypass the brand mapping.
 
 Semantic colors keep stock Tailwind meaning:

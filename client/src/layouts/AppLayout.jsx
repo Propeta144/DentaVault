@@ -50,7 +50,7 @@ function NavBadge({ count }) {
   if (!count) return null
   return (
     <span
-      className="rounded-full bg-amber-500 px-1.5 py-0.5 text-[11px] font-semibold leading-none text-white"
+      className="rounded-full bg-amber-700 px-1.5 py-0.5 text-xs font-semibold leading-none text-white"
       title={`${count} new X-ray${count === 1 ? '' : 's'} from patients`}
     >
       {count}

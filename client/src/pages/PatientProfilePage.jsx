@@ -80,20 +80,24 @@ function PatientDetails({ patient, portalAccount, showPortal }) {
     <dl className={`grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-3 ${xlCols}`}>
       {/* Email: truncate (+ buong value sa tooltip), dahil hinahati ng
           break-words ang email sa gitna ng salita sa makitid na column */}
+      {/* Iisang <div> lang ang puwedeng bumalot sa <dt>/<dd> (HTML rule), kaya
+          nasa loob ng <dt> ang icon at padding ang nagbibigay ng puwang sa <dd>.
+          Dati may <div> sa loob ng <div>, kaya hindi napapares ng screen reader
+          ang label at value (audit 2026-10-26). */}
       {items.map(({ icon: Icon, label, value, truncate }) => (
-        <div key={label} className="flex min-w-0 items-start gap-2.5">
-          <Icon className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" aria-hidden="true" />
-          <div className="min-w-0">
-            {/* Sentence case at mas madilim (dati maliit na uppercase sa
-                slate-400, 2.7:1 lang ang contrast) */}
-            <dt className="text-sm text-slate-600">{label}</dt>
-            <dd
-              className={`text-base ${value ? 'text-slate-900' : 'text-slate-500'} ${truncate ? 'truncate' : 'break-words'}`}
-              title={truncate && value ? value : undefined}
-            >
-              {value || 'Not provided'}
-            </dd>
-          </div>
+        <div key={label} className="min-w-0">
+          {/* Sentence case at mas madilim (dati maliit na uppercase sa
+              slate-400, 2.7:1 lang ang contrast) */}
+          <dt className="flex items-center gap-2.5 text-sm text-slate-600">
+            <Icon className="h-4 w-4 shrink-0 text-slate-500" aria-hidden="true" />
+            {label}
+          </dt>
+          <dd
+            className={`pl-[1.625rem] text-base ${value ? 'text-slate-900' : 'text-slate-500'} ${truncate ? 'truncate' : 'break-words'}`}
+            title={truncate && value ? value : undefined}
+          >
+            {value || 'Not provided'}
+          </dd>
         </div>
       ))}
     </dl>

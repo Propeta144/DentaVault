@@ -1858,3 +1858,33 @@ headings, walang "DENTIST", migration steps, 0 overflow, 0 console error). Build
 |---|---|---|
 | `client/src/components/common/ComboboxListInput.jsx` | MODIFIED | 44px na None chip, toggle, at confirm buttons. |
 | `client/src/pages/SettingsPage.jsx` | MODIFIED | 44px na `tel:` links hanggang `lg`. |
+
+---
+
+## 37. Technical Audit (impeccable) at mga Ayos: Contrast, Screen Reader, Reduce Motion
+
+`/impeccable audit` (Oct 26, 2026): **17/20 (Good)**. Code scan, detector, at **axe-core (WCAG 2.2 AA)** sa 28 screen
+(1366 at 390px, dentist at patient). Integrity: PASS. 0 overflow, 0 console error. Inayos ang lahat ng nakita:
+
+| | Problema | Ayos |
+|---|---|---|
+| P1 | Badge ng bagong X-ray (menu at X-ray Inbox filter): puti sa `amber-500` = **2.15:1**, 11px | `bg-amber-700` (5:1), `text-xs` |
+| P1 | Login, madilim na panel (laptop): `slate-500` sa `slate-950` = **3.85:1** | `slate-400` (6.8:1). Exception sa "walang slate-400" rule: sa madilim na background lang |
+| P1 | "Save Annotations" sa X-ray viewer: puti sa `emerald-600` = **3.77:1** | `bg-emerald-700` (hover `emerald-800`) |
+| P2 | Contact details sa profile: `<div>` sa loob ng `<div>` bago ang `<dt>`/`<dd>`, kaya hindi napapares ng screen reader ang label at value | Icon sa loob ng `<dt>`, iisang `<div>` bawat pares |
+| P3 | Walang suporta sa "reduce motion" ng device | Modal/menu/Ctrl+K: fade lang (walang galaw); skeleton at pulse ng ngipin: `motion-safe:`; Register errors: walang smooth scroll. Ang spinner ay iniwan (palatandaan ng paghihintay) |
+
+| Name | Type | Purpose |
+|---|---|---|
+| `client/src/layouts/AppLayout.jsx`, `pages/XrayInboxPage.jsx` | MODIFIED | Kulay ng badge. |
+| `client/src/pages/LoginPage.jsx` | MODIFIED | Secondary text sa madilim na panel. |
+| `client/src/components/xray/XrayViewer.jsx` | MODIFIED | Kulay ng Save Annotations. |
+| `client/src/pages/PatientProfilePage.jsx` | MODIFIED | `<dl>` structure ng contact details. |
+| `client/src/index.css` | MODIFIED | `@media (prefers-reduced-motion: reduce)`: fade-only na `modal-in`. |
+| `client/src/components/{common/Skeleton,xray/XrayThumbnail,chart/Tooth}.jsx`, `patients/PatientForm.jsx` | MODIFIED | `motion-safe:animate-pulse`; scroll ayon sa reduce motion. |
+| `.claude/skills/dentavault-ui/SKILL.md` | MODIFIED | Contrast rule: `slate-400` sa madilim na background lang; 700 shade para sa puting text sa amber/emerald. |
+
+**Na-verify (local, Edge via Playwright + axe-core):** muling scan sa 28 screen: **0 axe violations**, 0 overflow, 0 console error;
+badge 0 contrast violation; login 0; `<dl>` 0; reduce motion: walang transform ang modal (fade lang), may galaw pa rin kapag
+naka-off; screenshots ng contact details (1366 at 390px) at login. Detector: clean. Build pasado. Walang data na binago.
+**Hindi pa naka-push.** Walang migration.

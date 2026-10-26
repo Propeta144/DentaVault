@@ -6,7 +6,7 @@
 // role="status" + sr-only na label: para alam ng screen reader na
 // naglo-load, kahit hindi nila nakikita ang mga kahon.
 export function SkeletonBlock({ className = '' }) {
-  return <div className={`animate-pulse rounded-md bg-slate-200/70 ${className}`} />
+  return <div className={`rounded-md motion-safe:animate-pulse bg-slate-200/70 ${className}`} />
 }
 
 export function SkeletonRows({ rows = 6, label = 'Loading...' }) {

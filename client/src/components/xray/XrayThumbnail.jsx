@@ -46,7 +46,7 @@ export default function XrayThumbnail({ xray }) {
 
   if (!url) {
     return (
-      <div className="h-full w-full animate-pulse bg-slate-200" role="status">
+      <div className="h-full w-full bg-slate-200 motion-safe:animate-pulse" role="status">
         <span className="sr-only">Loading X-ray preview</span>
       </div>
     )
