@@ -1913,4 +1913,4 @@ naka-off; screenshots ng contact details (1366 at 390px) at login. Detector: cle
 **Na-verify (production build + `vite preview`, Edge via Playwright, naka-block ang service worker):** **11/11**: Dashboard at
 Patients list walang 3D; profile (History tab pa rin) → 3D JS (1,070 KB) at `teeth.glb` na-download pagkalipas ng ~0.5 s;
 pagpindot sa 3D → walang bagong download, lumabas ang model; pangalawang profile → walang dobleng download; patient → walang
-preload; 0 console error. Build pasado. **Hindi pa naka-push.** Walang migration.
+preload; 0 console error. Build pasado. **Naka-push na** (commit `f1a0251`, 2026-10-26). Walang migration.
