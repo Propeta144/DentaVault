@@ -1887,4 +1887,4 @@ headings, walang "DENTIST", migration steps, 0 overflow, 0 console error). Build
 **Na-verify (local, Edge via Playwright + axe-core):** muling scan sa 28 screen: **0 axe violations**, 0 overflow, 0 console error;
 badge 0 contrast violation; login 0; `<dl>` 0; reduce motion: walang transform ang modal (fade lang), may galaw pa rin kapag
 naka-off; screenshots ng contact details (1366 at 390px) at login. Detector: clean. Build pasado. Walang data na binago.
-**Hindi pa naka-push.** Walang migration.
+**Naka-push na** (commit `d01543c`, 2026-10-26). Walang migration.
