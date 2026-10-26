@@ -44,7 +44,25 @@ import { fullName, sexLabel } from '../utils/patientName'
 import { calculateAge, formatDate } from '../utils/formatDate'
 import useDiscardGuard from '../hooks/useDiscardGuard'
 
-const Odontogram3D = lazy(() => import('../components/chart/Odontogram3D'))
+const loadOdontogram3D = () => import('../components/chart/Odontogram3D')
+const Odontogram3D = lazy(loadOdontogram3D)
+
+// Tahimik na preload ng 3D chart (dentist lang): ~300 KB gzip na JS + teeth.glb
+// (kusang dina-download ng useGLTF.preload sa Tooth3D.jsx pagka-load ng module).
+// Sinisimulan kapag walang ginagawa ang browser, kaya hindi nito pinababagal ang
+// pagbukas ng profile; pagpindot sa "3D", nandiyan na. Hindi ginagawa kapag
+// naka-on ang Data Saver. Iisang beses lang ina-import ng browser ang module,
+// kaya walang dobleng download kahit ilang profile ang buksan.
+function preloadOdontogram3D() {
+  if (navigator.connection?.saveData) return () => {}
+  const load = () => loadOdontogram3D().catch(() => {})
+  if ('requestIdleCallback' in window) {
+    const handle = window.requestIdleCallback(load, { timeout: 4000 })
+    return () => window.cancelIdleCallback(handle)
+  }
+  const timer = setTimeout(load, 1500)
+  return () => clearTimeout(timer)
+}
 
 // Contact at iba pang detalye. Dalawang beses ito nire-render sa page:
 // sa loob ng header card sa desktop (lg), at sa ilalim ng tabs sa phone —
@@ -120,6 +138,8 @@ export default function PatientProfilePage() {
     ['history', 'chart', 'xrays'].includes(location.state?.tab) ? location.state.tab : 'history',
   )
   const [chartView, setChartView] = useState('2d')
+  // Pagkabukas ng profile, ihanda na ang 3D chart (tingnan ang preloadOdontogram3D)
+  useEffect(() => (isDentist ? preloadOdontogram3D() : undefined), [isDentist])
 
   const [has3DPendingDrawing, setHas3DPendingDrawing] = useState(false)
   const [confirmLeave3D, setConfirmLeave3D] = useState(false)

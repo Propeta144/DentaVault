@@ -1888,3 +1888,29 @@ headings, walang "DENTIST", migration steps, 0 overflow, 0 console error). Build
 badge 0 contrast violation; login 0; `<dl>` 0; reduce motion: walang transform ang modal (fade lang), may galaw pa rin kapag
 naka-off; screenshots ng contact details (1366 at 390px) at login. Detector: clean. Build pasado. Walang data na binago.
 **Naka-push na** (commit `d01543c`, 2026-10-26). Walang migration.
+
+---
+
+## 38. Preload ng 3D Chart Pagbukas ng Patient Profile
+
+**Tanong ng team:** paano kung hindi na lazy ang 3D? Sinukat: ang 3D chunk (three.js + React Three Fiber + drei) ay
+**1,070 KB (299 KB gzip)**, ang pinakamalaking file ng app. Kung isasama sa main file, halos 3x ang unang download
+(~123 → ~420 KB gzip) kahit sa login at sa phone ng pasyente, kahit dentist lang ang gumagamit ng 3D. Kaya **lazy pa rin**
+(#9), pero **inihahanda na nang tahimik** pagbukas ng profile:
+
+- **Dentist lang.** Pagbukas ng patient profile, kapag walang ginagawa ang browser (`requestIdleCallback`, max 4s; 1.5s na
+  `setTimeout` kung walang ganito), dina-download ang 3D module. Kasabay nito ang `teeth.glb`, dahil may
+  `useGLTF.preload` na sa `Tooth3D.jsx` pagka-load ng module.
+- Pagpindot sa **3D Chart**, nandiyan na: walang bagong download.
+- **Hindi apektado:** login, Dashboard, Patients list, at ang pasyente (walang preload). Hindi rin ginagawa kapag naka-on
+  ang **Data Saver** (`navigator.connection.saveData`). Isang beses lang dina-download kahit ilang profile ang buksan.
+- Kapag pumalya ang preload (hal. offline), tahimik lang; magda-download pa rin pagpindot sa 3D, gaya ng dati.
+
+| Name | Type | Purpose |
+|---|---|---|
+| `client/src/pages/PatientProfilePage.jsx` | MODIFIED | `loadOdontogram3D` (iisang import para sa `lazy` at preload), `preloadOdontogram3D()`, `useEffect` para sa dentist. |
+
+**Na-verify (production build + `vite preview`, Edge via Playwright, naka-block ang service worker):** **11/11**: Dashboard at
+Patients list walang 3D; profile (History tab pa rin) → 3D JS (1,070 KB) at `teeth.glb` na-download pagkalipas ng ~0.5 s;
+pagpindot sa 3D → walang bagong download, lumabas ang model; pangalawang profile → walang dobleng download; patient → walang
+preload; 0 console error. Build pasado. **Hindi pa naka-push.** Walang migration.
