@@ -29,7 +29,7 @@ async function run() {
   await pool.execute(
     `INSERT INTO users (role, email, password_hash, full_name)
      VALUES ('dentist', :email, :passwordHash, 'Dr. Nolita Reloj Teodosio-Rufin')
-     ON DUPLICATE KEY UPDATE password_hash = :passwordHash, token_version = token_version + 1`,
+     ON DUPLICATE KEY UPDATE password_hash = :passwordHash, token_version = token_version + 1, session_end_reason = 'password_changed'`,
     { email, passwordHash },
   )
 

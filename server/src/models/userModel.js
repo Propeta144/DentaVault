@@ -42,6 +42,7 @@ export async function findUserById(id) {
 export async function findUserAuthState(id) {
   const [rows] = await pool.execute(
     `SELECT u.is_active AS isActive, u.token_version AS tokenVersion,
+            u.session_end_reason AS sessionEndReason,
             (p.deleted_at IS NOT NULL) AS patientDeleted
      FROM users u
      LEFT JOIN patients p ON p.id = u.patient_id
@@ -50,20 +51,44 @@ export async function findUserAuthState(id) {
   )
   const row = rows[0]
   if (!row) return null
-  return { isActive: Boolean(row.isActive), tokenVersion: Number(row.tokenVersion), patientDeleted: Boolean(row.patientDeleted) }
+  return {
+    isActive: Boolean(row.isActive),
+    tokenVersion: Number(row.tokenVersion),
+    sessionEndReason: row.sessionEndReason,
+    patientDeleted: Boolean(row.patientDeleted),
+  }
 }
 
 // Sign out / pag-revoke: lahat ng token na naibigay na sa user na 'to ay
 // hindi na gagana (lahat ng device).
-export async function bumpTokenVersion(userId) {
-  await pool.execute('UPDATE users SET token_version = token_version + 1 WHERE id = :userId', { userId })
+// `reason` = session_end_reason: ang ipapakita sa mga na-log out na device.
+export async function bumpTokenVersion(userId, reason = 'signed_out') {
+  await pool.execute(
+    'UPDATE users SET token_version = token_version + 1, session_end_reason = :reason WHERE id = :userId',
+    { userId, reason },
+  )
+}
+
+// Pag-login (#39): isang session lang bawat account, kaya tinataasan ang
+// token_version at ibinabalik ang bagong halaga para sa bagong token.
+// LAST_INSERT_ID(expr) para atomic: kahit sabay na mag-login ang dalawang
+// device, magkaiba ang makukuha nilang version (ang huli lang ang gagana).
+export async function startNewSession(userId) {
+  const [result] = await pool.execute(
+    `UPDATE users SET token_version = LAST_INSERT_ID(token_version + 1),
+            session_end_reason = 'signed_in_elsewhere'
+     WHERE id = :userId`,
+    { userId },
+  )
+  return Number(result.insertId)
 }
 
 // Kapag na-delete ang patient: hindi na makakapag-login ang portal account
 // niya, at agad na hihinto ang mga bukas na session.
 export async function deactivateUserForPatient(patientId) {
   await pool.execute(
-    'UPDATE users SET is_active = 0, token_version = token_version + 1 WHERE patient_id = :patientId',
+    `UPDATE users SET is_active = 0, token_version = token_version + 1, session_end_reason = 'account_closed'
+     WHERE patient_id = :patientId`,
     { patientId },
   )
 }
@@ -84,7 +109,7 @@ export async function findUserByPatientId(patientId) {
 export async function updatePasswordHash(userId, passwordHash, { mustChangePassword = false } = {}) {
   await pool.execute(
     `UPDATE users SET password_hash = :passwordHash, must_change_password = :mustChange,
-            token_version = token_version + 1
+            token_version = token_version + 1, session_end_reason = 'password_changed'
      WHERE id = :userId`,
     { userId, passwordHash, mustChange: mustChangePassword ? 1 : 0 },
   )

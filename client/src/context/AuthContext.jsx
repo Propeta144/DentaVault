@@ -11,6 +11,11 @@ const LAST_ACTIVITY_KEY = 'dentavault_last_activity'
 // papalitan ang password. sessionStorage: nananatili pagka-refresh, nawawala
 // pagsara ng tab.
 const SIGN_IN_INFO_KEY = 'dentavault_sign_in'
+// Bakit pinutol ng server ang session, para sa ibang bukas na tab (#39)
+const SIGN_OUT_REASON_KEY = 'dentavault_sign_out_reason'
+// Gaano kadalas tinitingnan kung buhay pa ang session (hal. nag-login sa
+// ibang device), habang nakabukas at nakikita ang tab.
+const SESSION_CHECK_MS = 60 * 1000
 
 export const IDLE_TIMEOUT_MS = 15 * 60 * 1000
 const IDLE_WARNING_MS = 60 * 1000
@@ -41,7 +46,8 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
   // Bakit nasa login page: 'ended' = pinutol ng server ang session (password
-  // reset, sign out sa ibang device...); 'idle' = 15 minutong walang galaw.
+  // reset, sign out sa ibang device...); 'elsewhere' = nag-login ang account
+  // sa ibang device (#39); 'idle' = 15 minutong walang galaw.
   // null = ang user mismo ang nag-sign out.
   const [signOutReason, setSignOutReason] = useState(null)
   const [signInInfo, setSignInInfo] = useState(() => readJson(sessionStorage, SIGN_IN_INFO_KEY))
@@ -74,6 +80,7 @@ export function AuthProvider({ children }) {
       if (token) {
         api.post('/auth/logout', null, { headers: { Authorization: `Bearer ${token}` } }).catch(() => {})
       }
+      localStorage.removeItem(SIGN_OUT_REASON_KEY)
       setSignOutReason(reason)
       clearSession()
     },
@@ -103,11 +110,16 @@ export function AuthProvider({ children }) {
   // Galing sa api.js: 401 sa isang naka-login na request = hindi na valid
   // ang token sa server (password reset, sign out sa ibang device, atbp.)
   useEffect(() => {
-    function handleSessionEnded() {
-      clearSession()
+    function handleSessionEnded(e) {
       // Kapag sabay na nag-sign out ang ibang tab dahil walang galaw, 401 din
       // ang sagot dito; idle pa rin ang tamang paliwanag.
-      setSignOutReason(idleExpired() ? 'idle' : 'ended')
+      let reason = 'ended'
+      if (idleExpired()) reason = 'idle'
+      else if (e.detail?.reason === 'signed_in_elsewhere') reason = 'elsewhere'
+      // Isinusulat bago burahin ang token, para mabasa ng ibang tab
+      localStorage.setItem(SIGN_OUT_REASON_KEY, reason)
+      clearSession()
+      setSignOutReason(reason)
     }
     window.addEventListener(SESSION_ENDED_EVENT, handleSessionEnded)
     return () => window.removeEventListener(SESSION_ENDED_EVENT, handleSessionEnded)
@@ -117,13 +129,33 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     function handleStorage(e) {
       if (e.key === TOKEN_KEY && !e.newValue && user) {
-        setSignOutReason(idleExpired() ? 'idle' : null)
+        setSignOutReason(idleExpired() ? 'idle' : localStorage.getItem(SIGN_OUT_REASON_KEY))
         clearSession()
       }
     }
     window.addEventListener('storage', handleStorage)
     return () => window.removeEventListener('storage', handleStorage)
   }, [user, clearSession])
+
+  // ---- Isang session bawat account (#39) ----
+  // Kapag nag-login ang account sa ibang device, nalalaman lang ito ng device
+  // na 'to sa susunod na request. Kaya tinitingnan ang /auth/me pagbalik sa
+  // tab at bawat minuto habang nakikita ang tab; ang 401 ay sinasalo ng
+  // api.js (SESSION_ENDED_EVENT). Maliit na query lang (primary key).
+  useEffect(() => {
+    if (!user) return undefined
+    function checkSession() {
+      if (document.visibilityState === 'visible') api.get('/auth/me').catch(() => {})
+    }
+    const timer = setInterval(checkSession, SESSION_CHECK_MS)
+    document.addEventListener('visibilitychange', checkSession)
+    window.addEventListener('focus', checkSession)
+    return () => {
+      clearInterval(timer)
+      document.removeEventListener('visibilitychange', checkSession)
+      window.removeEventListener('focus', checkSession)
+    }
+  }, [user])
 
   // ---- Auto sign-out kapag 15 minutong walang galaw (#33) ----
   // Bawat galaw ay itinatala (hanggang isang beses bawat 5 segundo). Habang
@@ -174,6 +206,7 @@ export function AuthProvider({ children }) {
     touchActivity()
     const info = { ...data.signIn, passwordUpgradeRequired: Boolean(data.user.passwordUpgradeRequired) }
     sessionStorage.setItem(SIGN_IN_INFO_KEY, JSON.stringify(info))
+    localStorage.removeItem(SIGN_OUT_REASON_KEY)
     setSignInInfo(info)
     setSignOutReason(null)
     setUser(data.user)

@@ -1914,3 +1914,41 @@ naka-off; screenshots ng contact details (1366 at 390px) at login. Detector: cle
 Patients list walang 3D; profile (History tab pa rin) → 3D JS (1,070 KB) at `teeth.glb` na-download pagkalipas ng ~0.5 s;
 pagpindot sa 3D → walang bagong download, lumabas ang model; pangalawang profile → walang dobleng download; patient → walang
 preload; 0 console error. Build pasado. **Naka-push na** (commit `f1a0251`, 2026-10-26). Walang migration.
+
+---
+
+## 39. Isang Session Lang Bawat Account (login sa ibang device = log out sa nauna)
+
+Galing sa listahan ng posibleng tanong ng panel (Oct 29, 2026). Dati, puwedeng sabay na naka-login ang iisang account sa
+maraming device. Ngayon, **kapag nag-login sa bagong device, nalo-log out ang nauna** (dentist at patient).
+
+- **Paano:** bawat login ay tinataasan ang `users.token_version` (mekanismo ng #26). Ang token ng naunang device ay may
+  lumang `tv`, kaya 401 na sa susunod na request. Atomic (`LAST_INSERT_ID(token_version + 1)`): kahit sabay na mag-login
+  ang dalawang device, isa lang ang gagana.
+- **Dahilan sa na-log out na device:** bagong column `users.session_end_reason` (`signed_in_elsewhere` / `signed_out` /
+  `password_changed` / `account_closed`), ibinabalik bilang `reason` sa 401. Login page: "Your account was signed in on
+  another device, so you were signed out here. If that wasn't you, sign in and change your password."
+- **Mabilis na malalaman:** tinitingnan ang `/auth/me` pagbalik sa tab (focus/visibility) at bawat 60 segundo habang
+  nakikita ang tab. Sabay na nalo-log out ang lahat ng tab ng browser na iyon (may parehong mensahe).
+- **Hindi apektado:** maling password (hindi naglo-log out ng iba), ibang account, maraming tab sa iisang browser.
+- **Kapalit:** hindi na puwedeng sabay gamitin ang laptop sa clinic at phone gamit ang iisang dentist account.
+
+> ⚠️ **Bago/kasabay ng push, patakbuhin sa Aiven ang migration 019**
+> (`$env:DOTENV_CONFIG_PATH=".env.aiven"; npm run migrate` sa `server/`). Kung hindi, **pumapalya ang lahat ng login at
+> request** (binabasa ng auth middleware ang `session_end_reason`). ✅ Napatakbo na sa Aiven (2026-10-29, bago ang push).
+
+| Name | Type | Purpose |
+|---|---|---|
+| `server/db/migrations/019_add_session_end_reason.sql` | **NEW** | `users.session_end_reason`. Napatakbo na sa local. |
+| `server/src/models/userModel.js` | MODIFIED | `startNewSession()` (atomic bump), `bumpTokenVersion(userId, reason)`, reason sa password change at deactivate, `sessionEndReason` sa `findUserAuthState`. |
+| `server/src/services/authService.js` | MODIFIED | Login → `startNewSession`; bagong version sa token. |
+| `server/src/middleware/auth.js` | MODIFIED | 401 na may `reason` kapag hindi tugma ang `tv`. |
+| `server/db/{seed,seedPatientUser}.js` | MODIFIED | Reason `password_changed` sa reset. |
+| `client/src/services/api.js` | MODIFIED | `reason` sa `SESSION_ENDED_EVENT` (`CustomEvent`). |
+| `client/src/context/AuthContext.jsx` | MODIFIED | `'elsewhere'` reason, session check (focus + 60s), reason para sa ibang tab (`dentavault_sign_out_reason`). |
+| `client/src/pages/LoginPage.jsx` | MODIFIED | Mensahe para sa "signed in on another device". |
+
+**Na-verify (local):** API **15/15** (A na-kick pagka-login ng B, reason, data API 401, B gumagana, 2 sabay na login = 1 lang
+ang valid, Sign out = `signed_out`, maling password hindi naglo-log out, dentist at patient hindi nagkakaapektuhan). UI sa Edge
+**14/14** (2 tab ng device A na-kick pagbalik sa tab na may mensahe, B na-kick ng 60s check nang walang galaw, 390px walang
+overflow, sariling Sign out walang mensahe, 0 console error). Build pasado. Nilinis ang test audit rows. **Hindi pa naka-push.**

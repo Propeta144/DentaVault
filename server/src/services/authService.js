@@ -1,7 +1,7 @@
 import crypto from 'node:crypto'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
-import { findUserByEmail, findUserById, updatePasswordHash, bumpTokenVersion, requirePasswordChange } from '../models/userModel.js'
+import { findUserByEmail, findUserById, updatePasswordHash, bumpTokenVersion, startNewSession, requirePasswordChange } from '../models/userModel.js'
 import { recordAuditLog, getSignInSummary } from '../models/auditLogModel.js'
 import { passwordProblems } from '../utils/passwordPolicy.js'
 import AppError from '../utils/AppError.js'
@@ -72,12 +72,16 @@ export async function login({ email, password, ipAddress }) {
   // Bago itala ang bagong login: ang naunang login at mga maling subok mula noon
   const signIn = await getSignInSummary(user.id)
 
+  // Isang session lang bawat account (#39): ang bagong token_version ang nasa
+  // bagong token, kaya hindi na gagana ang token ng naunang device.
+  const tokenVersion = await startNewSession(user.id)
+
   const token = signToken({
     id: user.id,
     role: user.role,
     patientId: user.patient_id,
     mustChangePassword,
-    tokenVersion: user.token_version,
+    tokenVersion,
   })
 
   await recordAuditLog({

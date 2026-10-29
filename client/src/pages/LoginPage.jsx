@@ -100,16 +100,17 @@ export default function LoginPage() {
 
           <form onSubmit={handleSubmit}>
             {/* Hindi ang user ang nag-sign out dito: pinutol ng server ang session
-                (hal. na-reset ang password o nag-sign out sa ibang device), o
-                15 minutong walang galaw (#33) */}
+                (hal. na-reset ang password, nag-sign out, o nag-login sa ibang
+                device, #39), o 15 minutong walang galaw (#33) */}
             {signOutReason && !error && (
               <div
                 role="status"
                 className="mb-4 rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-base text-sky-800"
               >
-                {signOutReason === 'idle'
-                  ? 'You were signed out after 15 minutes of inactivity. Please sign in again.'
-                  : 'Your session has ended. Please sign in again.'}
+                {signOutReason === 'idle' && 'You were signed out after 15 minutes of inactivity. Please sign in again.'}
+                {signOutReason === 'elsewhere' &&
+                  "Your account was signed in on another device, so you were signed out here. If that wasn't you, sign in and change your password."}
+                {signOutReason !== 'idle' && signOutReason !== 'elsewhere' && 'Your session has ended. Please sign in again.'}
               </div>
             )}
             {error && (

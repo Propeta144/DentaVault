@@ -30,8 +30,17 @@ export async function authenticate(req, res, next) {
   } catch (err) {
     return next(err)
   }
-  if (!state || !state.isActive || state.patientDeleted || req.user.tv !== state.tokenVersion) {
+  if (!state || !state.isActive || state.patientDeleted) {
     return next(new AppError('Your session has ended. Please sign in again.', 401))
+  }
+  // `reason`: para masabi ng client kung bakit (hal. nag-login sa ibang
+  // device, #39). Dahilan lang, walang detalye ng ibang device.
+  if (req.user.tv !== state.tokenVersion) {
+    return next(
+      new AppError('Your session has ended. Please sign in again.', 401, {
+        reason: state.sessionEndReason || 'ended',
+      }),
+    )
   }
 
   // Temporary password (mula sa dentist) na hindi pa napapalitan: bawal ang
