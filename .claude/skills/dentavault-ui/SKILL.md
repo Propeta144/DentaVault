@@ -125,6 +125,8 @@ Destructive modals follow `DeletePatientModal.jsx`: red alert box with `AlertTri
   secondary/destructive actions. Fixed-positioned, so it is safe inside `overflow-x-auto` tables.
 - `components/common/BrandMark.jsx`: the official clinic mark (CSS mask, takes `text-*` color).
   Official logo PNG: `assets/brand/teodosio-rufin-logo.png` (login, print headers via `PrintHeader`).
+- `components/common/AuthBrandPanel.jsx`: dark brand panel for signed-out pages (Welcome `/`, Login). Fonts are
+  self-hosted (`assets/fonts/`, `@font-face` in `index.css`); never add Google Fonts or other external font links.
 - Patient search: the "Find patient" button / Ctrl+K palette lives in the sidebar (lg+) and the top
   bar (below lg) in `AppLayout` on every page, so pages don't add their own search-patient button.
 - Audit actions: `actionLabel()` (readable text), `groupAuditLogs()`, `auditPatientName()`,

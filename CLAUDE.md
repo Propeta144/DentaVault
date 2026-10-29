@@ -1952,3 +1952,39 @@ maraming device. Ngayon, **kapag nag-login sa bagong device, nalo-log out ang na
 ang valid, Sign out = `signed_out`, maling password hindi naglo-log out, dentist at patient hindi nagkakaapektuhan). UI sa Edge
 **14/14** (2 tab ng device A na-kick pagbalik sa tab na may mensahe, B na-kick ng 60s check nang walang galaw, 390px walang
 overflow, sariling Sign out walang mensahe, 0 console error). Build pasado. Nilinis ang test audit rows. **Naka-push na** (commit `fdbbe71`, 2026-10-29). Napatakbo muna ang migration 019 sa Aiven bago ang push.
+
+---
+
+## 40. Inter Font sa Loob ng App + Welcome Page (VirusTotal tags)
+
+**Puna:** sa VirusTotal scan ng `dentavault.vercel.app`, **0/93** (malinis), pero may tags na `password-input` at
+`external-resources`, samantalang wala sa ibang kaklase. Hindi ito babala; paglalarawan lang ng laman ng page.
+
+- **`external-resources` → Inter font nasa app na.** Dati galing sa Google Fonts (`index.html`). Ngayon dalawang
+  `woff2` file sa `src/assets/fonts/` (latin + latin-ext, iisang variable file para sa 400–700, ~133 KB), naka-`@font-face`
+  sa `index.css`, kasama sa offline precache (`woff2` sa `globPatterns`). Walang IP ng user na napupunta sa Google, gumagana
+  offline. Tinanggal ang `fonts.googleapis.com`/`fonts.gstatic.com` sa CSP. Lisensya: SIL OFL (`assets/fonts/OFL.txt`).
+  Pareho ang itsura.
+- **`password-input` → Welcome page sa `/`.** Kapag hindi naka-login: logo, maikling paliwanag, highlights (sa phone/tablet),
+  **Sign in** button papuntang `/login`, at "No account yet?" na may address at numero ng clinic (`CLINIC_INFO`). Walang
+  password field. Kapag naka-login: diretso sa Dashboard / My Record gaya ng dati (`RootRoute`). Ang `/login` ay may **Back**.
+  Kosmetiko lang ito (hindi dagdag na seguridad), dagdag na isang pindot bago mag-sign in.
+- Ang brand panel sa kaliwa (laptop) ay shared na (`AuthBrandPanel`). Ang troika font ng 3D chart ay galing pa rin sa
+  jsdelivr, pero pagka-login lang.
+
+| Name | Type | Purpose |
+|---|---|---|
+| `client/src/assets/fonts/inter-latin.woff2`, `inter-latin-ext.woff2`, `OFL.txt` | **NEW** | Inter font at lisensya. |
+| `client/src/index.css` | MODIFIED | `@font-face` para sa Inter. |
+| `client/index.html` | MODIFIED | Tinanggal ang Google Fonts links. |
+| `client/vercel.json` | MODIFIED | CSP walang Google Fonts. |
+| `client/vite.config.js` | MODIFIED | `woff2` sa PWA precache. |
+| `client/src/components/common/AuthBrandPanel.jsx` | **NEW** | Shared brand panel + `HIGHLIGHTS` (galing sa LoginPage). |
+| `client/src/pages/WelcomePage.jsx` | **NEW** | Welcome page. |
+| `client/src/pages/LoginPage.jsx` | MODIFIED | `AuthBrandPanel`, Back link. |
+| `client/src/App.jsx` | MODIFIED | `RootRoute` sa `/` (Welcome o redirect), lazy `WelcomePage`. |
+
+**Na-verify (local, production build + `vite preview` na may CSP, Edge via Playwright):** **20/20** (×3): Welcome sa `/` sa 1366,
+768, 360px, walang password field, 0 overflow; Inter na-load mula sa app; Sign in → `/login`, Back → `/`; dentist → Dashboard,
+naka-login sa `/` → Dashboard; patient → sariling record; `/dashboard` na hindi naka-login → `/login`; **0 request sa ibang
+website**, 0 console error. Build pasado. **Hindi pa naka-push.**

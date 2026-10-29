@@ -103,7 +103,7 @@ export default defineConfig({
       workbox: {
         // Precache the built app shell (JS/CSS/HTML/icons) so the UI loads
         // instantly offline. Runtime data below is handled separately.
-        globPatterns: ['**/*.{js,css,html,svg,png,ico}'],
+        globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
         navigateFallback: '/index.html',
         runtimeCaching: [
           // Order matters: Workbox uses the FIRST matching route. The X-ray

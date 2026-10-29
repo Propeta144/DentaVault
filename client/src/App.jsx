@@ -6,6 +6,7 @@ import PageLoader from './components/common/PageLoader'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { ToastProvider } from './context/ToastContext'
 import { PROFILE_PATH } from './utils/selectedPatient'
+import { useSlowAfter, SERVER_WAKING_MESSAGE } from './hooks/useSlowAfter'
 
 // Lazy loading (code splitting): bawat page ay hiwalay na file (chunk) na
 // dina-download LANG kapag binuksan — hal. hindi dina-download ang Audit Log
@@ -14,6 +15,7 @@ import { PROFILE_PATH } from './utils/selectedPatient'
 // ang <PageLoader /> (tignan ang <Suspense> dito at sa AppLayout.jsx).
 // Eager pa rin ang AppLayout/ProtectedRoute — sila ang "shell" na laging
 // kailangan, kaya walang saysay na i-lazy.
+const WelcomePage = lazy(() => import('./pages/WelcomePage'))
 const LoginPage = lazy(() => import('./pages/LoginPage'))
 const DashboardPage = lazy(() => import('./pages/DashboardPage'))
 const PatientsListPage = lazy(() => import('./pages/PatientsListPage'))
@@ -41,6 +43,17 @@ function HomeRedirect() {
   return <Navigate to="/dashboard" replace />
 }
 
+// "/": Welcome page kapag hindi naka-login (walang password field, tignan
+// WelcomePage.jsx); kapag naka-login, diretso sa dashboard/record gaya ng dati.
+// Ang sapilitang pagpalit ng password ay hinaharang pa rin ng ProtectedRoute
+// ng pupuntahang page.
+function RootRoute() {
+  const { user, loading } = useAuth()
+  const slow = useSlowAfter(loading)
+  if (loading) return <PageLoader fullScreen hint={slow ? SERVER_WAKING_MESSAGE : null} />
+  return user ? <HomeRedirect /> : <WelcomePage />
+}
+
 function App() {
   return (
     <ToastProvider>
@@ -50,6 +63,7 @@ function App() {
               Yung may sidebar, may sariling <Suspense> sa AppLayout. */}
           <Suspense fallback={<PageLoader fullScreen />}>
           <Routes>
+            <Route index element={<RootRoute />} />
             <Route path="/login" element={<LoginPage />} />
 
             <Route element={<ProtectedRoute />}>
@@ -66,7 +80,6 @@ function App() {
               <Route path="patients/profile/xray/print" element={<XrayPrintPage />} />
 
               <Route element={<AppLayout />}>
-                <Route index element={<HomeRedirect />} />
                 <Route path="patients" element={<ProtectedRoute allowedRoles={['dentist']} />}>
                   <Route index element={<PatientsListPage />} />
                 </Route>
