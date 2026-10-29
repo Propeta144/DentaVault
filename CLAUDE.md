@@ -1951,4 +1951,4 @@ maraming device. Ngayon, **kapag nag-login sa bagong device, nalo-log out ang na
 **Na-verify (local):** API **15/15** (A na-kick pagka-login ng B, reason, data API 401, B gumagana, 2 sabay na login = 1 lang
 ang valid, Sign out = `signed_out`, maling password hindi naglo-log out, dentist at patient hindi nagkakaapektuhan). UI sa Edge
 **14/14** (2 tab ng device A na-kick pagbalik sa tab na may mensahe, B na-kick ng 60s check nang walang galaw, 390px walang
-overflow, sariling Sign out walang mensahe, 0 console error). Build pasado. Nilinis ang test audit rows. **Hindi pa naka-push.**
+overflow, sariling Sign out walang mensahe, 0 console error). Build pasado. Nilinis ang test audit rows. **Naka-push na** (commit `fdbbe71`, 2026-10-29). Napatakbo muna ang migration 019 sa Aiven bago ang push.
