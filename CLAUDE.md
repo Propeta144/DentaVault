@@ -1988,3 +1988,82 @@ overflow, sariling Sign out walang mensahe, 0 console error). Build pasado. Nili
 768, 360px, walang password field, 0 overflow; Inter na-load mula sa app; Sign in → `/login`, Back → `/`; dentist → Dashboard,
 naka-login sa `/` → Dashboard; patient → sariling record; `/dashboard` na hindi naka-login → `/login`; **0 request sa ibang
 website**, 0 console error. Build pasado. **Naka-push na** (commit `9d2b068`, 2026-10-29). Walang migration.
+
+---
+
+## 41. Pagsusuri ng Drawing Data + Export Error Message (galing sa "Security Fix Plan" PDF)
+
+**Pinanggalingan:** `Downloads/pagpunta sa client/DentaVault_Security_Fix_Plan.pdf`, isinulat batay sa obfuscated na JS
+sa F12. Sinuri ang bawat item laban sa code: **karamihan ay hindi tugma sa DentaVault** (Supabase, `clinic_id`, admin /
+clinician / front-desk roles, `/appointments`, `/treatments/:id`: wala sa system) o **nagawa na** (limit max 50 at sort
+whitelist sa server, parameterized queries, `requireRole('dentist')` sa lahat ng write at export,
+`canAccessPatientRecord`, protektado ang print pages, nire-reset ang selection sa Ctrl+K). Ang "plaintext-password HTML
+form" (C4) ay ang **Print slip** ng temporary password (nagpi-print lang, escaped, walang isinusumite). Hindi tinanggal ang
+obfuscation (L1), hiling ng teacher (#24). **Dalawang totoong isyu** ang inayos:
+
+### A. Drawing data (X-ray annotations at 3D chart strokes)
+- **Dati:** "array ba?" lang ang check sa server, kaya kahit anong laman ay naise-save, at ang isang sirang entry ay
+  puwedeng makasira sa pag-display ng X-ray o ngipin. Dentist lang ang nakakapag-save, kaya mababa ang panganib.
+  Sa local DB, may isang sirang annotation (X-ray #2, maagang test: listahan ng mga letra imbes na shapes); **wala sa Aiven**.
+- **Server (`utils/drawingData.js`):** uri (`line`/`text`; `freehand` sa 3D), coordinates na totoong numero at nasa loob ng
+  larawan (0–1; may 0.05 na palugit sa X-ray), kulay = `#RRGGBB`, text hanggang 200 character, max 200 shapes / 50 strokes,
+  max 5,000 points bawat guhit at 20,000 lahat. Mali = 422 na may malinaw na mensahe.
+- **Client:** `cleanShapes()` sa `drawAnnotations.js`: nilalaktawan ang sirang entry sa pag-drawing (viewer at print), at
+  hindi na naipapadala ulit pag-save. `maxLength` 200 sa annotation text. 3D: nilalaktawan ang sirang punto.
+
+### B. Export/template error message
+- **Dati:** kapag pumalya ang CSV export o template download (`responseType: 'blob'`), Blob din ang error kaya generic
+  na mensahe lang ang lumalabas. **Ngayon:** `withBlobErrors()` sa `services/api.js` binabasa ang totoong mensahe.
+
+| Name | Type | Purpose |
+|---|---|---|
+| `server/src/utils/drawingData.js` | **NEW** | `annotationsProblem`, `strokeDataProblem`, `isValidAnnotations`, `isValidStrokeData`. |
+| `server/src/routes/{xrays,chart}.routes.js` | MODIFIED | Validation ng `annotations` at `strokeData`. |
+| `server/src/controllers/xrays.controller.js` | MODIFIED | `assertValid` sa `updateAnnotations`. |
+| `client/src/components/xray/drawAnnotations.js` | MODIFIED | `cleanShapes()`, `ANNOTATION_TEXT_MAX`. |
+| `client/src/components/xray/XrayViewer.jsx` | MODIFIED | Nililinis ang naka-save na shapes pagbukas; `maxLength` sa text. |
+| `client/src/components/chart/Tooth3D.jsx` | MODIFIED | Nilalaktawan ang sirang stroke points. |
+| `client/src/services/{api,patients,patientImport}.js` | MODIFIED | `withBlobErrors()` sa dalawang download. |
+
+**Na-verify (local):** API **26/26** (tama = 200/201; 12 uri ng maling annotation at 6 na maling stroke = 422; 200-char text
+at 1.03 na gilid OK; clear-all OK; patient 403). UI sa Edge **10/10** (hindi nasisira ang drawing sa sirang data, 2 lang ang
+natitirang valid shape, lahat ng 6 na X-ray kasama ang sirang #2 nabubuksan, text box max 200, export at template error =
+totoong mensahe "You do not have permission to do that", 0 console error). Build pasado. Nabura ang test chart entries at
+audit rows; naibalik ang annotations ng X-ray #1. **Hindi pa naka-push.**
+
+---
+
+## 42. Mas Mabilis na Dashboard Pagka-login (LCP / element render delay)
+
+**Puna:** sa performance test, **2,842 ms** ang LCP pagka-login dahil sa "element render delay". Sanhi: ang Dashboard ay
+buong-page spinner hanggang dumating ang LAHAT ng data (`if (!data) return <PageLoader />`), kaya pati ang bati (na hindi
+naman kailangan ng data) ay naantala. Sunod-sunod din ang tatlong hakbang: login → download ng page file → data.
+
+- **Agad ang page:** bati, petsa, Register button, at lahat ng section title ay lumalabas agad; **skeleton** ang laman ng
+  Recent patients, Needs attention, Clinic overview, charts, at Recent activity hanggang dumating ang data. Iisang
+  `role="status"` ("Loading dashboard data") para sa screen reader. Kapag pumalya, nananatili ang bati at may error box.
+- **Sabay na simula:** pagka-login ng dentist (`AuthContext.login`), kinukuha na agad ang Dashboard data
+  (`prefetchDashboard`) habang dina-download ang page; at dina-download na ang Dashboard page file habang nasa login page
+  pa (idle). Iisang request lang kahit sabay na hingin (in-flight dedupe). Hindi ito ginagawa para sa patient o kapag
+  kailangan munang palitan ang password.
+- **Maliit na cache (parang SWR, walang library):** pagbalik sa Dashboard, ang huling data muna ang ipinapakita (agad),
+  habang kinukuha ang bago. **Binubura sa sign out** (walang matirang data ng naunang user).
+
+**Sukat (local production build, may simulated na delay ng Render at 4x mabagal na CPU; median ng 3 run):**
+| | Bago | Pagkatapos |
+|---|---|---|
+| Sign in → lumabas ang bati | 2,556 ms | **~1,550 ms** |
+| Sign in → lumabas ang data | 2,578 ms | **~1,850 ms** |
+| Pagbalik sa Dashboard → data | 1,370 ms | **~620 ms** |
+
+| Name | Type | Purpose |
+|---|---|---|
+| `client/src/services/dashboard.js` | MODIFIED | Cache + in-flight dedupe; `prefetchDashboard`, `peekDashboard`, `clearDashboardCache`. |
+| `client/src/pages/DashboardPage.jsx` | MODIFIED | Walang buong-page loader; `ListSkeleton`, `ChartSkeleton`; `buildOverview()` (inilipat ang chart data); cache muna. |
+| `client/src/context/AuthContext.jsx` | MODIFIED | Prefetch pagka-login ng dentist; clear cache sa sign out. |
+| `client/src/pages/LoginPage.jsx` | MODIFIED | Idle preload ng Dashboard page file. |
+
+**Na-verify (local, Edge via Playwright):** **17/17** (1366 at 390px: bati habang naglo-load pa, skeletons + section titles,
+screen reader status, napapalitan ng data, **iisang** dashboard request lang, 0 overflow; pagbalik = agad mula cache; sign
+out + sign in = walang lumang data; error = bati + error box; patient = walang dashboard request; 0 console error).
+Regression: welcome/login 20/20 (×3). Build pasado. **Hindi pa naka-push.**

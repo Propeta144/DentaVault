@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { ArrowLeft, Eye, EyeOff, Lock, Mail, Loader2 } from 'lucide-react'
 import AuthBrandPanel from '../components/common/AuthBrandPanel'
@@ -9,6 +9,15 @@ import { useSlowAfter, SERVER_WAKING_MESSAGE } from '../hooks/useSlowAfter'
 // Split layout: sa kaliwa ang brand panel (desktop lang), sa kanan ang form
 // na may official logo ng clinic (LOGOS/teodosio-rufin-logo.png). Sa phone,
 // form at logo lang. Dati: maliit na card sa gitna ng blangkong screen.
+// Habang nasa login page (nagta-type pa ng email/password), i-download na ang
+// Dashboard page file para hindi na hintayin pagka-sign in (#42). Maliit na
+// file ito; ang 3D chart at ibang mabibigat na page ay hindi kasama.
+function preloadDashboardPage() {
+  const load = () => import('./DashboardPage').catch(() => {})
+  if ('requestIdleCallback' in window) window.requestIdleCallback(load, { timeout: 2000 })
+  else setTimeout(load, 1000)
+}
+
 export default function LoginPage() {
   const { login, signOutReason } = useAuth()
   const navigate = useNavigate()
@@ -19,6 +28,8 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const slow = useSlowAfter(submitting)
+
+  useEffect(preloadDashboardPage, [])
 
   async function handleSubmit(e) {
     e.preventDefault()

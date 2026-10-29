@@ -2,10 +2,10 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { format } from 'date-fns'
 import { UserPlus, ScrollText, ArrowRight, Inbox, HelpCircle, CheckCircle2, ChevronRight, Users } from 'lucide-react'
-import { getDashboard } from '../services/dashboard'
+import { getDashboard, peekDashboard } from '../services/dashboard'
 import HorizontalBarChart from '../components/dashboard/HorizontalBarChart'
 import MonthlyTrendChart from '../components/dashboard/MonthlyTrendChart'
-import PageLoader from '../components/common/PageLoader'
+import { SkeletonBlock } from '../components/common/Skeleton'
 import Avatar from '../components/common/Avatar'
 import { AllergyFlag } from '../components/common/MedicalAlertBadge'
 import { useAuth } from '../context/AuthContext'
@@ -150,32 +150,42 @@ function NeedsAttention({ unreviewedXrays, allergiesNotRecorded }) {
   )
 }
 
-export default function DashboardPage() {
-  const { user } = useAuth()
-  const [data, setData] = useState(null)
-  const [error, setError] = useState('')
-  const [showAllProcedures, setShowAllProcedures] = useState(false)
-
-  useEffect(() => {
-    getDashboard()
-      .then(setData)
-      .catch((err) => setError(err.response?.data?.error || 'Failed to load dashboard'))
-  }, [])
-
-  const recent = useMemo(
-    () => (data ? groupAuditLogs(data.recentActivity).slice(0, RECENT_LIMIT) : []),
-    [data],
+// Mga placeholder habang wala pang data (#42). aria-hidden: iisang
+// "Loading dashboard data" lang ang binabasa ng screen reader (nasa itaas).
+function ListSkeleton({ rows = 4 }) {
+  return (
+    <div aria-hidden="true" className="space-y-1">
+      {Array.from({ length: rows }, (_, i) => (
+        <div key={i} className="flex min-h-14 items-center gap-3 py-2.5">
+          <div className="h-8 w-8 shrink-0 rounded-full bg-slate-200/70 motion-safe:animate-pulse" />
+          <div className="flex-1 space-y-2">
+            <SkeletonBlock className="h-3.5 w-2/5" />
+            <SkeletonBlock className="h-3 w-3/5" />
+          </div>
+        </div>
+      ))}
+    </div>
   )
+}
 
-  if (error) {
-    return <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-base text-red-700">{error}</div>
-  }
-  if (!data) return <PageLoader label="Loading dashboard..." />
+function ChartSkeleton({ bars = 5 }) {
+  const widths = ['w-11/12', 'w-3/4', 'w-1/2', 'w-2/5', 'w-1/4', 'w-1/5']
+  return (
+    <div aria-hidden="true" className="space-y-3">
+      {Array.from({ length: bars }, (_, i) => (
+        <div key={i} className="flex items-center gap-3">
+          <SkeletonBlock className="h-3.5 w-24 shrink-0" />
+          <SkeletonBlock className={`h-5 ${widths[i % widths.length]}`} />
+        </div>
+      ))}
+    </div>
+  )
+}
 
-  const { stats, procedureBreakdown, conditionBreakdown, monthlyTrend } = data
-  const recentPatients = data.recentPatients || []
-  const allergiesNotRecorded = data.allergiesNotRecorded || { rows: [], total: 0 }
-
+// Chart data ng "Procedures performed" at "Tooth conditions" (galing sa
+// dating loob ng DashboardPage; inilipat para hindi kailangan ang data bago
+// ipakita ang page).
+function buildOverview({ procedureBreakdown, conditionBreakdown }, showAllProcedures) {
   // Kulay ayon sa GRUPO ng procedure, sa FIXED na pagkakasunod (hindi sorted
   // by count): tignan PROCEDURE_CATEGORY_COLORS sa dashboardColors.js kung
   // bakit. Ang lumang "Crown / Bridge" ay lumalabas lang kapag may record pa.
@@ -231,6 +241,39 @@ export default function DashboardPage() {
     color: c.color,
   }))
 
+  return { procedureData, hiddenProcedures, procedureLegend, conditionData }
+}
+
+export default function DashboardPage() {
+  const { user } = useAuth()
+  // Huling data (cache) muna kung meron, kaya agad may laman pagbalik (#42)
+  const [data, setData] = useState(peekDashboard)
+  const [error, setError] = useState('')
+  const [showAllProcedures, setShowAllProcedures] = useState(false)
+
+  // Laging kinukuha ang bago. Kapag pumalya pero may lumang data na, iyon na
+  // lang ang ipinapakita (walang error box sa ibabaw ng gumaganang page).
+  useEffect(() => {
+    getDashboard()
+      .then(setData)
+      .catch((err) => {
+        if (!peekDashboard()) setError(err.response?.data?.error || 'Failed to load dashboard')
+      })
+  }, [])
+
+  const recent = useMemo(
+    () => (data ? groupAuditLogs(data.recentActivity).slice(0, RECENT_LIMIT) : []),
+    [data],
+  )
+
+  // Hindi na hinihintay ang data bago ipakita ang page (#42): dati buong-page
+  // spinner hanggang dumating ang lahat, kaya pati ang bati ay naantala (LCP).
+  // Ngayon agad ang bati at mga section; skeleton ang laman hanggang may data.
+  const stats = data?.stats
+  const recentPatients = data?.recentPatients || []
+  const allergiesNotRecorded = data?.allergiesNotRecorded || { rows: [], total: 0 }
+  const overview = data ? buildOverview(data, showAllProcedures) : null
+
   return (
     <div className="space-y-8">
       {/* Bati + petsa + Register. Ang "Find patient" ay nasa sidebar/top bar
@@ -251,6 +294,17 @@ export default function DashboardPage() {
         </Link>
       </div>
 
+      {!data && !error && (
+        <p role="status" className="sr-only">
+          Loading dashboard data
+        </p>
+      )}
+      {error && (
+        <div role="alert" className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-base text-red-700">
+          {error}
+        </div>
+      )}
+
       {/* ===== 1. Patients: ang uunahin ===== */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <section className={`${CARD} lg:col-span-2`} aria-labelledby="dash-recent-patients">
@@ -266,14 +320,18 @@ export default function DashboardPage() {
               <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
-          <RecentPatients patients={recentPatients} />
+          {data ? <RecentPatients patients={recentPatients} /> : <ListSkeleton rows={5} />}
         </section>
 
         <section className={CARD} aria-labelledby="dash-attention">
           <h2 id="dash-attention" className="mb-3 text-lg font-semibold text-slate-900">
             Needs attention
           </h2>
-          <NeedsAttention unreviewedXrays={stats.unreviewedXrays} allergiesNotRecorded={allergiesNotRecorded} />
+          {data ? (
+            <NeedsAttention unreviewedXrays={stats.unreviewedXrays} allergiesNotRecorded={allergiesNotRecorded} />
+          ) : (
+            <ListSkeleton rows={3} />
+          )}
         </section>
       </div>
 
@@ -289,13 +347,15 @@ export default function DashboardPage() {
             </h2>
             <dl className="grid grid-cols-3 gap-4 sm:flex sm:gap-10">
               {[
-                ['Active patients', stats.activePatients],
-                ['Treatments this month', stats.treatmentsThisMonth],
-                ['X‑rays this month', stats.xraysThisMonth],
+                ['Active patients', stats?.activePatients],
+                ['Treatments this month', stats?.treatmentsThisMonth],
+                ['X‑rays this month', stats?.xraysThisMonth],
               ].map(([label, value]) => (
                 <div key={label} className="flex flex-col-reverse">
                   <dt className="text-xs uppercase tracking-[0.12em] text-sky-100">{label}</dt>
-                  <dd className="text-2xl font-semibold tabular-nums">{value}</dd>
+                  <dd className="text-2xl font-semibold tabular-nums">
+                    {data ? value : <span aria-hidden="true" className="my-1 block h-6 w-10 rounded-md bg-white/25 motion-safe:animate-pulse" />}
+                  </dd>
                 </div>
               ))}
             </dl>
@@ -306,22 +366,30 @@ export default function DashboardPage() {
           <section className={CARD}>
             <h3 className="mb-1 text-base font-semibold text-slate-900">Procedures performed</h3>
             <p className="mb-4 text-sm text-slate-600">All treatments on record, by procedure.</p>
-            <HorizontalBarChart data={procedureData} legend={procedureLegend} minScale={5} />
-            {hiddenProcedures > 0 && (
+            {overview ? (
+              <HorizontalBarChart data={overview.procedureData} legend={overview.procedureLegend} minScale={5} />
+            ) : (
+              <ChartSkeleton bars={6} />
+            )}
+            {overview?.hiddenProcedures > 0 && (
               <button
                 type="button"
                 onClick={() => setShowAllProcedures((v) => !v)}
                 aria-expanded={showAllProcedures}
                 className="mt-3 flex min-h-11 items-center rounded-md px-2 text-sm font-medium text-sky-700 transition-colors hover:bg-sky-50"
               >
-                {showAllProcedures ? 'Hide procedures with no records' : `Show all procedures (${hiddenProcedures} with no records)`}
+                {showAllProcedures ? 'Hide procedures with no records' : `Show all procedures (${overview.hiddenProcedures} with no records)`}
               </button>
             )}
           </section>
           <section className={CARD}>
             <h3 className="mb-1 text-base font-semibold text-slate-900">Tooth conditions</h3>
             <p className="mb-4 text-sm text-slate-600">Current state across all charts (latest entry per tooth surface).</p>
-            <HorizontalBarChart data={conditionData} legend={CONDITION_LEGEND} minScale={5} />
+            {overview ? (
+              <HorizontalBarChart data={overview.conditionData} legend={CONDITION_LEGEND} minScale={5} />
+            ) : (
+              <ChartSkeleton bars={5} />
+            )}
           </section>
         </div>
 
@@ -329,7 +397,7 @@ export default function DashboardPage() {
           <section className={CARD}>
             <h3 className="mb-1 text-base font-semibold text-slate-900">New patients and treatments</h3>
             <p className="mb-4 text-sm text-slate-600">Last 6 months. Hover or tap a month for exact numbers.</p>
-            <MonthlyTrendChart data={monthlyTrend} />
+            {data ? <MonthlyTrendChart data={data.monthlyTrend} /> : <SkeletonBlock className="h-48 w-full" />}
           </section>
 
           <section className={CARD}>
@@ -343,7 +411,9 @@ export default function DashboardPage() {
                 <ArrowRight className="h-4 w-4" />
               </Link>
             </div>
-            {recent.length === 0 ? (
+            {!data ? (
+              <ListSkeleton rows={5} />
+            ) : recent.length === 0 ? (
               <div className="flex flex-col items-center py-8 text-center">
                 <ScrollText className="mb-2 h-6 w-6 text-slate-300" aria-hidden="true" />
                 <p className="text-sm text-slate-600">No activity on patient records yet.</p>

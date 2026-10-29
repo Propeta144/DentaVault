@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import api, { SESSION_ENDED_EVENT } from '../services/api'
 import IdleWarningModal from '../components/common/IdleWarningModal'
+import { prefetchDashboard, clearDashboardCache } from '../services/dashboard'
 
 const AuthContext = createContext(null)
 const TOKEN_KEY = 'dentavault_token'
@@ -60,6 +61,7 @@ export function AuthProvider({ children }) {
     setSignInInfo(null)
     setUser(null)
     setIdleSecondsLeft(null)
+    clearDashboardCache()
     // Belt-and-suspenders na lang 'to on top ng per-identity cache-key
     // scoping sa vite.config.js: kapag malinis yung logout, walang
     // matitirang cached patient data ng session na 'to sa service worker's
@@ -204,6 +206,10 @@ export function AuthProvider({ children }) {
     const { data } = await api.post('/auth/login', { email, password })
     localStorage.setItem(TOKEN_KEY, data.token)
     touchActivity()
+    // Dentist → Dashboard ang susunod: kunin na agad ang data habang
+    // dina-download pa ang page (#42). Hindi kapag kailangan munang palitan
+    // ang password (403 lang ang makukuha).
+    if (data.user.role === 'dentist' && !data.user.mustChangePassword) prefetchDashboard()
     const info = { ...data.signIn, passwordUpgradeRequired: Boolean(data.user.passwordUpgradeRequired) }
     sessionStorage.setItem(SIGN_IN_INFO_KEY, JSON.stringify(info))
     localStorage.removeItem(SIGN_OUT_REASON_KEY)
