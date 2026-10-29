@@ -4,6 +4,7 @@ import * as chartController from '../controllers/chart.controller.js'
 import { authenticate } from '../middleware/auth.js'
 import { requireRole } from '../middleware/rbac.js'
 import { FIELD_LIMITS, CHART_CONDITIONS, isValidToothNumber } from '../utils/validators.js'
+import { isValidStrokeData } from '../utils/drawingData.js'
 
 const router = Router()
 
@@ -28,7 +29,8 @@ router.post(
       .withMessage('Tooth number must be an FDI number (11–48, or 51–85 for baby teeth)'),
     body('surface').isIn(SURFACES).withMessage('Invalid surface'),
     body('conditionCode').isIn(CHART_CONDITIONS).withMessage('Invalid condition'),
-    body('strokeData').optional({ nullable: true }).isArray().withMessage('strokeData must be an array'),
+    // Laman din ng bawat guhit, hindi lang kung array (#41)
+    body('strokeData').optional({ nullable: true }).custom(isValidStrokeData),
     body('addTreatment').optional().isBoolean({ strict: true }).withMessage('addTreatment must be true or false'),
     body('notes')
       .optional({ values: 'falsy' })

@@ -265,8 +265,12 @@ function SurfaceLayer({ geometry, fills, marks }) {
     }
 
     for (const mark of marks) {
-      const pts = mark.points
-      if (!pts || pts.length === 0) continue
+      // Sirang naka-save na drawing (hindi numero ang coordinate): nilalaktawan
+      // ang punto, hindi sinisira ang buong ngipin (#41)
+      const pts = Array.isArray(mark.points)
+        ? mark.points.filter((p) => Array.isArray(p) && Number.isFinite(p[0]) && Number.isFinite(p[1]))
+        : []
+      if (pts.length === 0) continue
       ctx.globalAlpha = 0.85
       ctx.fillStyle = mark.color
       ctx.strokeStyle = mark.color

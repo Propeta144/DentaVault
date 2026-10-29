@@ -211,11 +211,12 @@ export const remove = asyncHandler(async (req, res) => {
 })
 
 export const updateAnnotations = asyncHandler(async (req, res) => {
+  assertValid(req)
   const xray = await xrayModel.findXrayById(req.params.id)
   if (!xray) throw new AppError('X-ray not found', 404)
 
   // Dentist lang ang nag-a-annotate (clinical review), hindi yung patient.
-  const updated = await xrayModel.updateAnnotations(xray.id, req.body.annotations || [])
+  const updated = await xrayModel.updateAnnotations(xray.id, req.body.annotations)
 
   await recordAuditLog({
     userId: req.user.userId,

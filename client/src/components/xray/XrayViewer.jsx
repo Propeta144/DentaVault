@@ -3,7 +3,7 @@ import { PenLine, Type, Undo2, Save, ZoomIn, ZoomOut, X, Printer, Trash2 } from 
 import { fetchXrayObjectUrl, saveAnnotations } from '../../services/xrays'
 import { useToast } from '../../context/ToastContext'
 import { openPrintTab, PROFILE_PATH } from '../../utils/selectedPatient'
-import { drawShapes } from './drawAnnotations'
+import { drawShapes, cleanShapes, ANNOTATION_TEXT_MAX } from './drawAnnotations'
 import DeleteXrayModal from './DeleteXrayModal'
 import Modal from '../common/Modal'
 
@@ -45,7 +45,8 @@ export default function XrayViewer({ xray, patientCode, canAnnotate, canDelete =
   // makakapasa pa rin sa truthy check na 'to, tapos yung `[...shapes,
   // newShape]` sa susunod, tahimik lang na i-spread yung string papuntang
   // individual characters sa halip na mag-error.
-  const [shapes, setShapes] = useState(Array.isArray(xray.annotations) ? xray.annotations : [])
+  // cleanShapes: walang sirang entry na ipapakita o ipapadala ulit pag-save (#41)
+  const [shapes, setShapes] = useState(() => cleanShapes(xray.annotations))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [deleting, setDeleting] = useState(false)
@@ -354,6 +355,7 @@ export default function XrayViewer({ xray, patientCode, canAnnotate, canDelete =
                   type="text"
                   autoFocus
                   value={textInput.value}
+                  maxLength={ANNOTATION_TEXT_MAX}
                   placeholder="Annotation text"
                   onChange={(e) => setTextInput((prev) => ({ ...prev, value: e.target.value }))}
                   onBlur={commitTextInput}

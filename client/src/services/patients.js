@@ -1,4 +1,4 @@
-import api from './api'
+import api, { withBlobErrors } from './api'
 import { todayISO } from '../utils/formatDate'
 
 export function listPatients({ search = '', sort = 'name', page = 1, limit = 20 } = {}) {
@@ -9,7 +9,7 @@ export function listPatients({ search = '', sort = 'name', page = 1, limit = 20 
 // patientImport.js — hindi kasi makakapagpadala ng Bearer token yung plain
 // <a href>.
 export async function exportPatientsCsv({ search = '' } = {}) {
-  const response = await api.get('/patients/export', { params: { search }, responseType: 'blob' })
+  const response = await withBlobErrors(api.get('/patients/export', { params: { search }, responseType: 'blob' }))
   const url = URL.createObjectURL(response.data)
   const link = document.createElement('a')
   link.href = url

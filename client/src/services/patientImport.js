@@ -1,4 +1,4 @@
-import api from './api'
+import api, { withBlobErrors } from './api'
 
 const multipart = { headers: { 'Content-Type': 'multipart/form-data' } }
 
@@ -24,10 +24,12 @@ export function importPatientsFile(file, { mapping, dryRun = false } = {}) {
 // iba, kaya hindi pwedeng gumamit ng plain <a href> — kunin na lang siya
 // bilang blob tapos i-trigger yung download nang manual.
 export async function downloadImportTemplate(format = 'xlsx') {
-  const response = await api.get('/patients/import/template', {
-    responseType: 'blob',
-    params: format === 'csv' ? { format: 'csv' } : undefined,
-  })
+  const response = await withBlobErrors(
+    api.get('/patients/import/template', {
+      responseType: 'blob',
+      params: format === 'csv' ? { format: 'csv' } : undefined,
+    }),
+  )
   const url = URL.createObjectURL(response.data)
   const link = document.createElement('a')
   link.href = url

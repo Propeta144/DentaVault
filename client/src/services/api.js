@@ -31,4 +31,24 @@ api.interceptors.response.use(undefined, (error) => {
   return Promise.reject(error)
 })
 
+// Kapag `responseType: 'blob'` (file downloads) at pumalya ang request, Blob
+// din ang error body, kaya nawawala ang totoong mensahe ng server (#41).
+// Binabasa ito at ibinabalik bilang JSON, para gumana ang karaniwang
+// `err.response?.data?.error`.
+export async function withBlobErrors(request) {
+  try {
+    return await request
+  } catch (err) {
+    const data = err.response?.data
+    if (data instanceof Blob) {
+      try {
+        err.response.data = JSON.parse(await data.text())
+      } catch {
+        // hindi JSON: iwan na lang
+      }
+    }
+    throw err
+  }
+}
+
 export default api

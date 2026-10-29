@@ -6,6 +6,7 @@ import { requireRole } from '../middleware/rbac.js'
 import { patientXrayUploadLimiter } from '../middleware/rateLimit.js'
 import { uploadXray } from '../config/upload.js'
 import { FIELD_LIMITS, notInFuture } from '../utils/validators.js'
+import { isValidAnnotations } from '../utils/drawingData.js'
 
 const router = Router()
 
@@ -47,7 +48,13 @@ router.put('/xrays/:id/reviewed', requireRole('dentist'), xraysController.markRe
 
 // X-ray-scoped 'to: gumagana sa isang image, base sa sarili niyang id.
 router.get('/xrays/:id/file', xraysController.getFile)
-router.put('/xrays/:id/annotations', requireRole('dentist'), xraysController.updateAnnotations)
+router.put(
+  '/xrays/:id/annotations',
+  requireRole('dentist'),
+  // Laman ng bawat guhit/text (#41): uri, coordinates, kulay, haba ng text, bilang
+  [body('annotations').custom(isValidAnnotations)],
+  xraysController.updateAnnotations,
+)
 // Patient: sariling upload lang na hindi pa nare-review (tignan controller)
 router.delete('/xrays/:id', requireRole('dentist', 'patient'), xraysController.remove)
 
