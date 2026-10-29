@@ -2029,7 +2029,7 @@ obfuscation (L1), hiling ng teacher (#24). **Dalawang totoong isyu** ang inayos:
 at 1.03 na gilid OK; clear-all OK; patient 403). UI sa Edge **10/10** (hindi nasisira ang drawing sa sirang data, 2 lang ang
 natitirang valid shape, lahat ng 6 na X-ray kasama ang sirang #2 nabubuksan, text box max 200, export at template error =
 totoong mensahe "You do not have permission to do that", 0 console error). Build pasado. Nabura ang test chart entries at
-audit rows; naibalik ang annotations ng X-ray #1. **Hindi pa naka-push.**
+audit rows; naibalik ang annotations ng X-ray #1. **Naka-push na** (commit `1d99938`, 2026-10-29). Walang migration.
 
 ---
 
@@ -2066,4 +2066,4 @@ naman kailangan ng data) ay naantala. Sunod-sunod din ang tatlong hakbang: login
 **Na-verify (local, Edge via Playwright):** **17/17** (1366 at 390px: bati habang naglo-load pa, skeletons + section titles,
 screen reader status, napapalitan ng data, **iisang** dashboard request lang, 0 overflow; pagbalik = agad mula cache; sign
 out + sign in = walang lumang data; error = bati + error box; patient = walang dashboard request; 0 console error).
-Regression: welcome/login 20/20 (×3). Build pasado. **Hindi pa naka-push.**
+Regression: welcome/login 20/20 (×3). Build pasado. **Naka-push na** (commit `6d78218`, 2026-10-29). Walang migration.
