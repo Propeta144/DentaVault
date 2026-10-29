@@ -1987,4 +1987,4 @@ overflow, sariling Sign out walang mensahe, 0 console error). Build pasado. Nili
 **Na-verify (local, production build + `vite preview` na may CSP, Edge via Playwright):** **20/20** (×3): Welcome sa `/` sa 1366,
 768, 360px, walang password field, 0 overflow; Inter na-load mula sa app; Sign in → `/login`, Back → `/`; dentist → Dashboard,
 naka-login sa `/` → Dashboard; patient → sariling record; `/dashboard` na hindi naka-login → `/login`; **0 request sa ibang
-website**, 0 console error. Build pasado. **Hindi pa naka-push.**
+website**, 0 console error. Build pasado. **Naka-push na** (commit `9d2b068`, 2026-10-29). Walang migration.
