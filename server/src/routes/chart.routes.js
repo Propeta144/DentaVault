@@ -14,6 +14,7 @@ const SURFACES = ['mesial', 'distal', 'occlusal', 'facial', 'lingual', 'whole']
 
 router.get('/patients/:patientCode/chart', chartController.getCurrentChart)
 router.get('/patients/:patientCode/chart/:toothNumber/history', chartController.getToothHistory)
+router.delete('/patients/:patientCode/chart/:entryId', requireRole('dentist'), chartController.deleteEntry)
 // Intraoral Examination (Periodontal, Occlusion, Appliances, TMD): para sa
 // buong bibig, hindi bawat ngipin
 router.get('/patients/:patientCode/intraoral', chartController.getIntraoral)

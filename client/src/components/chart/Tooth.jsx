@@ -185,7 +185,9 @@ export default function Tooth({
                 strokeWidth={0.75}
                 strokeLinejoin="round"
                 onClick={() => canEdit && onSurfaceClick(toothNumber, surfaceCode)}
-                className={canEdit ? 'cursor-pointer transition-all duration-150 hover:brightness-90' : ''}
+                // Kulay ng primary buttons sa hover lang; babalik sa recorded
+                // condition color pag-alis ng pointer. Read-only/print: walang hover.
+                className={canEdit ? 'cursor-pointer transition-colors duration-150 hover:fill-sky-600 hover:stroke-sky-700' : ''}
               >
                 {canEdit && <title>{`Tooth ${toothNumber}, ${surfaceLabel(surfaceCode)}`}</title>}
               </polygon>

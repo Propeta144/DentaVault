@@ -28,6 +28,8 @@ const FIELD_LABELS = {
   medical_history: 'Medical history',
   allergies: 'Allergies',
   emergency_contact_name: 'Emergency contact name',
+  emergency_contact_relationship: 'Emergency contact relationship',
+  emergency_contact_relationship_other: 'Other emergency contact relationship',
   emergency_contact_phone: 'Emergency contact phone',
   procedure_name: 'Procedure',
   treatment_date: 'Treatment date',

@@ -6,10 +6,11 @@ import { ALL_TEETH, surfaceLetters } from '../constants/dental'
 import PageLoader from '../components/common/PageLoader'
 import PrintHeader from '../components/common/PrintHeader'
 import { formatDate, formatDateTime } from '../utils/formatDate'
+import { emergencyRelationshipLabel } from '../constants/emergencyRelationship'
 
 // Hindi hiwalay na linya: ang middle name ay nasa Name na, at ang "If so, ..."
 // na sagot ay nasa tabi ng Yes/No
-const SKIP_IN_DETAILS = ['middleName', ...HEALTH_QUESTIONS.map((q) => q.detailsKey).filter(Boolean)]
+const SKIP_IN_DETAILS = ['middleName', 'emergencyContactRelationship', 'emergencyContactRelationshipOther', ...HEALTH_QUESTIONS.map((q) => q.detailsKey).filter(Boolean)]
 
 export default function PatientSummaryPrintPage() {
   const id = usePrintState()?.patientCode
@@ -63,6 +64,15 @@ export default function PatientSummaryPrintPage() {
         </div>
         <div className="col-span-2">
           <strong>Medical History:</strong> {patient.medical_history || '—'}
+        </div>
+      </div>
+
+      <div className="mb-6 break-inside-avoid border-b border-slate-200 pb-4 text-sm">
+        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">Emergency Contact</h2>
+        <div className="grid grid-cols-2 gap-2">
+          <div><strong>Name:</strong> {patient.emergency_contact_name || 'Not recorded'}</div>
+          <div><strong>Relationship:</strong> {emergencyRelationshipLabel(patient) || 'Not recorded'}</div>
+          <div><strong>Phone:</strong> {patient.emergency_contact_phone || 'Not recorded'}</div>
         </div>
       </div>
 

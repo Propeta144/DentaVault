@@ -77,6 +77,11 @@ function obfuscateSource() {
 
 // https://vite.dev/config/
 export default defineConfig({
+  // Isama agad ang lazy 3D libraries sa dev optimization para hindi
+  // magpalit ng dependency URLs sa unang pagbukas ng 3D tab.
+  optimizeDeps: {
+    include: ['three', '@react-three/fiber', '@react-three/drei', 'troika-three-text'],
+  },
   plugins: [
     react(),
     tailwindcss(),

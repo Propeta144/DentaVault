@@ -5,16 +5,13 @@ import AppError from '../utils/AppError.js'
 import { FIELD_LIMITS, stripPhoneFormatting, isValidToothNumber, clinicToday } from '../utils/validators.js'
 import { EXTRA_PATIENT_FIELDS, parseYesNo } from '../utils/patientFields.js'
 import { readXlsx, isXlsxBuffer, isLegacyXlsBuffer } from '../utils/xlsx.js'
+import { relationshipErrors } from '../utils/emergencyRelationship.js'
 
-const REQUIRED_COLUMNS = ['first_name', 'last_name', 'sex', 'date_of_birth']
+const REQUIRED_COLUMNS = ['first_name', 'last_name', 'sex', 'date_of_birth', 'contact_number', 'address', 'emergency_contact_name', 'emergency_contact_relationship', 'emergency_contact_phone']
 const OPTIONAL_COLUMNS = [
-  'contact_number',
   'email',
-  'address',
   'medical_history',
   'allergies',
-  'emergency_contact_name',
-  'emergency_contact_phone',
 ]
 
 // Optional per-row treatment columns. The sheet is "long format" — a
@@ -81,7 +78,7 @@ export const IMPORT_TEMPLATE_HEADERS = [
   'middle_name',
   ...REQUIRED_COLUMNS.filter((c) => c !== 'first_name'),
   ...OPTIONAL_COLUMNS,
-  ...INFO_COLUMNS.filter((c) => c !== 'middle_name'),
+  ...INFO_COLUMNS.filter((c) => c !== 'middle_name' && !REQUIRED_COLUMNS.includes(c)),
   ...TREATMENT_COLUMNS,
 ]
 
@@ -205,7 +202,7 @@ export function suggestMapping(headers) {
 }
 
 // Sinusuri ang mapping galing sa client: header na totoong nasa file lang,
-// at kumpleto ang 4 na required na field.
+// at kumpleto ang required na fields.
 function resolveMapping(headers, mapping) {
   const resolved = {}
   for (const field of IMPORT_FIELDS) {
@@ -374,6 +371,16 @@ function validateAndNormalizeRow(raw, { dayFirst } = {}) {
 
   if (!firstName) errors.push('first_name is required')
   if (!lastName) errors.push('last_name is required')
+  for (const column of ['address', 'emergency_contact_name']) {
+    if (!String(raw[column] ?? '').trim()) errors.push(`${column} is required`)
+  }
+  for (const column of ['contact_number', 'emergency_contact_phone']) {
+    const phone = normalizeImportPhone(raw[column])
+    if (!phone) errors.push(`${column} is required`)
+    else if (!/^(09\d{9}|\+639\d{9})$/.test(phone)) {
+      errors.push(`${column} must be a valid PH mobile number (09XXXXXXXXX or +639XXXXXXXXX)`)
+    }
+  }
   if (!sex) errors.push(`sex must be male/female (got "${raw.sex ?? ''}")`)
   if (!dateOfBirth) {
     errors.push(
@@ -409,6 +416,8 @@ function validateAndNormalizeRow(raw, { dayFirst } = {}) {
     }
   }
 
+  errors.push(...Object.values(relationshipErrors(info)))
+  if (info.emergencyContactRelationship !== 'Other') info.emergencyContactRelationshipOther = null
   if (errors.length > 0) return { errors }
 
   return {

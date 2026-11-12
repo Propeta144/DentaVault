@@ -53,14 +53,14 @@ export async function getConditionBreakdown() {
   const [rows] = await pool.execute(
     `SELECT ce.condition_code, COUNT(*) AS count
      FROM (
-       SELECT patient_id, tooth_number, surface, condition_code,
+       SELECT patient_id, tooth_number, surface, condition_code, is_cleared,
               ROW_NUMBER() OVER (
                 PARTITION BY patient_id, tooth_number, surface ORDER BY recorded_at DESC, id DESC
               ) AS rn
        FROM chart_entries
      ) ce
      JOIN patients p ON p.id = ce.patient_id AND p.deleted_at IS NULL
-     WHERE ce.rn = 1
+     WHERE ce.rn = 1 AND ce.is_cleared = 0
      GROUP BY ce.condition_code`,
   )
   return rows

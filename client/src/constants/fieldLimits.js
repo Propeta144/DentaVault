@@ -9,6 +9,8 @@ export const FIELD_LIMITS = {
   address: 255,
   contactNumber: 20,
   emergencyContactName: 150,
+  emergencyContactRelationship: 20,
+  emergencyContactRelationshipOther: 100,
   emergencyContactPhone: 20,
   medicalHistory: 2000,
   allergies: 2000,

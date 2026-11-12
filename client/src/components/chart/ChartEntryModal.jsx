@@ -1,5 +1,5 @@
 import { useId, useState } from 'react'
-import { AlertTriangle, ClipboardList, Clock, History, Loader2 } from 'lucide-react'
+import { AlertTriangle, ClipboardList, Clock, History, Loader2, Trash2 } from 'lucide-react'
 import Modal from '../common/Modal'
 import { PatientAlertStrip } from '../common/MedicalAlertBadge'
 import {
@@ -131,7 +131,7 @@ function surfaceLabelFor(code) {
   return SURFACES.find((s) => s.code === code)?.label || code
 }
 
-// toothState (2D chart lang): lahat ng kasalukuyang marka ng ngipin, para
+// toothState (2D o 3D surface selection): kasalukuyang marka ng ngipin, para
 // mapalitan ang surface sa loob ng modal. Kapag wala (3D pen), nakapirmi ang
 // surface (galing sa iginuhit) at currentEntry ang gamit.
 // alerts: { allergies, medicalHistory } ng pasyente, laging kita sa itaas.
@@ -146,6 +146,7 @@ export default function ChartEntryModal({
   strokes,
   onClose,
   onSubmit,
+  onDelete,
 }) {
   const { showToast } = useToast()
   const formId = useId()
@@ -186,6 +187,7 @@ export default function ChartEntryModal({
   const [showHistory, setShowHistory] = useState(false)
   const [history, setHistory] = useState(null)
   const [loadingHistory, setLoadingHistory] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
 
   const surfaceLabel = surfaceLabelFor(surface)
   const selectedLabel = conditionLabel(conditionCode)
@@ -265,6 +267,52 @@ export default function ChartEntryModal({
     } finally {
       setSubmitting(false)
     }
+  }
+
+  async function handleDelete() {
+    if (!currentEntry || !onDelete || submitting) return
+    setError('')
+    setSubmitting(true)
+    try {
+      await onDelete(currentEntry.id)
+      showToast(`Condition removed from tooth ${toothNumber}.`, { type: 'success' })
+      onClose()
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to delete condition')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  if (confirmDelete && currentEntry && onDelete) {
+    const clearsWholeTooth = currentEntry.surface === 'whole' || isWholeToothCondition(currentEntry.condition_code)
+    return (
+      <Modal key="delete-condition" title="Delete Condition" onClose={() => !submitting && setConfirmDelete(false)}
+        notice={alerts && <PatientAlertStrip allergies={alerts.allergies} medicalHistory={alerts.medicalHistory} />}>
+        <div className="space-y-4">
+          <div className="flex items-start gap-3 rounded-md border border-red-200 bg-red-50 px-4 py-3">
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
+            <div className="text-base text-red-800">
+              <p className="font-semibold">Delete {conditionLabel(currentEntry.condition_code)} from tooth {toothNumber}
+                {clearsWholeTooth ? ' (whole tooth)' : ` (${surfaceLabel})`}?</p>
+              <p className="mt-1">{clearsWholeTooth
+                ? 'This clears the whole-tooth mark and all 5 surface marks on this tooth.'
+                : 'This clears only the selected surface mark.'} The cleared area becomes unmarked. The removal stays in chart history and the audit log.</p>
+              <p className="mt-1">Treatment History entries will remain. To delete an incorrect treatment, use Treatment History.</p>
+            </div>
+          </div>
+          {error && <p role="alert" className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-base text-red-700">{error}</p>}
+          <div className="flex gap-2">
+            <button type="button" disabled={submitting} onClick={() => { setConfirmDelete(false); setError('') }}
+              className="min-h-11 flex-1 rounded-md border border-slate-300 bg-white px-4 py-3 text-base font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50">Cancel</button>
+            <button type="button" disabled={submitting} onClick={handleDelete}
+              className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-md bg-red-600 px-4 py-3 text-base font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50">
+              <Trash2 className="h-4 w-4" />{submitting ? 'Deleting...' : 'Delete Condition'}
+            </button>
+          </div>
+        </div>
+      </Modal>
+    )
   }
 
   return (
@@ -360,7 +408,7 @@ export default function ChartEntryModal({
                   <div key={h.id} className="border-b border-slate-100 pb-2 text-xs last:border-0 last:pb-0">
                     <div className="flex items-center justify-between gap-2">
                       <span className="font-medium text-slate-700">
-                        {surfaceLabelFor(h.surface)} · {conditionLabel(h.condition_code)}
+                        {surfaceLabelFor(h.surface)} · {h.is_cleared ? `Removed: ${conditionLabel(h.condition_code)}` : conditionLabel(h.condition_code)}
                       </span>
                       <span className="shrink-0 text-slate-500">{timeAgo(h.recorded_at)}</span>
                     </div>
@@ -425,6 +473,12 @@ export default function ChartEntryModal({
           </div>
         )}
 
+        {strokes && currentEntry && conditionCode && !applyToWholeTooth && currentEntry.condition_code !== conditionCode && (
+          <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            Saving replaces the current condition and drawing on this surface. Other surfaces stay unchanged.
+          </p>
+        )}
+
         <div>
           <label htmlFor={`${formId}-notes`} className="mb-1 block text-base font-medium text-slate-700">
             Notes <span className="font-normal text-slate-500">(optional)</span>
@@ -456,7 +510,12 @@ export default function ChartEntryModal({
           </label>
         )}
 
-        {/* Dalawang button gaya ng ibang modal (dati Save lang) */}
+        {onDelete && currentEntry && (
+          <button type="button" disabled={submitting} onClick={() => { setError(''); setConfirmDelete(true) }}
+            className="flex min-h-11 w-full items-center justify-center gap-2 rounded-md border border-red-300 bg-white px-4 py-2.5 text-base font-medium text-red-700 transition-colors hover:bg-red-50 disabled:opacity-50">
+            <Trash2 className="h-4 w-4" />Delete Current Condition
+          </button>
+        )}
         {!conditionCode && (
           <p id={`${formId}-save-hint`} className="text-sm text-slate-600">
             Choose a condition above to save.

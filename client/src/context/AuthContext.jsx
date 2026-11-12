@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 import api, { SESSION_ENDED_EVENT } from '../services/api'
 import IdleWarningModal from '../components/common/IdleWarningModal'
 import { prefetchDashboard, clearDashboardCache } from '../services/dashboard'
+import { OFFLINE_SESSION_KEY, readOfflineSession, saveOfflineSession } from '../utils/offlineSession'
 
 const AuthContext = createContext(null)
 const TOKEN_KEY = 'dentavault_token'
@@ -57,6 +58,7 @@ export function AuthProvider({ children }) {
 
   const clearSession = useCallback(() => {
     localStorage.removeItem(TOKEN_KEY)
+    localStorage.removeItem(OFFLINE_SESSION_KEY)
     sessionStorage.removeItem(SIGN_IN_INFO_KEY)
     setSignInInfo(null)
     setUser(null)
@@ -102,12 +104,33 @@ export function AuthProvider({ children }) {
       setLoading(false)
       return
     }
-    api
-      .get('/auth/me')
-      .then(({ data }) => setUser(data.user))
-      .catch(() => localStorage.removeItem(TOKEN_KEY))
-      .finally(() => setLoading(false))
-  }, [logout])
+    let cancelled = false
+    async function restoreSession() {
+      try {
+        const { data } = await api.get('/auth/me', { timeout: 10000 })
+        if (cancelled || localStorage.getItem(TOKEN_KEY) !== token) return
+        saveOfflineSession(localStorage, token, data.user)
+        setUser(data.user)
+      } catch (err) {
+        if (cancelled || localStorage.getItem(TOKEN_KEY) !== token) return
+        if (err.response?.status === 401) {
+          clearSession()
+        } else if (!err.response && !idleExpired()) {
+          // Network failure lang: dating verified account ang puwedeng
+          // magbasa ng cached data. Hindi nito ina-authorize ang API writes.
+          setUser(readOfflineSession(localStorage, token))
+        }
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    restoreSession()
+    window.addEventListener('online', restoreSession)
+    return () => {
+      cancelled = true
+      window.removeEventListener('online', restoreSession)
+    }
+  }, [logout, clearSession])
 
   // Galing sa api.js: 401 sa isang naka-login na request = hindi na valid
   // ang token sa server (password reset, sign out sa ibang device, atbp.)
@@ -205,6 +228,7 @@ export function AuthProvider({ children }) {
   async function login(email, password) {
     const { data } = await api.post('/auth/login', { email, password })
     localStorage.setItem(TOKEN_KEY, data.token)
+    saveOfflineSession(localStorage, data.token, data.user)
     touchActivity()
     // Dentist → Dashboard ang susunod: kunin na agad ang data habang
     // dina-download pa ang page (#42). Hindi kapag kailangan munang palitan
@@ -223,6 +247,7 @@ export function AuthProvider({ children }) {
   async function changePassword(currentPassword, newPassword) {
     const { data } = await api.post('/auth/change-password', { currentPassword, newPassword })
     localStorage.setItem(TOKEN_KEY, data.token)
+    saveOfflineSession(localStorage, data.token, data.user)
     if (signInInfo?.passwordUpgradeRequired) {
       const info = { ...signInInfo, passwordUpgradeRequired: false }
       sessionStorage.setItem(SIGN_IN_INFO_KEY, JSON.stringify(info))

@@ -10,6 +10,8 @@
 //   "Pregnant: Yes" kapag napalitan ang sex.
 // Kapag binago ito, baguhin din ang client/src/constants/patientInfo.js.
 export const EXTRA_PATIENT_FIELDS = [
+  { key: 'emergencyContactRelationship', column: 'emergency_contact_relationship', type: 'text', max: 20, label: 'Emergency contact relationship' },
+  { key: 'emergencyContactRelationshipOther', column: 'emergency_contact_relationship_other', type: 'text', max: 100, label: 'Other emergency contact relationship' },
   { key: 'middleName', column: 'middle_name', type: 'text', max: 100, label: 'Middle name' },
   { key: 'occupation', column: 'occupation', type: 'text', max: 100, label: 'Occupation' },
   { key: 'nationality', column: 'nationality', type: 'text', max: 60, label: 'Nationality' },

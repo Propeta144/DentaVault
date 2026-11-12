@@ -12,6 +12,10 @@ export function createChartEntry(patientId, payload) {
   return api.post(`/patients/${patientId}/chart`, payload).then((r) => r.data.entry)
 }
 
+export function deleteChartEntry(patientId, entryId) {
+  return api.delete(`/patients/${patientId}/chart/${entryId}`).then((r) => r.data)
+}
+
 // Intraoral Examination (Periodontal, Occlusion, Appliances, TMD)
 export function getIntraoralExam(patientCode) {
   return api.get(`/patients/${patientCode}/intraoral`).then((r) => r.data.exam)

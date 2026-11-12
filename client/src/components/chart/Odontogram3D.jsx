@@ -2,18 +2,20 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
 import { PenLine, Undo2, Save, X, Baby, Smile } from 'lucide-react'
-import Tooth3D, { mostCommon, surfaceForUV } from './Tooth3D'
+import Tooth3D from './Tooth3D'
+import { groupPenDrafts, splitPenStroke, undoPenStroke } from '../../utils/penDrafts'
 import Gingiva from './Gingiva'
 import { DENTITION_SCENES, SceneLights, groupChartEntries } from './chartScene'
 import ChartEntryModal from './ChartEntryModal'
-import { CONDITIONS, conditionColor, isPrimaryTooth } from '../../constants/dental'
+import { CONDITIONS, SURFACES, conditionColor, conditionLabel, isPrimaryTooth } from '../../constants/dental'
 import ConditionLegend from './ConditionLegend'
 
 // Pagpipilian ng pen: ang mga kondisyon na iginuguhit sa isang SURFACE lang
 // (Decayed, Filled, ...). Ang pang-buong-ngipin (Missing, Crown, ...) ay
 // pinipili sa modal pagkatapos gumuhit, o sa 2D chart.
 const PEN_CONDITIONS = CONDITIONS.filter((c) => c.scope !== 'whole')
-import { getCurrentChart, createChartEntry } from '../../services/chart'
+import { getCurrentChart, createChartEntry, deleteChartEntry } from '../../services/chart'
+import PageLoader from '../common/PageLoader'
 
 // Same physical dental arch (upper + lower) as Odontogram2D, laid out in
 // 3D, inheriting the same FDI ordering (and patient-orientation mirroring)
@@ -44,27 +46,32 @@ export default function Odontogram3D({ patientId, canEdit, onPendingChange, aler
   // dragging across a tooth only paints once the dentist explicitly turns
   // drawing on, instead of every rotate-attempt risking an accidental mark.
   const [penActive, setPenActive] = useState(false)
-  // A mark-in-progress: one tooth's worth of freehand strokes that have
-  // been drawn but not yet saved. Only one tooth can be "active" at a time
-  // — starting a stroke on a different tooth while this is set is blocked
-  // (see paintEnabled below) so a half-finished mark can't get silently
-  // abandoned by drifting to another tooth.
-  const [pending, setPending] = useState(null) // { toothNumber, strokes: [{uv, local}, ...] }
+  // Drafts sa maraming ngipin; bawat segment may sariling condition/surface.
+  // Hindi kinukulayan ulit ang lumang stroke kapag nagpalit ng pen.
+  const [pending, setPending] = useState([])
+  const hasPending = pending.length > 0
+  const pendingGroups = useMemo(() => groupPenDrafts(pending), [pending])
+  const pendingByTooth = useMemo(() => {
+    const grouped = {}
+    for (const draft of pending) (grouped[draft.toothNumber] ??= []).push(draft)
+    return grouped
+  }, [pending])
   const controlsRef = useRef(null)
   // Permanent (32) o Baby teeth (20) — Feature #30. null = hindi pa pumipili
   // ang user: Baby teeth kapag baby teeth lang ang may record (bata pa).
   const [dentitionChoice, setDentitionChoice] = useState(null)
 
   useEffect(() => {
-    onPendingChange?.(!!pending)
-  }, [pending, onPendingChange])
+    onPendingChange?.(hasPending)
+  }, [hasPending, onPendingChange])
 
-  const load = useCallback(() => {
-    setLoading(true)
-    getCurrentChart(patientId)
+  const load = useCallback((silent = false) => {
+    if (!silent) setLoading(true)
+    setError('')
+    return getCurrentChart(patientId)
       .then(setEntries)
       .catch((err) => setError(err.response?.data?.error || 'Failed to load chart'))
-      .finally(() => setLoading(false))
+      .finally(() => { if (!silent) setLoading(false) })
   }, [patientId])
 
   useEffect(() => {
@@ -78,49 +85,48 @@ export default function Odontogram3D({ patientId, canEdit, onPendingChange, aler
   const scene = DENTITION_SCENES[dentition]
 
   const handleStrokeComplete = useCallback((toothNumber, stroke) => {
-    setPending((prev) => {
-      if (prev && prev.toothNumber === toothNumber) return { ...prev, strokes: [...prev.strokes, stroke] }
-      if (prev) return prev // a different tooth is already active — ignore
-      return { toothNumber, strokes: [stroke] }
-    })
+    const segments = splitPenStroke(toothNumber, stroke, crypto.randomUUID())
+    setPending((prev) => [...prev, ...segments])
   }, [])
 
   function handleUndo() {
-    setPending((prev) => {
-      if (!prev) return prev
-      const strokes = prev.strokes.slice(0, -1)
-      return strokes.length ? { ...prev, strokes } : null
-    })
+    setPending(undoPenStroke)
   }
 
-  function handleSaveMark() {
-    if (!pending) return
-    const uvPoints = pending.strokes.flatMap((s) => s.uv)
-    if (uvPoints.length === 0) return
-    // Surface = ang UV cell na pinakamaraming tinamaan ng drawing (tingnan
-    // ang surfaceForUV). Laging mesial ang +X cell, dahil mina-mirror ng
-    // Tooth3D ang geometry sa kabilang side ng bibig.
-    const surface = mostCommon(uvPoints.map(surfaceForUV))
-    // Carried through to ChartEntryModal so the actual drawn strokes (not
-    // just which surface they landed on) get saved alongside the entry —
-    // see stroke_data on chart_entries.
-    const strokes = pending.strokes.map((s) => s.uv)
-    setSelection({ toothNumber: pending.toothNumber, surface, strokes })
+  function handleSaveMark(group = pendingGroups[0]) {
+    if (!group?.drafts) return
+    setSelection({ toothNumber: group.toothNumber, surface: group.surface,
+      conditionCode: group.conditionCode, strokes: group.drafts.map((draft) => draft.uv),
+      draftIds: group.drafts.map((draft) => draft.id) })
   }
 
   async function handleSaveEntry(payload) {
-    await createChartEntry(patientId, payload)
-    await load()
+    // Dagdag na guhit sa parehong saved condition: panatilihin ang dating
+    // strokes. Ibang condition sa parehong surface = explicit replacement.
+    const current = chartByTooth[payload.toothNumber]?.[payload.surface]
+    const existingStrokes = selection?.strokes && current?.condition_code === payload.conditionCode && Array.isArray(current.stroke_data)
+      ? current.stroke_data : []
+    await createChartEntry(patientId, { ...payload,
+      strokeData: payload.strokeData ? [...existingStrokes, ...payload.strokeData] : payload.strokeData })
+    if (selection?.draftIds) {
+      const savedIds = new Set(selection.draftIds)
+      setPending((drafts) => drafts.filter((draft) => !savedIds.has(draft.id)))
+    }
+    await load(true)
     setHighlightedTooth(payload.toothNumber)
     setTimeout(() => setHighlightedTooth(null), 2000)
-    if (pending?.toothNumber === payload.toothNumber) setPending(null)
   }
 
   function setOrbitEnabled(enabled) {
     if (controlsRef.current) controlsRef.current.enabled = enabled
   }
 
-  if (loading) return <p className="text-sm text-slate-400">Loading chart...</p>
+  function openSurface(toothNumber, surface) {
+    if (!canEdit || penActive || hasPending) return
+    setSelection({ toothNumber, surface })
+  }
+
+  if (loading) return <PageLoader label="Loading chart..." />
 
   return (
     <div>
@@ -146,9 +152,10 @@ export default function Odontogram3D({ patientId, canEdit, onPendingChange, aler
               aria-live="polite"
             >
               {!penActive
-                ? 'Turn the pen on to mark teeth. For now, drag freely to rotate.'
+                ? hasPending ? 'Save or discard the unsaved drawings before selecting a surface.'
+                  : 'Click a surface to record a condition. Drag to rotate. Turn the pen on to draw.'
                 : activeCondition
-                  ? 'Draw directly on a tooth to mark it, then Save.'
+                  ? 'Draw on any tooth. Change conditions as needed, then review and save each mark.'
                   : 'Choose a condition first, then draw on a tooth.'}
             </p>
           </div>
@@ -172,11 +179,10 @@ export default function Odontogram3D({ patientId, canEdit, onPendingChange, aler
             ))}
           </div>
 
-          {pending && (
+          {hasPending && (
             <div className="mt-3 flex flex-wrap items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2">
               <span className="text-sm text-amber-800">
-                Unsaved mark on tooth {pending.toothNumber}: {pending.strokes.length} stroke
-                {pending.strokes.length === 1 ? '' : 's'}. Other teeth are locked until this is saved or discarded.
+                {pendingGroups.length} unsaved {pendingGroups.length === 1 ? 'mark' : 'marks'} on {Object.keys(pendingByTooth).length} {Object.keys(pendingByTooth).length === 1 ? 'tooth' : 'teeth'}. Review and save each surface separately.
               </span>
               <div className="ml-auto flex gap-2">
                 <button
@@ -189,22 +195,36 @@ export default function Odontogram3D({ patientId, canEdit, onPendingChange, aler
                 </button>
                 <button
                   type="button"
-                  onClick={() => setPending(null)}
+                  onClick={() => setPending([])}
                   className="flex min-h-9 items-center gap-1.5 rounded-md border border-amber-300 bg-white px-3 text-sm font-medium text-amber-800 hover:bg-amber-100"
                 >
                   <X className="h-3.5 w-3.5" />
-                  Discard
+                  Discard All
                 </button>
                 <button
                   type="button"
-                  onClick={handleSaveMark}
+                  onClick={() => handleSaveMark()}
                   className="flex min-h-9 items-center gap-1.5 rounded-md bg-emerald-600 px-3 text-sm font-semibold text-white hover:bg-emerald-700"
                 >
                   <Save className="h-3.5 w-3.5" />
-                  Save Mark
+                  Save Next Mark
                 </button>
               </div>
             </div>
+          )}
+          {hasPending && (
+            <details className="mt-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+              <summary className="min-h-11 cursor-pointer py-2 text-sm font-medium text-slate-700">Review unsaved marks ({pendingGroups.length})</summary>
+              <div className="space-y-2 pb-1">
+                {pendingGroups.map((group) => (
+                  <button key={group.key} type="button" onClick={() => handleSaveMark(group)}
+                    className="flex min-h-11 w-full items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50">
+                    <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: conditionColor(group.conditionCode) }} />
+                    Tooth {group.toothNumber} · {SURFACES.find((surface) => surface.code === group.surface)?.label} · {conditionLabel(group.conditionCode)}
+                  </button>
+                ))}
+              </div>
+            </details>
           )}
         </div>
       )}
@@ -212,9 +232,20 @@ export default function Odontogram3D({ patientId, canEdit, onPendingChange, aler
       {/* Fixed height, not viewport-scaled — same reasoning as the 2D
           chart's fixed pixel width: a shrunk canvas makes drag-painting
           individual tooth surfaces impractical on small screens. */}
-      {/* Permanent / Baby teeth. Naka-lock habang may hindi pa naka-save na
-          drawing (nasa ibang set ang ngiping iyon). */}
+      {/* Permanent / Baby teeth: nasa pending state ang drafts, kaya
+          nananatili kahit magpalit ng dentition. */}
       <div className="mb-3 flex flex-wrap items-center gap-2">
+        {canEdit && (
+          <label className="flex items-center gap-2 text-base font-medium text-slate-700">
+            Select tooth
+            <select value="" disabled={penActive || hasPending}
+              onChange={(event) => openSurface(event.target.value, 'occlusal')}
+              className="min-h-11 rounded-md border border-slate-300 bg-white px-3 py-2.5 text-base text-slate-900 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-100 disabled:opacity-50">
+              <option value="">Choose tooth...</option>
+              {scene.rows.flat().map((toothNumber) => <option key={toothNumber} value={toothNumber}>Tooth {toothNumber}</option>)}
+            </select>
+          </label>
+        )}
         <div className="flex gap-1.5 rounded-lg border border-slate-200 bg-slate-100 p-1" role="group" aria-label="Teeth shown">
           {[
             { code: 'permanent', label: 'Permanent', icon: Smile },
@@ -224,8 +255,6 @@ export default function Odontogram3D({ patientId, canEdit, onPendingChange, aler
               key={code}
               type="button"
               aria-pressed={dentition === code}
-              disabled={Boolean(pending) && dentition !== code}
-              title={pending && dentition !== code ? 'Save or discard the unsaved mark first' : undefined}
               onClick={() => setDentitionChoice(code)}
               className={`flex min-h-9 items-center gap-1.5 whitespace-nowrap rounded-md px-3 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
                 dentition === code ? 'bg-white text-sky-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
@@ -256,12 +285,12 @@ export default function Odontogram3D({ patientId, canEdit, onPendingChange, aler
             maxDistance={14}
           />
           {scene.arches.map((arch) => (
-            <Gingiva key={arch.upper ? 'upper' : 'lower'} arch={arch} />
+            <Gingiva key={arch.upper ? 'upper' : 'lower'} arch={arch}
+              blockSurfaceSelection={canEdit && !penActive && !hasPending && !selection} />
           ))}
           {scene.rows.map((row, rowIndex) =>
             row.map((toothNumber, i) => {
               const { position, rotationY, flipUpper, mesialOnPositiveX, tiltX, labelY } = scene.placements[rowIndex][i]
-              const isPendingTooth = pending?.toothNumber === toothNumber
               return (
                 <Tooth3D
                   key={toothNumber}
@@ -269,8 +298,10 @@ export default function Odontogram3D({ patientId, canEdit, onPendingChange, aler
                   chartState={chartByTooth[toothNumber] || NO_CHART}
                   labelY={labelY}
                   canEdit={canEdit}
-                  paintEnabled={canEdit && penActive && Boolean(activeCondition) && (!pending || isPendingTooth)}
-                  pendingStrokes={isPendingTooth ? pending.strokes : NO_STROKES}
+                  surfaceSelectionEnabled={!penActive && !hasPending && !selection}
+                  onSurfaceSelect={openSurface}
+                  paintEnabled={canEdit && penActive && Boolean(activeCondition) && !selection}
+                  pendingStrokes={pendingByTooth[toothNumber] || NO_STROKES}
                   onStrokeComplete={(stroke) => handleStrokeComplete(toothNumber, stroke)}
                   position={position}
                   rotationY={rotationY}
@@ -278,6 +309,7 @@ export default function Odontogram3D({ patientId, canEdit, onPendingChange, aler
                   mesialOnPositiveX={mesialOnPositiveX}
                   tiltX={tiltX}
                   penColor={conditionColor(activeCondition)}
+                  penConditionCode={activeCondition}
                   onPaintStart={() => setOrbitEnabled(false)}
                   onPaintEnd={() => setOrbitEnabled(true)}
                   highlighted={toothNumber === highlightedTooth}
@@ -303,11 +335,16 @@ export default function Odontogram3D({ patientId, canEdit, onPendingChange, aler
           toothNumber={selection.toothNumber}
           surface={selection.surface}
           currentEntry={chartByTooth[selection.toothNumber]?.[selection.surface]}
-          defaultConditionCode={activeCondition}
+          toothState={!selection.strokes ? chartByTooth[selection.toothNumber] || NO_CHART : undefined}
+          defaultConditionCode={selection.strokes ? selection.conditionCode : undefined}
           strokes={selection.strokes}
           alerts={alerts}
           onClose={() => setSelection(null)}
           onSubmit={handleSaveEntry}
+          onDelete={canEdit && !selection.strokes ? async (entryId) => {
+            await deleteChartEntry(patientId, entryId)
+            await load(true)
+          } : undefined}
         />
       )}
     </div>

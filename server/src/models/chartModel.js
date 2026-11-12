@@ -1,4 +1,6 @@
 import pool from '../config/db.js'
+import AppError from '../utils/AppError.js'
+import { WHOLE_TOOTH_CONDITIONS } from '../utils/validators.js'
 
 // mysql2 returns JSON columns as raw text, not a parsed value — same gotcha
 // as xray_images.annotations (see xrayModel.js), same fix: parse on every
@@ -28,7 +30,7 @@ export async function getCurrentChart(patientId) {
        WHERE patient_id = :patientId
      ) ce
      JOIN users u ON u.id = ce.recorded_by
-     WHERE ce.rn = 1`,
+     WHERE ce.rn = 1 AND ce.is_cleared = 0`,
     { patientId },
   )
   return rows.map(parseStrokeData)
@@ -69,6 +71,48 @@ export async function createChartEntry({ patientId, toothNumber, surface, condit
 }
 
 const ALL_SURFACES = ['whole', 'mesial', 'distal', 'occlusal', 'facial', 'lingual']
+
+// Removal markers ang pinakabagong entries; sa labas ng ROW_NUMBER filter
+// tinatanggal sa current view para hindi bumalik ang mas lumang kondisyon.
+export async function clearChartEntry({ patientId, entryId, recordedBy }) {
+  const connection = await pool.getConnection()
+  try {
+    await connection.beginTransaction()
+    const [selected] = await connection.execute(
+      'SELECT * FROM chart_entries WHERE id = :entryId AND patient_id = :patientId',
+      { entryId, patientId },
+    )
+    const entry = selected[0]
+    if (!entry) throw new AppError('Chart entry not found', 404)
+    const [rows] = await connection.execute(
+      `SELECT * FROM chart_entries WHERE patient_id = :patientId AND tooth_number = :toothNumber
+       ORDER BY recorded_at DESC, id DESC FOR UPDATE`,
+      { patientId, toothNumber: entry.tooth_number },
+    )
+    const current = new Map()
+    for (const row of rows) if (!current.has(row.surface)) current.set(row.surface, row)
+    if (entry.is_cleared || current.get(entry.surface)?.id !== entry.id) {
+      throw new AppError('This condition has changed. Close the panel and reopen the chart before deleting.', 409)
+    }
+    const whole = entry.surface === 'whole' || WHOLE_TOOTH_CONDITIONS.includes(entry.condition_code)
+    const surfaces = whole ? ALL_SURFACES : [entry.surface]
+    for (const surface of surfaces) {
+      await connection.execute(
+        `INSERT INTO chart_entries (patient_id, tooth_number, surface, condition_code, notes, recorded_by, is_cleared)
+         VALUES (:patientId, :toothNumber, :surface, :conditionCode, :notes, :recordedBy, 1)`,
+        { patientId, toothNumber: entry.tooth_number, surface, conditionCode: entry.condition_code,
+          notes: 'Condition removed from chart', recordedBy },
+      )
+    }
+    await connection.commit()
+    return { entry, whole, surfaces }
+  } catch (err) {
+    await connection.rollback()
+    throw err
+  } finally {
+    connection.release()
+  }
+}
 
 // Yung whole-tooth fact (extracted, o na-restore pabalik sa present/healthy),
 // wala talagang sariling mesial/distal/occlusal state — either missing yung

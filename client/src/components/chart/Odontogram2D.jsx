@@ -6,7 +6,7 @@ import ChartEntryModal from './ChartEntryModal'
 import ConditionLegend from './ConditionLegend'
 import PageLoader from '../common/PageLoader'
 import { ODONTOGRAM_ROWS, PRIMARY_ROWS, isPrimaryTooth } from '../../constants/dental'
-import { getCurrentChart, createChartEntry } from '../../services/chart'
+import { getCurrentChart, createChartEntry, deleteChartEntry } from '../../services/chart'
 
 // Iisang sukat ng ngipin para sa layout at sa hugis (toothShape.js)
 const TOOTH_SIZE = TOOTH_BOX
@@ -326,6 +326,10 @@ export default function Odontogram2D({ patientId, canEdit, printMode = false, al
           alerts={alerts}
           onClose={closeModal}
           onSubmit={handleSaveEntry}
+          onDelete={canEdit ? async (entryId) => {
+            await deleteChartEntry(patientId, entryId)
+            await load(true)
+          } : undefined}
         />
       )}
     </div>

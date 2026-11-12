@@ -7,6 +7,7 @@ import { FIELD_LIMITS } from '../../constants/fieldLimits'
 import { calculateAge, formatDate, todayISO } from '../../utils/formatDate'
 import { sanitizePhoneInput } from '../../utils/phone'
 import { EMPTY_INFO_FORM, HEALTH_QUESTIONS, BLOOD_TYPES } from '../../constants/patientInfo'
+import { EMERGENCY_RELATIONSHIPS } from '../../constants/emergencyRelationship'
 
 // Walang default ang `sex` (dati "male" na agad): kapag nakalimutang
 // palitan, mali ang record nang walang babala. Required na ito.
@@ -61,7 +62,17 @@ function validate(form, { portalEmail } = {}) {
     errors.contactNumber = 'Use a PH mobile number: 09XX XXX XXXX or +639XX XXX XXXX'
   }
 
-  if (form.emergencyContactPhone && !PH_MOBILE_PATTERN.test(cleanPhone(form.emergencyContactPhone))) {
+  if (!form.address.trim()) errors.address = 'Address is required'
+  if (!form.emergencyContactName.trim()) errors.emergencyContactName = 'Emergency contact name is required'
+  if (!EMERGENCY_RELATIONSHIPS.includes(form.emergencyContactRelationship)) {
+    errors.emergencyContactRelationship = 'Select the emergency contact relationship'
+  }
+  if (form.emergencyContactRelationship === 'Other' && !form.emergencyContactRelationshipOther.trim()) {
+    errors.emergencyContactRelationshipOther = 'Specify the emergency contact relationship'
+  }
+  if (!form.emergencyContactPhone.trim()) {
+    errors.emergencyContactPhone = 'Emergency contact number is required'
+  } else if (!PH_MOBILE_PATTERN.test(cleanPhone(form.emergencyContactPhone))) {
     errors.emergencyContactPhone = 'Use a PH mobile number: 09XX XXX XXXX or +639XX XXX XXXX'
   }
 
@@ -299,6 +310,8 @@ export default function PatientForm({
       email: form.email.trim(),
       contactNumber: cleanPhone(form.contactNumber),
       emergencyContactPhone: cleanPhone(form.emergencyContactPhone),
+      emergencyContactRelationshipOther: form.emergencyContactRelationship === 'Other'
+        ? form.emergencyContactRelationshipOther.trim() : '',
     }
     for (const q of HEALTH_QUESTIONS) {
       // "If so, ..." ay para lang sa Yes; ang pang-babae lang ay null kapag Male
@@ -499,9 +512,9 @@ export default function PatientForm({
         </Field>
       </div>
 
-      <Field label="Address">
+      <Field label="Address" required error={fieldErrors.address}>
         <input
-          className={inputClass(false)}
+          className={inputClass(fieldErrors.address)}
           value={form.address}
           maxLength={FIELD_LIMITS.address}
           autoComplete="off"
@@ -512,9 +525,9 @@ export default function PatientForm({
       <SectionHeading icon={ShieldAlert}>Emergency Contact</SectionHeading>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="Contact Name" hint="Include the relationship, e.g. Rosa Dela Cruz (Wife)">
+        <Field label="Contact Name" required error={fieldErrors.emergencyContactName}>
           <input
-            className={inputClass(false)}
+            className={inputClass(fieldErrors.emergencyContactName)}
             value={form.emergencyContactName}
             maxLength={FIELD_LIMITS.emergencyContactName}
             autoComplete="off"
@@ -522,7 +535,33 @@ export default function PatientForm({
             onChange={(e) => update('emergencyContactName', e.target.value)}
           />
         </Field>
-        <Field label="Contact Phone" error={fieldErrors.emergencyContactPhone}>
+        <Field label="Relationship" required error={fieldErrors.emergencyContactRelationship}>
+          <select
+            className={inputClass(fieldErrors.emergencyContactRelationship)}
+            value={form.emergencyContactRelationship}
+            onChange={(e) => {
+              update('emergencyContactRelationship', e.target.value)
+              update('emergencyContactRelationshipOther', '')
+            }}
+          >
+            <option value="">Select relationship</option>
+            {EMERGENCY_RELATIONSHIPS.map((relationship) => (
+              <option key={relationship} value={relationship}>{relationship}</option>
+            ))}
+          </select>
+        </Field>
+        {form.emergencyContactRelationship === 'Other' && (
+          <Field label="Specify Relationship" required error={fieldErrors.emergencyContactRelationshipOther}>
+            <input
+              className={inputClass(fieldErrors.emergencyContactRelationshipOther)}
+              value={form.emergencyContactRelationshipOther}
+              maxLength={FIELD_LIMITS.emergencyContactRelationshipOther}
+              autoComplete="off"
+              onChange={(e) => update('emergencyContactRelationshipOther', e.target.value)}
+            />
+          </Field>
+        )}
+        <Field label="Contact Phone" required error={fieldErrors.emergencyContactPhone}>
           <input
             type="tel"
             inputMode="tel"

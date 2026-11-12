@@ -36,6 +36,7 @@ import DropdownMenu from '../components/common/DropdownMenu'
 import EmptyState from '../components/common/EmptyState'
 import StatusBadge from '../components/common/StatusBadge'
 import Odontogram2D from '../components/chart/Odontogram2D'
+import Chart3DErrorBoundary from '../components/chart/Chart3DErrorBoundary'
 import { ALL_TEETH, surfaceLetters } from '../constants/dental'
 import MedicalAlertBadge, { PatientAlertStrip } from '../components/common/MedicalAlertBadge'
 import PageLoader from '../components/common/PageLoader'
@@ -43,6 +44,7 @@ import { useSelectedPatientCode, openPrintTab, profileState, PROFILE_PATH } from
 import { fullName, sexLabel } from '../utils/patientName'
 import { calculateAge, formatDate } from '../utils/formatDate'
 import useDiscardGuard from '../hooks/useDiscardGuard'
+import { emergencyRelationshipLabel } from '../constants/emergencyRelationship'
 
 const loadOdontogram3D = () => import('../components/chart/Odontogram3D')
 const Odontogram3D = lazy(loadOdontogram3D)
@@ -77,7 +79,7 @@ function PatientDetails({ patient, portalAccount, showPortal }) {
       icon: Contact,
       label: 'Emergency contact',
       value: patient.emergency_contact_name
-        ? `${patient.emergency_contact_name}${patient.emergency_contact_phone ? ` · ${patient.emergency_contact_phone}` : ''}`
+        ? `${patient.emergency_contact_name}${emergencyRelationshipLabel(patient) ? ` (${emergencyRelationshipLabel(patient)})` : ''}${patient.emergency_contact_phone ? ` · ${patient.emergency_contact_phone}` : ''}`
         : null,
     },
   ]
@@ -570,9 +572,11 @@ export default function PatientProfilePage() {
               {chartView === '2d' ? (
                 <Odontogram2D patientId={id} canEdit={isDentist} alerts={alerts} />
               ) : (
-                <Suspense fallback={<PageLoader label="Loading 3D chart..." />}>
-                  <Odontogram3D patientId={id} canEdit={isDentist} onPendingChange={setHas3DPendingDrawing} alerts={alerts} />
-                </Suspense>
+                <Chart3DErrorBoundary onSwitchTo2D={() => setChartView('2d')}>
+                  <Suspense fallback={<PageLoader label="Loading 3D chart..." />}>
+                    <Odontogram3D patientId={id} canEdit={isDentist} onPendingChange={setHas3DPendingDrawing} alerts={alerts} />
+                  </Suspense>
+                </Chart3DErrorBoundary>
               )}
             </div>
             {/* Periodontal, Occlusion, Appliances, TMD (buong bibig; papel ng clinic) */}

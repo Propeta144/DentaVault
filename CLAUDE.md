@@ -2067,3 +2067,151 @@ naman kailangan ng data) ay naantala. Sunod-sunod din ang tatlong hakbang: login
 screen reader status, napapalitan ng data, **iisang** dashboard request lang, 0 overflow; pagbalik = agad mula cache; sign
 out + sign in = walang lumang data; error = bati + error box; patient = walang dashboard request; 0 console error).
 Regression: welcome/login 20/20 (×3). Build pasado. **Naka-push na** (commit `6d78218`, 2026-10-29). Walang migration.
+
+## Local fixes and required patient details (2026-11-12)
+
+Local changes only. Walang deployment o database migration.
+
+| File | Type | Purpose |
+|---|---|---|
+| `client/src/components/patients/PatientForm.jsx` | MODIFIED | Required na ang address at emergency contact name/phone. Existing required first/last name at patient phone, layout, colors, at inline-error pattern ay preserved. |
+| `server/src/routes/patients.routes.js` | MODIFIED | Parehong requirements sa create at update API; hindi puwedeng i-bypass sa direct request. |
+| `server/src/services/patientImportService.js` | MODIFIED | Required columns at row validation para pareho ang imported at manually entered records. |
+| `server/src/controllers/patientImport.controller.js` | MODIFIED | Required markers sa import template. |
+| `client/src/utils/offlineSession.js` | NEW | Token-bound snapshot ng huling verified account para sa offline refresh; expired, mismatched, malformed, at temporary-password sessions ay hindi nire-restore. |
+| `client/src/context/AuthContext.jsx` | MODIFIED | Network failures no longer delete login; bounded network check, offline snapshot fallback, online retry, snapshot cleanup on sign-out. API authorization stays on the server. |
+| `client/src/pwa.js` | MODIFIED | Reload activates the waiting service worker before reloading, using the installed plugin updater. |
+| `client/src/components/patients/PortalCredentials.jsx` | MODIFIED | Existing inline alert style for blocked print popups. |
+| `client/test/offlineSession.test.js` | NEW | Offline session expiry, account isolation, malformed storage, temporary-password checks. |
+| `server/test/patientValidation.test.js` | NEW | Create/edit required fields, phone validation, invalid imports, own-record access checks. No database connection needed. |
+| `package.json` | MODIFIED | Run focused checks with `npm test`. |
+
+Flow: PatientForm -> patients service -> POST/PUT patient route -> validators -> controller -> model -> database. Required fields must be completed when saving an existing incomplete record; existing records are not rewritten automatically. Import mapping receives requiredFields from the server and uses the original UI.
+
+Manual local checks: register/edit a patient and submit blank/space-only required fields; enter valid details and save. After an online login with a normal password, switch offline and refresh within the token/idle limits to read previously cached data. Reconnect to revalidate. For PWA updates, build/serve two versions locally and use the existing Reload prompt. Block popups and press Print slip to see the inline alert. Browser update-cycle and visual checks still require a running local app/browser.
+
+## Separate emergency contact relationship (2026-11-12)
+
+Required na ang Relationship dropdown: Parent, Spouse, Child, Sibling, Guardian, Relative, Friend, Other. Kapag Other, required ang Specify Relationship (100 characters max). Pangalan lang ang Contact Name; tinanggal ang dating hint. Same form styling at responsive grid, walang bagong UI library.
+
+| File | Type | Purpose |
+|---|---|---|
+| `client/src/components/patients/PatientForm.jsx` | MODIFIED | Required dropdown, conditional Other field, validation, and clear stale Other details on selection/save. |
+| `client/src/constants/emergencyRelationship.js` | NEW | Dropdown choices and display label. |
+| `client/src/constants/patientInfo.js`, `client/src/constants/fieldLimits.js` | MODIFIED | Form defaults, edit prefilling, and field limits. |
+| `client/src/pages/PatientProfilePage.jsx`, `client/src/pages/PatientSummaryPrintPage.jsx` | MODIFIED | Relationship shown beside emergency contact and in printed summary. |
+| `client/src/components/migration/BulkImportWizard.jsx` | MODIFIED | Readable mapping labels for new columns. |
+| `server/db/migrations/020_add_emergency_contact_relationship.sql` | NEW | Separate nullable relationship and Other-details columns. Applied to the verified local DB only. |
+| `server/src/utils/emergencyRelationship.js` | NEW | Server dropdown choices and required/Other validation. |
+| `server/src/utils/patientFields.js`, `server/src/utils/validators.js` | MODIFIED | Existing model whitelist handles insert/update and export of the new fields; synchronized field lengths. |
+| `server/src/routes/patients.routes.js` | MODIFIED | Enforce valid relationship and Other details on create/edit, clear unused Other details. |
+| `server/src/services/patientImportService.js` | MODIFIED | Required relationship mapping, row validation, persistence, no duplicate template columns. |
+| `server/src/controllers/patientImport.controller.js` | MODIFIED | Required template label and Excel relationship dropdown. |
+| `client/test/emergencyRelationship.test.js` | NEW | Render standard/Other/legacy edit values and conditional field. |
+| `server/test/patientValidation.test.js` | MODIFIED | Blank/invalid relationship, Other required/max length, stale-detail cleanup, imports. |
+| `server/test/emergencyRelationship.local.js` | NEW | Opt-in local database create/edit/import/export checks within a rolled-back transaction. |
+
+Flow: dropdown -> form camelCase values -> patient API validation -> EXTRA_PATIENT_FIELDS whitelist -> model -> separate DB columns. Edit uses patientInfoToForm to prefill. Print/profile use emergencyRelationshipLabel; CSV uses the existing extra-field export path. Patient users can view their relationship but only the dentist can edit it.
+
+Old records stay NULL for relationship until the dentist selects one during edit; old name text is preserved and not automatically parsed. Re-download import templates for the new required relationship column. Local checks: npm test (8 passing); lint (no errors, 15 existing warnings); production build passed; node --env-file=.env test/emergencyRelationship.local.js from server passed with sample rows rolled back. No deployment. Browser visual inspection was unavailable; form rendering was checked automatically.
+
+## 2D tooth surface hover (2026-11-12)
+
+| File | Type | Purpose |
+|---|---|---|
+| `client/src/components/chart/Tooth.jsx` | MODIFIED | Editable surface polygons use the primary-button color (`hover:fill-sky-600`, darker brand outline) instead of a subtle brightness/gray hover. |
+
+Hover lang ang pagbabago: SVG fill from chartState remains the recorded condition color; CSS temporarily highlights only the polygon under the pointer. On pointer leave, original fill returns. Existing surface click -> ChartEntryModal -> chart service/API -> database flow is unchanged. Read-only/print and condition palette are unchanged. Local only. Check by hovering each of the five surfaces in the dentist's 2D chart. Lint: no errors, 15 existing warnings. Browser visual verification unavailable.
+
+## Local 3D blank-page fix (2026-11-12)
+
+Confirmed in a headless local browser: 3D imports returned 504 Outdated Optimize Dep. The form render test shared Vite's default dependency cache with the running dev server, invalidating its optimized modules. This was a development cache failure, not a chart-data or 2D-hover change.
+
+| File | Type | Purpose |
+|---|---|---|
+| `client/test/emergencyRelationship.test.js` | MODIFIED | Unique temporary Vite cache per test run; closes server and removes only its verified temporary cache directory. Prevents interference with npm run dev. |
+| `client/vite.config.js` | MODIFIED | Explicitly optimize three, @react-three/fiber, @react-three/drei, and troika-three-text before opening the lazy 3D module. Config reload rebuilt local dependency cache. |
+| `client/src/components/chart/Chart3DErrorBoundary.jsx` | NEW | Catch lazy-load/render failures inside the chart, show existing-style feedback and Use 2D chart action instead of unmounting the whole profile. |
+| `client/src/pages/PatientProfilePage.jsx` | MODIFIED | Wrap 3D Suspense in the chart error boundary; existing tabs and patient profile remain available. |
+
+Validation: eight automated tests passed, lint had no errors (15 existing warnings), production build passed. Headless Edge with mock empty chart data loaded the actual 3D component and canvas after rerunning tests, with no failed 3D imports. A simulated rejected lazy import displayed the fallback, preserved the surrounding page, and switched successfully to a 2D test view. Temporary diagnostic HTML/scripts removed afterward. Browser test used its own temporary browser profile and no patient account. User's Brave tab needs Ctrl+Shift+R once to discard old module URLs. Local only; no deployment or DB changes in this fix.
+
+## Delete a condition from the 2D chart panel (2026-11-12)
+
+Dentist: click a marked tooth surface -> Delete Current Condition -> confirmation -> Delete Condition. Blank surfaces have no Delete action. Confirmation names the saved condition, tooth, and surface (not an unsaved condition choice). Cancel returns to the panel without deleting. Errors remain in the confirmation; buttons and dismissal are locked during the request. Whole-tooth conditions explicitly warn that all five surfaces are cleared. Original chart/modal styling is retained.
+
+Deletion clears the current chart mark only, including its 3D display. It does not mark the surface Healthy. Old chart history and removal entries remain. Linked Treatment History entries remain; the confirmation explains how to delete an incorrect treatment separately. A later new condition can be recorded normally.
+
+| File | Type | Purpose |
+|---|---|---|
+| `client/src/components/chart/ChartEntryModal.jsx` | MODIFIED | Conditional delete button, explicit confirmation, busy/error handling, and removal labels in tooth history. |
+| `client/src/components/chart/Odontogram2D.jsx` | MODIFIED | Dentist-only delete callback and silent reload of current chart after deletion. |
+| `client/src/services/chart.js` | MODIFIED | DELETE API wrapper. |
+| `client/src/utils/auditAction.js` | MODIFIED | Readable label for chart-condition removal. |
+| `server/src/routes/chart.routes.js` | MODIFIED | Dentist-only DELETE /patients/:patientCode/chart/:entryId route. |
+| `server/src/controllers/chart.controller.js` | MODIFIED | Patient/entry validation, clear operation, and DELETE_CHART_ENTRY audit. |
+| `server/src/models/chartModel.js` | MODIFIED | Transactional clear markers, same-patient/current-entry checks, tooth-range locking, and filtering after ranking so prior conditions never silently reappear. |
+| `server/src/models/dashboardModel.js` | MODIFIED | Exclude cleared current slots from condition breakdown after ranking. |
+| `server/db/migrations/021_add_chart_clear_markers.sql` | NEW | is_cleared flag for append-only removal; applied locally only. |
+| `server/test/chartDeleteAccess.test.js` | NEW | Dentist allowed; patient/unknown/unauthenticated roles rejected. |
+| `server/test/chartDeletion.local.js` | NEW | Opt-in local DB integration test, using savepoints inside a rolled-back fixture transaction. |
+
+Flow: modal confirmation -> deleteChartEntry service -> dentist-only route -> controller patient access check -> transactional clearChartEntry -> new removal marker rows -> current-chart reload. No hard deletion of past chart entries. The latest marker suppresses the slot in 2D, 3D, print, and dashboard; it stays visible as Removed in tooth history.
+
+Validation: local headless browser with mock data verified confirmation, Cancel without API deletion, exact entry ID, blank-surface action hidden, whole-tooth warning, and failed-request recovery. Local database checks passed for surface/whole deletion, stale ID rejection, cross-patient rejection, no resurrection of older conditions, other-tooth preservation, retained treatment/history, re-add, and dashboard SQL; sample rows rolled back. Frontend lint had no errors (15 existing warnings), production build passed. Temporary diagnostic files removed. Local only; no deployment.
+
+## 3D surface condition panel (2026-11-12)
+
+Pen Off: click/tap an actual crown surface to open the same ChartEntryModal used by 2D. UV atlas mapping chooses the anatomical surface, including mirrored teeth. The dentist can correct the surface using the existing picker, choose a condition, save a full-surface color, or delete an existing condition with confirmation. Missing/extracted teeth open Whole Tooth. A Select tooth dropdown provides a keyboard-accessible alternative and follows the Permanent/Baby teeth choice.
+
+Pen On: existing freehand drawing stays available. Surface selection and the dropdown are disabled while the pen is on or an unsaved mark exists. Saving a pen mark still uses strokes and a fixed surface; it does not expose delete or silently substitute a surface-fill operation. No automatic pen condition is copied into the surface panel. Dragging over a tooth rotates without opening the modal; clicks behind gums are blocked in selection mode.
+
+| File | Type | Purpose |
+|---|---|---|
+| `client/src/components/chart/Odontogram3D.jsx` | MODIFIED | Surface selection state, Select tooth dropdown, shared picker/delete wiring, updated instructions, silent awaited chart refresh to preserve canvas/camera after saving. |
+| `client/src/components/chart/Tooth3D.jsx` | MODIFIED | Enable crown raycasting in selection mode, map clicked UV to surface, ignore orbit drags/non-left clicks, disable inactive ink-shell raycasting. Removed an unused import. |
+| `client/src/components/chart/Gingiva.jsx` | MODIFIED | Optional click blocker prevents selecting teeth through gums while preserving orbit controls. Off by default for print scenes. |
+| `client/src/components/chart/ChartEntryModal.jsx` | MODIFIED | Comment updated to describe both 2D and 3D surface selection; same existing UI and save/delete behavior. |
+
+Flow: 3D crown click -> UV surfaceForUV -> selection -> shared ChartEntryModal -> existing chart create/delete service and API -> current-chart reload -> SurfaceLayer texture fill. The same saved entries feed the 2D chart, 3D chart, history, and prints. No new API or migration. Patient/read-only and print scenes do not expose selection controls.
+
+Validation: local headless browser with mock chart data exercised actual mouse and touch clicks on raycast crown coordinates, correct surface label, drag-to-orbit without modal, dropdown and picker changes, saved condition payload with no strokes, matching 2D color after switching views, confirmed 3D deletion, actual pointer-drawn pen stroke and save, pending-drawing locks, baby-tooth dropdown, and read-only controls. No runtime exceptions. Lint had no errors (existing warnings); production build passed. Temporary browser fixture and diagnostic script removed. Local only; no deployment or database changes.
+
+## 3D surface hover highlight (2026-11-12)
+
+| File | Type | Purpose |
+|---|---|---|
+| `client/src/components/chart/Tooth3D.jsx` | MODIFIED | Pointer UV identifies the hovered surface; SurfaceLayer redraws just that UV cell in the primary-button purple. Original fills/strokes remain unchanged and return on pointer-out. Hover is cleared on pointer-down, touch, disabled selection, or panel opening. Temporary textures are disposed on unmount. |
+| `client/src/components/chart/Gingiva.jsx` | MODIFIED | Block hover through gums in selection mode, alongside existing click blocking. |
+| `client/src/components/chart/Odontogram3D.jsx` | MODIFIED | Disable selection/hover raycasts while the condition panel is open; existing pen/pending locks remain. |
+
+Same brand color as 2D/buttons: reads --color-sky-600 from the existing theme, with #6f2dbd fallback. Hover uses the same UV atlas as surface clicks and condition coloring, so it follows the curved crown and mirrored teeth. A missing/extracted tooth highlights as a whole, matching its Whole Tooth selection. Mouse hover is cosmetic only: no API/database write. Touch taps still select normally without a sticky hover. Pen On, unsaved drawings, read-only mode, and prints have no hover highlight.
+
+Validation: local headless browser used actual raycast coordinates and canvas texture pixel samples. Only the pointed surface on one tooth became purple; moving between two surfaces restored the prior one; leaving the tooth restored the saved colors exactly. Pointer-down/orbit and Pen On cleared the overlay; read-only remained unchanged; zero API writes and no runtime exceptions. Lint: no errors (14 existing warnings). Production build passed. Temporary browser fixture/script removed. No deployment or database changes.
+
+## Independent 3D pen conditions and multiple teeth (2026-11-12)
+
+Root causes: InkLayer redrew all pending strokes using the current penColor; Odontogram3D stored only one pending tooth and disabled all other teeth. Saving used a majority UV surface and one active condition for the whole tooth's draft. That could recolor drafts and attach drawings from different surfaces to one chart entry.
+
+Now each pointer stroke captures its own condition at pointer-down. UV segments belong to a specific tooth/surface/condition. The dentist can draw on multiple teeth and switch pen conditions or dentitions without recoloring or discarding existing drafts. Undo removes the most recent pointer stroke, including its surface segments. Discard All explicitly clears all unsaved drafts.
+
+Save Next Mark opens the existing chart panel for one group. Review unsaved marks lets the dentist choose a group directly. Save succeeds -> only that group's drafts are removed; other groups stay visible and unsaved. Failure or Cancel preserves drafts. Default condition is the group's captured condition, not the current pen palette. Repeated strokes for the same saved surface/condition append to its saved drawing. A different condition on the same surface is an explicit replacement with a warning; the chart still has one current condition per surface. Different surfaces retain independent conditions, including in 2D.
+
+| File | Type | Purpose |
+|---|---|---|
+| `client/src/utils/toothUV.js` | NEW | Shared UV atlas and anatomical surface classification for both rendering and draft splitting. |
+| `client/src/utils/penDrafts.js` | NEW | Split strokes at surface boundaries/UV seams; group by tooth/surface/condition; Undo one complete pointer stroke. |
+| `client/src/components/chart/Tooth3D.jsx` | MODIFIED | Capture each stroke's condition, redraw in its own condition color, forward condition with UV points, dispose transient ink textures on unmount. |
+| `client/src/components/chart/Odontogram3D.jsx` | MODIFIED | Multi-tooth draft array, per-tooth rendering, unrestricted pen drawing across teeth, review/save queue, per-group cleanup, existing-stroke append, preserved drafts across dentition switching. |
+| `client/src/components/chart/ChartEntryModal.jsx` | MODIFIED | Warn when saving a new pen condition replaces an existing condition/drawing on the same surface. |
+| `client/test/penDrafts.test.js` | NEW | Multi-tooth/condition grouping, cross-surface splitting, whole-stroke Undo, independent saved-group removal, seam separation. |
+
+Flow: pointer-down captures condition -> UV stroke -> splitPenStroke -> draft array -> per-tooth InkLayer and group review -> existing ChartEntryModal -> existing createChartEntry API -> existing chart model/database. No schema/API changes. Pending-route guards stay active until all drafts are saved or discarded; surface picker remains locked while drafts are unsaved, but pen drawing on other teeth is enabled. Existing UI styles and chart condition palette retained.
+
+Validation: 13 automated tests passed; lint had no errors (existing warnings); production build passed. Headless local browser with mock chart API exercised actual drawing in two colors on different surfaces of one tooth plus another tooth, preserved colors after palette changes, Undo, dentition switching, save failure/Cancel retention, exact tooth/surface/condition save payloads, remaining drafts after partial save, and appending to the same saved drawing. Temporary diagnostic files removed. Local only, no deployment or database changes. Previously saved records are not rewritten.
+
+## Release preparation for GitHub push (2026-11-12)
+
+User authorized committing and pushing the completed changes to main. GitHub origin/main was fetched and matched local HEAD before the commit. Final checks: 13 automated tests passed, frontend lint had no errors (existing warnings), production build passed. Environment files, generated builds, and temporary browser fixtures are excluded from version control.
+
+Deployment prerequisite from DEPLOYMENT.md: verified the Aiven connection with certificate verification and checked migration history. Only 020_add_emergency_contact_relationship.sql and 021_add_chart_clear_markers.sql were pending. Applied both successfully to Aiven before pushing so Render's auto-deployed code can use the new columns. These migrations only add columns; existing patient/clinical records were preserved. Earlier Local only notes describe the implementation phase; this release preparation records the later authorized production schema update.

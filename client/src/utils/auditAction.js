@@ -46,6 +46,7 @@ const ACTION_LABELS = {
   DELETE_TREATMENT: { label: 'Deleted a treatment' },
   UPDATE_INTRAORAL_EXAM: { label: 'Updated the intraoral examination' },
   CREATE_CHART_ENTRY: { label: 'Updated the dental chart', plural: (n) => `Updated the dental chart (${n} entries)` },
+  DELETE_CHART_ENTRY: { label: 'Removed a dental chart condition' },
   UPLOAD_XRAY: { label: 'Uploaded an X-ray' },
   PATIENT_UPLOAD_XRAY: { label: 'Patient uploaded an X-ray (patient portal)' },
   ANNOTATE_XRAY: { label: 'Annotated an X-ray', plural: (n) => `Annotated X-rays (${n} saves)` },

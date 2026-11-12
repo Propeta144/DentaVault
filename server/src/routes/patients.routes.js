@@ -9,6 +9,7 @@ import { FIELD_LIMITS, notInFuture, stripPhoneFormatting, isValidToothNumber } f
 import { EXTRA_PATIENT_FIELDS } from '../utils/patientFields.js'
 import { passwordProblems } from '../utils/passwordPolicy.js'
 import { isValidSurfaceList, CONDITION_PROCEDURE } from '../utils/treatmentChart.js'
+import { relationshipErrors } from '../utils/emergencyRelationship.js'
 
 const router = Router()
 
@@ -48,11 +49,27 @@ const patientValidation = [
     .bail()
     .matches(PH_MOBILE_PATTERN)
     .withMessage('Contact number must be a valid PH mobile number (09XXXXXXXXX or +639XXXXXXXXX)'),
+  body('address').trim().notEmpty().withMessage('Address is required'),
   maxLength('address', 'Address'),
+  body('emergencyContactName').trim().notEmpty().withMessage('Emergency contact name is required'),
   maxLength('emergencyContactName', 'Emergency contact name'),
+  body('emergencyContactRelationship').trim().custom((value, { req }) => {
+    const error = relationshipErrors({ ...req.body, emergencyContactRelationship: value }).emergencyContactRelationship
+    if (error) throw new Error(error)
+    return true
+  }),
+  body('emergencyContactRelationshipOther')
+    .customSanitizer((value, { req }) => req.body.emergencyContactRelationship === 'Other' ? String(value ?? '').trim() : '')
+    .custom((value, { req }) => {
+      const error = relationshipErrors({ ...req.body, emergencyContactRelationshipOther: value }).emergencyContactRelationshipOther
+      if (error) throw new Error(error)
+      return true
+    }),
   body('emergencyContactPhone')
     .customSanitizer(stripPhoneFormatting)
-    .optional({ values: 'falsy' })
+    .notEmpty()
+    .withMessage('Emergency contact number is required')
+    .bail()
     .matches(PH_MOBILE_PATTERN)
     .withMessage('Emergency contact phone must be a valid PH mobile number (09XXXXXXXXX or +639XXXXXXXXX)'),
   maxLength('medicalHistory', 'Medical history'),

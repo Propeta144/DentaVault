@@ -133,12 +133,15 @@ function buildPalate(arch) {
   return geometry
 }
 
-export default function Gingiva({ arch }) {
+export default function Gingiva({ arch, blockSurfaceSelection = false }) {
   const gum = useMemo(() => buildGum(arch), [arch])
   const palate = useMemo(() => (arch.upper ? buildPalate(arch) : null), [arch])
 
   return (
-    <group>
+    // Sa surface-picker mode, huwag pumili ng ngiping natatakpan ng gums.
+    // Click/hover sa likod lang ang hinaharang; native drag/orbit ay tuloy pa rin.
+    <group onClick={blockSurfaceSelection ? (event) => event.stopPropagation() : undefined}
+      onPointerMove={blockSurfaceSelection ? (event) => event.stopPropagation() : undefined}>
       <mesh geometry={gum} receiveShadow>
         {/* Basa at bahagyang makinang, gaya ng totoong gums */}
         <meshPhysicalMaterial vertexColors roughness={0.45} clearcoat={0.3} clearcoatRoughness={0.4} side={THREE.DoubleSide} />

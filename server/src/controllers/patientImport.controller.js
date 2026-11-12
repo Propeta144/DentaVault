@@ -1,5 +1,6 @@
 import { importPatients, previewImport, IMPORT_TEMPLATE_HEADERS } from '../services/patientImportService.js'
 import { EXTRA_PATIENT_FIELDS } from '../utils/patientFields.js'
+import { EMERGENCY_RELATIONSHIPS } from '../utils/emergencyRelationship.js'
 import { recordAuditLog } from '../models/auditLogModel.js'
 import asyncHandler from '../utils/asyncHandler.js'
 import AppError from '../utils/AppError.js'
@@ -65,13 +66,13 @@ const TEMPLATE_COLUMN_TITLES = {
   last_name: 'Last Name *',
   sex: 'Sex * (male/female)',
   date_of_birth: 'Date of Birth * (MM/DD/YYYY)',
-  contact_number: 'Contact Number (09XXXXXXXXX)',
+  contact_number: 'Contact Number * (09XXXXXXXXX)',
   email: 'Email',
-  address: 'Address',
+  address: 'Address *',
   medical_history: 'Medical History',
   allergies: 'Allergies (or None)',
-  emergency_contact_name: 'Emergency Contact Name',
-  emergency_contact_phone: 'Emergency Contact Phone',
+  emergency_contact_name: 'Emergency Contact Name *',
+  emergency_contact_phone: 'Emergency Contact Phone *',
   procedure_name: 'Procedure (past visit)',
   treatment_date: 'Treatment Date (MM/DD/YYYY)',
   tooth_number: 'Tooth Number (e.g. 26 or ALL)',
@@ -80,6 +81,8 @@ const TEMPLATE_COLUMN_TITLES = {
   ...Object.fromEntries(
     EXTRA_PATIENT_FIELDS.map((f) => [f.column, f.type === 'bool' ? `${f.label}? (Yes/No)` : f.label]),
   ),
+  emergency_contact_relationship: 'Emergency Contact Relationship *',
+  emergency_contact_relationship_other: 'Other Emergency Contact Relationship (if Other)',
 }
 
 // Excel template: Text format (para hindi mawala ang "0" ng 09...), date
@@ -114,7 +117,9 @@ export const downloadTemplate = asyncHandler(async (req, res) => {
     field,
     title: TEMPLATE_COLUMN_TITLES[field],
     kind: TEXT_COLUMNS.has(field) ? 'text' : DATE_COLUMNS.has(field) ? 'date' : 'general',
-    choices: field === 'sex' ? ['male', 'female'] : BOOL_COLUMNS.has(field) ? ['Yes', 'No'] : undefined,
+    choices: field === 'sex' ? ['male', 'female']
+      : field === 'emergency_contact_relationship' ? EMERGENCY_RELATIONSHIPS
+      : BOOL_COLUMNS.has(field) ? ['Yes', 'No'] : undefined,
   }))
   const file = await buildXlsxTemplate(columns)
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')

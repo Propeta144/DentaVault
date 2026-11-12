@@ -30,6 +30,24 @@ export const getToothHistory = asyncHandler(async (req, res) => {
   res.json({ history })
 })
 
+export const deleteEntry = asyncHandler(async (req, res) => {
+  const patient = await assertPatientAccess(req, req.params.patientCode)
+  if (!/^[1-9]\d*$/.test(req.params.entryId) || !Number.isSafeInteger(Number(req.params.entryId))) {
+    throw new AppError('Invalid chart entry', 422)
+  }
+  const result = await chartModel.clearChartEntry({
+    patientId: patient.id, entryId: Number(req.params.entryId), recordedBy: req.user.userId,
+  })
+  await recordAuditLog({
+    userId: req.user.userId, action: 'DELETE_CHART_ENTRY', entityType: 'chart_entry', entityId: result.entry.id,
+    details: { patientId: patient.id, toothNumber: result.entry.tooth_number,
+      conditionCode: result.entry.condition_code, surfaces: result.surfaces,
+      treatmentId: result.entry.treatment_id, treatmentPreserved: true },
+    ipAddress: req.ip,
+  })
+  res.json({ deleted: true, whole: result.whole })
+})
+
 export const createEntry = asyncHandler(async (req, res) => {
   const errors = validationResult(req)
   if (!errors.isEmpty()) {

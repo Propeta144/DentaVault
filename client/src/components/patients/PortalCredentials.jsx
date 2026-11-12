@@ -39,6 +39,7 @@ h1{font-size:18px;margin:24px 0 4px}p{margin:4px 0;font-size:14px}.box{border:1p
 // Ipinapakita pagkatapos gumawa/mag-reset: ang credentials, Copy, Print, Done
 export function PortalCredentials({ fullName, email, password, onDone }) {
   const [copyState, setCopyState] = useState('idle') // idle | copied | failed
+  const [printFailed, setPrintFailed] = useState(false)
 
   async function handleCopy() {
     try {
@@ -72,6 +73,11 @@ export function PortalCredentials({ fullName, email, password, onDone }) {
           Couldn&apos;t copy automatically. Select the text above and copy it, or print the slip.
         </p>
       )}
+      {printFailed && (
+        <p role="alert" className="text-sm text-red-600">
+          Couldn&apos;t open the print slip. Allow popups for this site and try again, or copy the credentials.
+        </p>
+      )}
 
       <div className="grid grid-cols-2 gap-2">
         <button
@@ -84,7 +90,7 @@ export function PortalCredentials({ fullName, email, password, onDone }) {
         </button>
         <button
           type="button"
-          onClick={() => printCredentialsSlip({ fullName, email, password })}
+          onClick={() => setPrintFailed(!printCredentialsSlip({ fullName, email, password }))}
           className="flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-md border border-slate-300 bg-white px-4 text-base font-medium text-slate-700 transition-colors hover:bg-slate-50"
         >
           <Printer className="h-4 w-4" />

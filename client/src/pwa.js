@@ -6,7 +6,7 @@ import { registerSW } from 'virtual:pwa-register'
 // Sa halip, ipapakita na lang natin yung maliit na dismissible banner tapos
 // sila na bahalang pumili kung kailan nila kukunin yung update.
 export function initPWA() {
-  registerSW({
+  const updateServiceWorker = registerSW({
     onNeedRefresh() {
       if (document.getElementById('pwa-update-banner')) return
 
@@ -25,7 +25,15 @@ export function initPWA() {
       reloadBtn.style.cssText =
         'background:#6f2dbd;color:#fff;border:none;padding:6px 12px;border-radius:6px;' +
         'cursor:pointer;font-weight:600;font-size:13px;white-space:nowrap'
-      reloadBtn.onclick = () => window.location.reload()
+      reloadBtn.onclick = async () => {
+        reloadBtn.disabled = true
+        try {
+          await updateServiceWorker(true)
+        } catch {
+          reloadBtn.disabled = false
+          text.textContent = 'Could not update. Please try Reload again.'
+        }
+      }
 
       const dismissBtn = document.createElement('button')
       dismissBtn.textContent = '✕'

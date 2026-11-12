@@ -5,6 +5,8 @@ import { configureTextBuilder } from 'troika-three-text'
 import { conditionColor, isMissingCondition } from '../../constants/dental'
 import teethModelUrl from '../../assets/models/teeth.glb?url'
 import TEETH_EXTENTS from '../../assets/models/teethExtents.json'
+import { UV_CELLS, surfaceForUV } from '../../utils/toothUV'
+export { surfaceForUV } from '../../utils/toothUV'
 
 // Content-Security-Policy (client/vercel.json, security review #26):
 // - Tooth numbers (troika Text): sa main thread na ang typesetting. Ang
@@ -40,13 +42,6 @@ const MAX_CONNECTED_UV_JUMP = 0.2
 // lumalabas pa rin ang mga lumang drawing). Sa geometry, +X = mesial: ang
 // mga ngipin sa kabilang side ay mina-mirror (tingnan Tooth3D), kaya laging
 // posX ang mesial at negX ang distal.
-const UV_CELLS = {
-  occlusal: [0, 2 / 3, 1, 1],
-  facial: [0, 1 / 3, 0.5, 2 / 3],
-  lingual: [0.5, 1 / 3, 1, 2 / 3],
-  mesial: [0, 0, 0.5, 1 / 3],
-  distal: [0.5, 0, 1, 1 / 3],
-}
 
 // Baby teeth (Feature #30): walang hiwalay na model, kaya ginagamit ang
 // pinakamalapit na permanent na hugis, pinaliit ayon sa karaniwang laki ng
@@ -85,12 +80,6 @@ export function toothExtents(toothNumber) {
 // lapad), na hindi laging tugma sa kung saan talaga lumalabas ang kulay —
 // hal. ang central fossa ng molar ay mababa kaya napupunta sa "facial".
 // Ngayon iisa ang batayan ng pintura at ng classification.
-export function surfaceForUV([u, v]) {
-  for (const [surface, [u0, v0, u1, v1]] of Object.entries(UV_CELLS)) {
-    if (u >= u0 && u <= u1 && v >= v0 && v <= v1) return surface
-  }
-  return 'occlusal'
-}
 
 export function mostCommon(list) {
   const counts = {}
@@ -113,7 +102,7 @@ export function mostCommon(list) {
 // component just renders whatever `strokes` it's given (redrawing fully
 // whenever that list changes, e.g. after an undo) and reports raw points
 // while a new one is in progress.
-function InkLayer({ geometry, strokes = [], paintEnabled, penColor, onStrokeComplete, onPaintStart, onPaintEnd }) {
+function InkLayer({ geometry, strokes = [], paintEnabled, penColor, penConditionCode, onStrokeComplete, onPaintStart, onPaintEnd }) {
   const canvas = useMemo(() => {
     const el = document.createElement('canvas')
     el.width = INK_CANVAS_SIZE
@@ -127,11 +116,13 @@ function InkLayer({ geometry, strokes = [], paintEnabled, penColor, onStrokeComp
     return t
   }, [canvas])
 
-  function drawSegment(fromUV, toUV) {
+  useEffect(() => () => texture.dispose(), [texture])
+
+  function drawSegment(fromUV, toUV, color) {
     const s = INK_CANVAS_SIZE
     ctx.globalAlpha = 0.85
-    ctx.fillStyle = penColor
-    ctx.strokeStyle = penColor
+    ctx.fillStyle = color
+    ctx.strokeStyle = color
     ctx.lineWidth = s * 0.05
     ctx.lineCap = 'round'
     ctx.lineJoin = 'round'
@@ -148,14 +139,13 @@ function InkLayer({ geometry, strokes = [], paintEnabled, penColor, onStrokeComp
     ctx.globalAlpha = 1
   }
 
-  // Full redraw whenever the committed-but-unsaved stroke list changes —
-  // covers undo (list shrinks), a fresh mark starting (list resets to
-  // empty for every tooth except the one being drawn on), and a save
-  // clearing everything back out.
+  // Redraw ng drafts para sa ngiping ito lang. Bawat segment ay may sariling
+  // condition, kaya palette changes o bagong guhit ay hindi nagre-recolor
+  // ng nauna. Undo/save ay nag-aalis lang ng kaukulang drafts.
   useEffect(() => {
     ctx.clearRect(0, 0, INK_CANVAS_SIZE, INK_CANVAS_SIZE)
     for (const stroke of strokes) {
-      stroke.uv.forEach((uv, i) => drawSegment(i === 0 ? null : stroke.uv[i - 1], uv))
+      stroke.uv.forEach((uv, i) => drawSegment(i === 0 ? null : stroke.uv[i - 1], uv, conditionColor(stroke.conditionCode)))
     }
     texture.needsUpdate = true
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -165,6 +155,7 @@ function InkLayer({ geometry, strokes = [], paintEnabled, penColor, onStrokeComp
   const lastUV = useRef(null)
   const currentUV = useRef([])
   const currentLocal = useRef([])
+  const currentCondition = useRef(null)
 
   function clampedUV(e) {
     if (!e.uv) return null
@@ -177,11 +168,12 @@ function InkLayer({ geometry, strokes = [], paintEnabled, penColor, onStrokeComp
     e.target.setPointerCapture?.(e.pointerId)
     onPaintStart()
     dragging.current = true
+    currentCondition.current = penConditionCode
     const uv = clampedUV(e)
     lastUV.current = uv
     currentUV.current = uv ? [uv] : []
     currentLocal.current = e.point ? [e.object.worldToLocal(e.point.clone())] : []
-    if (uv) drawSegment(null, uv)
+    if (uv) drawSegment(null, uv, penColor)
     texture.needsUpdate = true
   }
 
@@ -192,7 +184,7 @@ function InkLayer({ geometry, strokes = [], paintEnabled, penColor, onStrokeComp
     if (e.point) currentLocal.current.push(e.object.worldToLocal(e.point.clone()))
     const jumped =
       lastUV.current && Math.hypot(uv[0] - lastUV.current[0], uv[1] - lastUV.current[1]) > MAX_CONNECTED_UV_JUMP
-    drawSegment(jumped ? null : lastUV.current, uv)
+    drawSegment(jumped ? null : lastUV.current, uv, conditionColor(currentCondition.current))
     texture.needsUpdate = true
     currentUV.current.push(uv)
     lastUV.current = uv
@@ -204,7 +196,7 @@ function InkLayer({ geometry, strokes = [], paintEnabled, penColor, onStrokeComp
     dragging.current = false
     onPaintEnd()
     if (currentUV.current.length > 0) {
-      onStrokeComplete({ uv: currentUV.current, local: currentLocal.current })
+      onStrokeComplete({ uv: currentUV.current, local: currentLocal.current, conditionCode: currentCondition.current })
     }
     lastUV.current = null
     currentUV.current = []
@@ -215,6 +207,7 @@ function InkLayer({ geometry, strokes = [], paintEnabled, penColor, onStrokeComp
     <mesh
       geometry={geometry}
       scale={1.015}
+      raycast={paintEnabled ? THREE.Mesh.prototype.raycast : () => null}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
@@ -238,7 +231,7 @@ function InkLayer({ geometry, strokes = [], paintEnabled, penColor, onStrokeComp
 // No pointer handlers and raycast disabled — pure visual layer, must not
 // block InkLayer's own paint surface underneath it (an object with no
 // handlers still intercepts the raycast unless explicitly excluded).
-function SurfaceLayer({ geometry, fills, marks }) {
+function SurfaceLayer({ geometry, fills, marks, hoveredSurface = null }) {
   const canvas = useMemo(() => {
     const el = document.createElement('canvas')
     el.width = INK_CANVAS_SIZE
@@ -251,6 +244,8 @@ function SurfaceLayer({ geometry, fills, marks }) {
     t.colorSpace = THREE.SRGBColorSpace
     return t
   }, [canvas])
+
+  useEffect(() => () => texture.dispose(), [texture])
 
   useEffect(() => {
     const s = INK_CANVAS_SIZE
@@ -299,9 +294,17 @@ function SurfaceLayer({ geometry, fills, marks }) {
       }
       ctx.stroke()
     }
+    // Pansamantalang kulay ng primary buttons, gamit ang parehong UV atlas
+    // ng click/condition fill. Hindi binabago ang saved fills o pen strokes.
+    if (hoveredSurface) {
+      const [u0, v0, u1, v1] = hoveredSurface === 'whole' ? [0, 0, 1, 1] : UV_CELLS[hoveredSurface]
+      ctx.globalAlpha = 1
+      ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--color-sky-600').trim() || '#6f2dbd'
+      ctx.fillRect(u0 * s, (1 - v1) * s, (u1 - u0) * s, (v1 - v0) * s)
+    }
     ctx.globalAlpha = 1
     texture.needsUpdate = true
-  }, [ctx, texture, fills, marks])
+  }, [ctx, texture, fills, marks, hoveredSurface])
 
   return (
     <mesh geometry={geometry} scale={1.012} raycast={() => null}>
@@ -317,6 +320,8 @@ export default function Tooth3D({
   chartState,
   canEdit,
   paintEnabled,
+  surfaceSelectionEnabled = false,
+  onSurfaceSelect,
   pendingStrokes,
   onStrokeComplete,
   position,
@@ -326,6 +331,7 @@ export default function Tooth3D({
   tiltX = 0,
   labelY,
   penColor,
+  penConditionCode,
   onPaintStart,
   onPaintEnd,
   highlighted,
@@ -341,6 +347,33 @@ export default function Tooth3D({
   const extents = toothExtents(toothNumber)
   // Lahat ng "wala na ang ngipin" (Extracted, Missing, Congenitally Missing...)
   const isExtracted = isMissingCondition(chartState.whole?.condition_code)
+  const canSelect = canEdit && surfaceSelectionEnabled && Boolean(onSurfaceSelect)
+  const [hoveredSurface, setHoveredSurface] = useState(null)
+  const visibleHover = canSelect ? hoveredSurface : null
+
+  useEffect(() => {
+    if (!canSelect) setHoveredSurface(null)
+  }, [canSelect])
+
+  function handleSurfaceHover(event) {
+    if (!canSelect) return
+    event.stopPropagation()
+    if (event.buttons || event.pointerType === 'touch' || !event.uv) {
+      setHoveredSurface(null)
+      return
+    }
+    setHoveredSurface(isExtracted ? 'whole' : surfaceForUV([event.uv.x, event.uv.y]))
+  }
+
+  function handleSurfaceClick(event) {
+    // delta = layo mula pointer-down (R3F). Drag para mag-orbit ay hindi
+    // dapat magbukas ng panel pagkatapos bitawan ang mouse/daliri.
+    if (!canSelect || event.delta > 5 || event.button !== 0) return
+    event.stopPropagation()
+    setHoveredSurface(null)
+    const surface = isExtracted ? 'whole' : event.uv ? surfaceForUV([event.uv.x, event.uv.y]) : 'occlusal'
+    onSurfaceSelect(toothNumber, surface)
+  }
 
   // Hindi simetriko ang mga ngipin (iba ang mesial at distal na side), at
   // +X = mesial sa geometry. Sa mga posisyong nasa kabilang direksyon ang
@@ -383,7 +416,12 @@ export default function Tooth3D({
           scale={[mirrorX ? -scale : scale, scale, scale]}
         >
           {toothGeometry && (
-            <mesh castShadow receiveShadow geometry={toothGeometry} raycast={() => null}>
+            <mesh castShadow receiveShadow geometry={toothGeometry}
+              raycast={canSelect ? THREE.Mesh.prototype.raycast : () => null}
+              onClick={canSelect ? handleSurfaceClick : undefined}
+              onPointerMove={canSelect ? handleSurfaceHover : undefined}
+              onPointerOut={() => setHoveredSurface(null)}
+              onPointerDown={() => setHoveredSurface(null)}>
               {/* Enamel: bahagyang malamig na off-white, may kaunting kinang
                   (clearcoat) — dati flat na puti. Extracted = abo. */}
               <meshPhysicalMaterial
@@ -403,14 +441,15 @@ export default function Tooth3D({
               strokes={pendingStrokes}
               paintEnabled={paintEnabled}
               penColor={penColor}
+              penConditionCode={penConditionCode}
               onStrokeComplete={onStrokeComplete}
               onPaintStart={onPaintStart}
               onPaintEnd={onPaintEnd}
             />
           )}
 
-          {toothGeometry && !isExtracted && (fills.length > 0 || marks.length > 0) && (
-            <SurfaceLayer geometry={toothGeometry} fills={fills} marks={marks} />
+          {toothGeometry && ((!isExtracted && (fills.length > 0 || marks.length > 0)) || visibleHover) && (
+            <SurfaceLayer geometry={toothGeometry} fills={fills} marks={marks} hoveredSurface={visibleHover} />
           )}
         </group>
       </group>

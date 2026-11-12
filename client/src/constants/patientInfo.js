@@ -7,6 +7,8 @@ import { FIELD_LIMITS } from './fieldLimits'
 
 // Mga text field: key (form / API, camelCase) → column (DB row, snake_case)
 export const INFO_TEXT_FIELDS = [
+  { key: 'emergencyContactRelationship', column: 'emergency_contact_relationship', label: 'Emergency Contact Relationship' },
+  { key: 'emergencyContactRelationshipOther', column: 'emergency_contact_relationship_other', label: 'Other Emergency Contact Relationship' },
   { key: 'middleName', column: 'middle_name', label: 'Middle Name' },
   { key: 'occupation', column: 'occupation', label: 'Occupation' },
   { key: 'nationality', column: 'nationality', label: 'Nationality' },
