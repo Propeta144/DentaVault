@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Baby } from 'lucide-react'
 import Tooth from './Tooth'
 import { TOOTH_BOX } from './toothShape'
 import ChartEntryModal from './ChartEntryModal'
@@ -7,6 +6,7 @@ import ConditionLegend from './ConditionLegend'
 import PageLoader from '../common/PageLoader'
 import { ODONTOGRAM_ROWS, PRIMARY_ROWS, isPrimaryTooth } from '../../constants/dental'
 import { getCurrentChart, createChartEntry, deleteChartEntry } from '../../services/chart'
+import { defaultDentition, dentitionLabel, isDentition } from '../../utils/dentition'
 
 // Iisang sukat ng ngipin para sa layout at sa hugis (toothShape.js)
 const TOOTH_SIZE = TOOTH_BOX
@@ -17,59 +17,41 @@ const NUMBER_SPACE = 30 // numero ng ngipin (itaas ng upper, ibaba ng lower)
 const LETTER_SPACE = 26 // letter codes (D, F, ...) sa kabilang gilid
 const BITE_GAP = 28 // pagitan ng upper at lower (may dashed na bite line)
 
-// Baby teeth: bahagyang mas maliit, at nakahanay sa ilalim/ibabaw ng
-// permanent na papalit sa kanila (55 sa tapat ng 15, 51 sa tapat ng 11),
-// gaya ng papel na chart ng clinic.
-const PRIMARY_SCALE = 0.85
-const PRIMARY_COLUMN_OFFSET = 3 // 55 → column ng 15 (pang-4 sa hilera)
-
-function toothX(indexInRow) {
-  const midpoint = ODONTOGRAM_ROWS[0].length / 2
+function toothX(indexInRow, count) {
+  const midpoint = count / 2
   const extraGap = indexInRow >= midpoint ? QUADRANT_GAP : 0
   return indexInRow * (TOOTH_SIZE + TOOTH_GAP) + extraGap
 }
 
-const CHART_WIDTH = toothX(ODONTOGRAM_ROWS[0].length - 1) + TOOTH_SIZE + 8
-
-// Patayong ayos ng mga hilera. Kapag naka-on ang baby teeth: primary upper →
-// permanent upper → bite line → permanent lower → primary lower (gaya ng papel
-// ng clinic). Bawat ngipin: numero sa labas, letter codes palapit sa bite line.
-function buildLayout(showPrimary) {
+// Isang dentition lang: dalawang rows, kapwa malaki ang tap targets.
+function buildLayout(dentition) {
   const rows = []
   let y = ARCH_LABEL_SPACE
-  const upper = showPrimary
-    ? [
-        { teeth: PRIMARY_ROWS[0], primary: true },
-        { teeth: ODONTOGRAM_ROWS[0], primary: false },
-      ]
-    : [{ teeth: ODONTOGRAM_ROWS[0], primary: false }]
+  const teeth = dentition === 'primary' ? PRIMARY_ROWS : ODONTOGRAM_ROWS
+  const upper = [{ teeth: teeth[0] }]
   for (const row of upper) {
-    const size = TOOTH_SIZE * (row.primary ? PRIMARY_SCALE : 1)
     y += NUMBER_SPACE
     rows.push({ ...row, y, labelPosition: 'above' })
-    y += size + LETTER_SPACE
+    y += TOOTH_SIZE + LETTER_SPACE
   }
   const biteY = y + BITE_GAP / 2
   y += BITE_GAP
-  const lower = showPrimary
-    ? [
-        { teeth: ODONTOGRAM_ROWS[1], primary: false },
-        { teeth: PRIMARY_ROWS[1], primary: true },
-      ]
-    : [{ teeth: ODONTOGRAM_ROWS[1], primary: false }]
+  const lower = [{ teeth: teeth[1] }]
   for (const row of lower) {
-    const size = TOOTH_SIZE * (row.primary ? PRIMARY_SCALE : 1)
     y += LETTER_SPACE
     rows.push({ ...row, y, labelPosition: 'below' })
-    y += size + NUMBER_SPACE
+    y += TOOTH_SIZE + NUMBER_SPACE
   }
-  return { rows, biteY, height: y + ARCH_LABEL_SPACE }
+  const count = teeth[0].length
+  const half = count / 2
+  return { rows, biteY, height: y + ARCH_LABEL_SPACE,
+    width: toothX(count - 1, count) + TOOTH_SIZE + 8,
+    leftLabelX: (toothX(0, count) + toothX(half - 1, count) + TOOTH_SIZE) / 2,
+    rightLabelX: (toothX(half, count) + toothX(count - 1, count) + TOOTH_SIZE) / 2 }
 }
 
 function rowToothX(row, i) {
-  if (!row.primary) return toothX(i)
-  // Nakagitna sa column ng katapat na permanent tooth
-  return toothX(i + PRIMARY_COLUMN_OFFSET) + (TOOTH_SIZE * (1 - PRIMARY_SCALE)) / 2
+  return toothX(i, row.teeth.length)
 }
 
 // Yung Quadrant 1 (kanan ng pasyente, taas), nasa LEFT half ng chart siya —
@@ -78,9 +60,6 @@ function rowToothX(row, i) {
 // nandiyan para may maka-orient agad kahit hindi memorized yung FDI
 // notation (hal. defense panel, o pasyente mismo) — di na kailangan pang
 // i-explain isa-isa yung tooth numbers.
-const ARCH_MIDPOINT = ODONTOGRAM_ROWS[0].length / 2
-const LEFT_HALF_CENTER_X = (toothX(0) + toothX(ARCH_MIDPOINT - 1) + TOOTH_SIZE) / 2
-const RIGHT_HALF_CENTER_X = (toothX(ARCH_MIDPOINT) + toothX(ODONTOGRAM_ROWS[0].length - 1) + TOOTH_SIZE) / 2
 
 function ArchLabel({ x, y, children }) {
   return (
@@ -98,20 +77,15 @@ function ArchLabel({ x, y, children }) {
   )
 }
 
-// Ito lang ang module na nagre-render ng chart. Kapag may future 3D module
-// balang araw, hiwalay na component na lang siya na babasa rin sa parehong
-// /chart API — wala nang babaguhin dito para idagdag 'yon.
-// printMode: Print Chart page (bukas ang letter codes sa legend; baby teeth
-// lumalabas lang kapag may naitala, walang toggle button).
+// Parehong chart API at dentition policy ng 3D; hiwalay lang ang renderer.
+// printMode: napiling set lang, bukas ang legend, walang view controls.
 // alerts: { allergies, medicalHistory }, ipinapakita sa chart entry modal
-export default function Odontogram2D({ patientId, canEdit, printMode = false, alerts }) {
+export default function Odontogram2D({ patientId, canEdit, printMode = false, alerts, dateOfBirth, dentition: selectedDentition, onDentitionChange }) {
   const [entries, setEntries] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [selection, setSelection] = useState(null) // { toothNumber, surface }
   const [highlightedTooth, setHighlightedTooth] = useState(null)
-  // null = sundin ang default (bukas kapag may naitalang baby tooth)
-  const [showPrimaryChoice, setShowPrimaryChoice] = useState(null)
   // Keyboard (critique 2026-10-25): iisang Tab stop ang buong chart (dati 32);
   // ang ngiping ito ang may tabIndex 0, arrow keys ang paglipat.
   const [focusTooth, setFocusTooth] = useState(null)
@@ -135,6 +109,12 @@ export default function Odontogram2D({ patientId, canEdit, printMode = false, al
   useEffect(() => {
     load()
   }, [load])
+
+  const dentition = isDentition(selectedDentition) ? selectedDentition : defaultDentition(dateOfBirth, entries)
+  // Sa shared toolbar ang selector; hintayin ang records bago itakda ang default.
+  useEffect(() => {
+    if (!loading && !error && !isDentition(selectedDentition)) onDentitionChange?.(dentition)
+  }, [loading, error, selectedDentition, dentition, onDentitionChange])
 
   // { toothNumber: { surfaceCode: entry } }
   const chartByTooth = entries.reduce((acc, entry) => {
@@ -168,11 +148,9 @@ export default function Odontogram2D({ patientId, canEdit, printMode = false, al
 
   if (loading) return <PageLoader label="Loading chart..." />
 
-  // Madalang ang batang pasyente (sabi ng clinic), kaya nakatago ang baby
-  // teeth hangga't walang naitala o hindi binubuksan ng dentist
   const hasPrimaryEntries = entries.some((e) => isPrimaryTooth(e.tooth_number))
-  const showPrimary = printMode ? hasPrimaryEntries : (showPrimaryChoice ?? hasPrimaryEntries)
-  const layout = buildLayout(showPrimary)
+  const hasPermanentEntries = entries.some((e) => !isPrimaryTooth(e.tooth_number))
+  const layout = buildLayout(dentition)
   const visibleTeeth = layout.rows.flatMap((r) => r.teeth)
   const tabStopTooth = visibleTeeth.includes(focusTooth) ? focusTooth : visibleTeeth[0]
 
@@ -211,6 +189,7 @@ export default function Odontogram2D({ patientId, canEdit, printMode = false, al
   return (
     <div>
       {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
+      <h3 className="mb-3 text-base font-semibold text-slate-900">{dentitionLabel(dentition)}</h3>
 
       {/*
         Lumiliit ang chart para magkasya sa lalagyan (w-full, hanggang sa
@@ -232,11 +211,12 @@ export default function Odontogram2D({ patientId, canEdit, printMode = false, al
           pa rin (walang border doon). */}
       <div data-odontogram-scroll className="-mx-1 overflow-x-auto px-1 py-2 print:mx-0 print:overflow-visible print:p-0">
         <svg
-          viewBox={`0 0 ${CHART_WIDTH} ${layout.height}`}
+          data-dentition={dentition}
+          viewBox={`0 0 ${layout.width} ${layout.height}`}
           className="mx-auto block h-auto w-full min-w-[600px]"
-          style={{ maxWidth: CHART_WIDTH }}
+          style={{ maxWidth: layout.width }}
           role="group"
-          aria-label={canEdit ? 'Dental chart. Use arrow keys to move between teeth, Enter to open a tooth.' : 'Dental chart'}
+          aria-label={`${dentitionLabel(dentition)} dental chart.${canEdit ? ' Use arrow keys to move between teeth, Enter to open a tooth.' : ''}`}
           onKeyDown={canEdit ? handleChartKeyDown : undefined}
         >
           <defs>
@@ -245,10 +225,10 @@ export default function Odontogram2D({ patientId, canEdit, printMode = false, al
             </filter>
           </defs>
 
-          <ArchLabel x={LEFT_HALF_CENTER_X} y={14}>
+          <ArchLabel x={layout.leftLabelX} y={14}>
             UPPER RIGHT
           </ArchLabel>
-          <ArchLabel x={RIGHT_HALF_CENTER_X} y={14}>
+          <ArchLabel x={layout.rightLabelX} y={14}>
             UPPER LEFT
           </ArchLabel>
 
@@ -259,7 +239,7 @@ export default function Odontogram2D({ patientId, canEdit, printMode = false, al
                 toothNumber={toothNumber}
                 x={rowToothX(row, i)}
                 y={row.y}
-                scale={row.primary ? PRIMARY_SCALE : 1}
+                scale={1}
                 labelPosition={row.labelPosition}
                 chartState={chartByTooth[toothNumber] || {}}
                 canEdit={canEdit}
@@ -272,10 +252,10 @@ export default function Odontogram2D({ patientId, canEdit, printMode = false, al
             )),
           )}
 
-          <ArchLabel x={LEFT_HALF_CENTER_X} y={layout.height - 4}>
+          <ArchLabel x={layout.leftLabelX} y={layout.height - 4}>
             LOWER RIGHT
           </ArchLabel>
-          <ArchLabel x={RIGHT_HALF_CENTER_X} y={layout.height - 4}>
+          <ArchLabel x={layout.rightLabelX} y={layout.height - 4}>
             LOWER LEFT
           </ArchLabel>
 
@@ -283,7 +263,7 @@ export default function Odontogram2D({ patientId, canEdit, printMode = false, al
           <line
             x1={0}
             y1={layout.biteY}
-            x2={CHART_WIDTH}
+            x2={layout.width}
             y2={layout.biteY}
             stroke="#e2e8f0"
             strokeDasharray="4 4"
@@ -302,18 +282,10 @@ export default function Odontogram2D({ patientId, canEdit, printMode = false, al
                 : 'Only the dentist can update the chart.'}
             </p>
           )}
-          {!printMode && (
-            <button
-              type="button"
-              aria-pressed={showPrimary}
-              onClick={() => setShowPrimaryChoice(!showPrimary)}
-              className="flex min-h-11 items-center justify-center gap-2 self-start whitespace-nowrap rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 sm:self-auto print:hidden"
-            >
-              <Baby className="h-4 w-4" />
-              {showPrimary ? 'Hide baby teeth' : 'Show baby teeth'}
-            </button>
-          )}
         </div>
+        {!printMode && ((dentition === 'primary' && hasPermanentEntries) || (dentition === 'permanent' && hasPrimaryEntries)) && (
+          <p className="text-sm text-slate-500">{dentitionLabel(dentition === 'primary' ? 'permanent' : 'primary')} also have chart entries. Select that set to view them.</p>
+        )}
         <ConditionLegend expanded={printMode} />
       </div>
 
@@ -324,6 +296,7 @@ export default function Odontogram2D({ patientId, canEdit, printMode = false, al
           surface={selection.surface}
           toothState={chartByTooth[selection.toothNumber] || {}}
           alerts={alerts}
+          dateOfBirth={dateOfBirth}
           onClose={closeModal}
           onSubmit={handleSaveEntry}
           onDelete={canEdit ? async (entryId) => {

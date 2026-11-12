@@ -259,7 +259,7 @@ export default function PatientsListPage() {
                 className="cursor-pointer rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-colors hover:border-sky-200"
               >
                 <div className="flex items-start gap-3">
-                  <Avatar firstName={p.first_name} lastName={p.last_name} />
+                  <Avatar firstName={p.first_name} lastName={p.last_name} photoUrl={`/patients/${p.patient_code}/photo`} photoVersion={p.photo_version} />
                   <div className="min-w-0 flex-1">
                     <Link
                       to={PROFILE_PATH}
@@ -323,7 +323,7 @@ export default function PatientsListPage() {
                   >
                     <td className="px-4 py-2.5">
                       <div className="flex items-center gap-3">
-                        <Avatar firstName={p.first_name} lastName={p.last_name} size="sm" />
+                        <Avatar firstName={p.first_name} lastName={p.last_name} size="sm" photoUrl={`/patients/${p.patient_code}/photo`} photoVersion={p.photo_version} />
                         <div>
                           {/* Totoong link pa rin (para sa screen reader / middle-click) */}
                           <Link

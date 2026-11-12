@@ -8,6 +8,8 @@ build/
 uploads/xrays/*
 !uploads/xrays/.gitkeep
 server/uploads/xrays/*
+uploads/avatars/
+server/uploads/avatars/
 # Audit log archives — may personal data (sino, kailan, IP); huwag i-commit
 server/archives/
 !server/uploads/xrays/.gitkeep

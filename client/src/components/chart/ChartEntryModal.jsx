@@ -18,6 +18,7 @@ import { useToast } from '../../context/ToastContext'
 import { formatDate } from '../../utils/formatDate'
 import { FIELD_LIMITS } from '../../constants/fieldLimits'
 import { TOOTH_BOX, toothShape } from './toothShape'
+import { dentitionAgeCaution, dentitionLabel } from '../../utils/dentition'
 
 // Parehong hugis-ngipin na iginuguhit ng Tooth.jsx (toothShape.js), para
 // makita ng dentist kung anong parte ng ngipin ang napili. Orientation-aware
@@ -142,6 +143,7 @@ export default function ChartEntryModal({
   currentEntry: fixedEntry,
   toothState,
   alerts,
+  dateOfBirth,
   defaultConditionCode,
   strokes,
   onClose,
@@ -188,6 +190,8 @@ export default function ChartEntryModal({
   const [history, setHistory] = useState(null)
   const [loadingHistory, setLoadingHistory] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [confirmAge, setConfirmAge] = useState(false)
+  const ageCaution = dentitionAgeCaution(dateOfBirth, toothNumber)
 
   const surfaceLabel = surfaceLabelFor(surface)
   const selectedLabel = conditionLabel(conditionCode)
@@ -228,13 +232,18 @@ export default function ChartEntryModal({
     }
   }
 
-  async function handleSubmit(e) {
-    e.preventDefault()
+  async function handleSubmit(e, ageConfirmed = false) {
+    e?.preventDefault()
+    if (submitting) return
     if (!conditionCode) {
       setError('Choose a condition first.')
       return
     }
     setError('')
+    if (ageCaution && !ageConfirmed) {
+      setConfirmAge(true)
+      return
+    }
     setSubmitting(true)
     try {
       // Only a genuine single-surface 3D-pen save carries the actual drawn
@@ -282,6 +291,45 @@ export default function ChartEntryModal({
     } finally {
       setSubmitting(false)
     }
+  }
+
+  if (confirmAge && ageCaution) {
+    const backToEntry = () => {
+      if (submitting) return
+      setConfirmAge(false)
+      setError('')
+    }
+    return (
+      <Modal key="confirm-tooth-age" title="Confirm Tooth Set" onClose={backToEntry}
+        notice={alerts && <PatientAlertStrip allergies={alerts.allergies} medicalHistory={alerts.medicalHistory} />}>
+        <div className="space-y-4">
+          <div className="flex items-start gap-3 rounded-md border border-amber-200 bg-amber-50 px-4 py-3">
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" />
+            <div className="text-base text-amber-900">
+              <p className="font-semibold">Patient age: {ageCaution.age} {ageCaution.age === 1 ? 'year' : 'years'}</p>
+              <p className="mt-1">You are recording <strong>{dentitionLabel(ageCaution.selectedDentition).toLowerCase()}</strong>.
+                {' '}The age-based guide for this patient is {dentitionLabel(ageCaution.ageDefault).toLowerCase()}.</p>
+              <p className="mt-1">Age is a guide only. Confirm this is the tooth you examined before saving.</p>
+            </div>
+          </div>
+          <dl className="space-y-2 rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-base">
+            <div><dt className="text-sm text-slate-500">Tooth</dt><dd className="font-medium text-slate-900">{toothNumber} · {dentitionLabel(ageCaution.selectedDentition)}</dd></div>
+            <div><dt className="text-sm text-slate-500">Surface</dt><dd className="text-slate-800">{applyToWholeTooth ? 'Whole tooth (all 5 surfaces)' : surfaceLabel}</dd></div>
+            <div><dt className="text-sm text-slate-500">Condition</dt><dd className="text-slate-800">{selectedLabel}</dd></div>
+          </dl>
+          {addTreatment && <p className="text-sm text-slate-600">Also adds {procedureName} to Treatment History.</p>}
+          {error && <p role="alert" className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-base text-red-700">{error}</p>}
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <button type="button" onClick={backToEntry} disabled={submitting}
+              className="min-h-11 flex-1 rounded-md border border-slate-300 bg-white px-4 py-3 text-base font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50">Back to Entry</button>
+            <button type="button" onClick={() => handleSubmit(null, true)} disabled={submitting}
+              className="min-h-11 flex-1 rounded-md bg-sky-600 px-4 py-3 text-base font-semibold text-white hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-50">
+              {submitting ? 'Saving...' : 'Confirm and Save'}
+            </button>
+          </div>
+        </div>
+      </Modal>
+    )
   }
 
   if (confirmDelete && currentEntry && onDelete) {

@@ -289,7 +289,7 @@ export default function AppLayout() {
             triggerClassName="flex min-h-11 w-56 items-center gap-2.5 rounded-md p-2 text-left transition-colors hover:bg-slate-100"
             trigger={
               <>
-                <Avatar firstName={firstName} lastName={lastName} size="sm" tone="dark" />
+                <Avatar firstName={firstName} lastName={lastName} size="sm" tone="dark" photoUrl="/settings/photo" photoVersion={user?.photoVersion} />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-medium text-slate-800">{user?.fullName}</span>
                   <span className="block text-xs capitalize text-slate-500">{user?.role}</span>
@@ -321,7 +321,7 @@ export default function AppLayout() {
             <DropdownMenu
               label="Account menu"
               triggerClassName="flex min-h-11 items-center rounded-full p-1 transition-colors hover:bg-slate-100"
-              trigger={<Avatar firstName={firstName} lastName={lastName} size="sm" tone="dark" />}
+              trigger={<Avatar firstName={firstName} lastName={lastName} size="sm" tone="dark" photoUrl="/settings/photo" photoVersion={user?.photoVersion} />}
               header={accountHeader}
               items={accountItems}
             />

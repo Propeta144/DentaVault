@@ -2215,3 +2215,129 @@ Validation: 13 automated tests passed; lint had no errors (existing warnings); p
 User authorized committing and pushing the completed changes to main. GitHub origin/main was fetched and matched local HEAD before the commit. Final checks: 13 automated tests passed, frontend lint had no errors (existing warnings), production build passed. Environment files, generated builds, and temporary browser fixtures are excluded from version control.
 
 Deployment prerequisite from DEPLOYMENT.md: verified the Aiven connection with certificate verification and checked migration history. Only 020_add_emergency_contact_relationship.sql and 021_add_chart_clear_markers.sql were pending. Applied both successfully to Aiven before pushing so Render's auto-deployed code can use the new columns. These migrations only add columns; existing patient/clinical records were preserved. Earlier Local only notes describe the implementation phase; this release preparation records the later authorized production schema update.
+
+## Adult / Baby teeth selection and age defaults (2026-11-12)
+
+2D and 3D now share Adult teeth / Baby teeth controls and a visible label. Only the selected set is rendered: 32 adult teeth or 20 baby teeth. The old 2D Show baby teeth behavior that displayed both sets together was removed. Baby rows have their own width and quadrant-label positions, with large tooth targets and existing horizontal-scroll behavior on phones. Keyboard navigation follows the visible rows.
+
+Initial view rule: if current records exist in only one set, show that set first. Otherwise, age 0-12 defaults to Baby teeth; age 13+ or unknown/invalid/future DOB defaults to Adult teeth. This is a display preference, not an assertion about which teeth have erupted. The dentist/patient can always switch sets. For clinical context: Canadian Dental Association notes that adult teeth start appearing during childhood and primary teeth are lost until about age 12: https://www.cda-adc.ca/for-the-public/understanding-your-oral-health/dental-care-children/development . Existing records are never moved, deleted, or marked present based on age. A message indicates recorded findings in the other set.
+
+| File | Type | Purpose |
+|---|---|---|
+| `client/src/utils/dentition.js` | NEW | Shared age/record view default, labels, validation, and print filtering. |
+| `client/src/components/chart/DentitionSelector.jsx` | NEW | Shared existing-style Adult teeth / Baby teeth buttons with aria-pressed and 44px targets. |
+| `client/src/components/chart/Odontogram2D.jsx` | MODIFIED | Render one set only; dynamic row width/arch labels and visible keyboard targets; replace show/hide toggle with shared selector. |
+| `client/src/components/chart/Odontogram3D.jsx` | MODIFIED | Same labels/default policy/selector, selected scene and matching tooth dropdown. Existing multi-tooth pen drafts remain in component state across dentition changes. |
+| `client/src/pages/PatientProfilePage.jsx` | MODIFIED | Pass DOB to both charts; keep manual choice per patient and share between 2D/3D; include selected set in print handoff. |
+| `client/src/pages/ChartPrintPage.jsx` | MODIFIED | Use selected/default set; diagram and Findings show that set only. |
+| `client/src/pages/Chart3DPrintPage.jsx` | MODIFIED | Render snapshots for the selected set only, label the print heading, filter Findings consistently. |
+| `client/test/dentition.test.js` | NEW | Age cutoff/birthday boundary, unknown/future DOB, single-set record priority, mixed records, print filtering, labels and allowed set values. |
+
+Flow: profile DOB + chart entries -> defaultDentition -> selected 2D rows or 3D scene. Manual selector updates per-patient profile state, so switching between renderers keeps the choice. Print receives the same choice through the existing history/localStorage handoff; no IDs added to URLs. Saving/deleting clinical entries continues through the existing authenticated API. No database or API changes.
+
+Validation: 16 automated tests passed; lint no errors (existing warnings); production build passed. Actual local app tested in headless Edge with sample API responses: child/adult blank defaults and single-set record priority, 20/32 exclusive 2D tooth counts, baby-surface panel via keyboard, selector at 360/768/1024/1366, shared 2D/3D choice, actual 3D scene tooth counts and matching dropdown options, selected-set print handoff and 2D output, read-only patient switching without edit access. Screenshot visually inspected (sample patient only), kept in ignored .impeccable. Temporary diagnostic script removed. Local only; no commit, push, deployment, or database changes.
+
+## Remove the 3D Select tooth dropdown (2026-11-12)
+
+User requested removing the optional Select tooth / Choose tooth control. MODIFIED: client/src/components/chart/Odontogram3D.jsx, dropdown markup removed. Direct surface click/tap, hover, pen drawing, Adult teeth / Baby teeth tabs, and shared condition panel remain available. Local only. Earlier notes about the dropdown describe the previous implementation and are superseded by this change.
+
+## Confirm age/dentition mismatch before chart save (2026-11-12)
+
+The dentist requested a caution when recording baby teeth for a patient age 13+, or adult teeth for age 0-12. Both directions now open Confirm Tooth Set after Save Entry, before any create-entry request. This is an overridable age-based reminder, not a clinical prohibition. Unknown/invalid/future DOB does not produce a false age warning. Existing single-set records can still determine the initial view; the caution always uses the actual target tooth number and age, including queued pen marks.
+
+| File | Type | Purpose |
+|---|---|---|
+| `client/src/utils/dentition.js` | MODIFIED | Symmetric age-caution helper with actual tooth classification; ignores missing/invalid age. |
+| `client/src/components/chart/ChartEntryModal.jsx` | MODIFIED | Shared confirmation for 2D, 3D surface selection, and 3D pen save. Displays age, tooth set/number, surface/whole-tooth scope, condition, and linked-treatment side effect. Back preserves entry values; Confirm and Save performs the normal save; failed saves remain retryable. Dismissal/actions are locked while saving. Mobile confirmation buttons stack to keep labels readable. |
+| `client/src/components/chart/Odontogram2D.jsx`, `client/src/components/chart/Odontogram3D.jsx` | MODIFIED | Pass the profile DOB to the shared entry panel. |
+| `client/test/dentition.test.js` | MODIFIED | Both caution directions, 12/13 boundary, lower baby teeth, matching sets, and unknown/invalid/future dates. |
+
+Flow: profile DOB -> chart -> ChartEntryModal -> age/tooth-set check -> confirmation -> existing onSubmit/createChartEntry API. No clinical data is changed when opening the caution or going Back. The shared existing save path preserves pen strokes, treatment options, notes, and error handling. Deletion is unchanged. No new backend restriction, schema, or API.
+
+Validation: full suite passed (17 tests); lint had no errors (existing warnings); production build passed. Actual local 2D, 3D surface-click, and 3D pen flows tested in headless Edge with sample data for both mismatch directions. Confirmed zero API attempts before acknowledgement, Back retained the selected condition and drafts, failed-save retry worked, confirmation saved once, pen stroke payloads survived, and matching/unknown ages skipped the caution. Final focused age tests and production build repeated after small copy/responsive refinements. Temporary diagnostic fixtures removed. Local only; no commit, push, deployment, or database changes.
+
+## Shared chart toolbar for tooth-set selection (2026-11-12)
+
+Adult teeth / Baby teeth now appears immediately to the right of 2D Chart / 3D Chart in one shared profile toolbar. The groups wrap together on narrow screens. Duplicate selectors inside the charts were removed; the current tooth-set heading remains. After chart records load, the chart reports its age/record default to the toolbar; manual choices take priority and persist across renderer changes and print handoff.
+
+| File | Type | Purpose |
+|---|---|---|
+| `client/src/pages/PatientProfilePage.jsx` | MODIFIED | Render one shared tooth-set selector beside the chart-view buttons; stable per-patient change callback. |
+| `client/src/components/chart/Odontogram2D.jsx` | MODIFIED | Remove internal selector and report the resolved initial tooth set after records load. |
+| `client/src/components/chart/Odontogram3D.jsx` | MODIFIED | Remove internal selector and report the resolved initial tooth set; preserve pending pen drafts. |
+
+Validation: production build passed; lint had no errors (existing warnings). Actual local app checked in headless Edge using sample API responses at widths 360, 768, 1024, and 1366: exactly one selector, adjacent groups at tablet/desktop widths, safe wrapping on phone, no overlapping controls, record-based initial selection matches the toolbar, and switching tooth sets works across 2D/3D. No browser runtime exceptions. Screenshot visually inspected. Temporary diagnostic script removed. Local only; no commit, push, deployment, or database change.
+
+## Visible portal-account action in patient headers (2026-11-12)
+
+Create portal account is now a visible secondary button beside Edit in both the full patient header and the compact Chart/X-rays header. It opens the existing creation modal and credentials flow. Add Treatment retains the primary purple style. On phones, the portal control occupies its own row; wider layouts place it beside Edit. The full header stacks identity and actions through tablet widths to avoid crowding. Existing accounts show Portal active, or Portal inactive when the API explicitly reports isActive false/0. Reset portal password and Delete patient remain in the More patient actions menu. All account controls remain dentist-only.
+
+| File | Type | Purpose |
+|---|---|---|
+| `client/src/pages/PatientProfilePage.jsx` | MODIFIED | Shared responsive header actions, visible create button, existing-account status badge, and removal of create from the overflow menu. |
+| `CLAUDE.md` | MODIFIED | Document the updated portal-account entry point and validation. |
+
+Validation: lint had no errors (existing warnings), production build passed, and git diff --check passed. Headless Edge with intercepted sample API responses checked both full and compact headers at 360/768/1024/1366: controls remained within the viewport, 44px targets, and no overlapping buttons. Verified direct modal opening/cancel, successful sample creation (one POST), immediate active status and removal of Create, password reset still in the menu, inactive status, and absence of dentist controls for patient users. No runtime exceptions. Desktop screenshot visually inspected; temporary diagnostic script removed. No real account was created. Local only; no commit, push, deployment, API, or database changes.
+
+## Optional profile photos for dentist and patient accounts (2026-11-12)
+
+Both account roles can add/change/remove their own profile photo in Settings > Account. The patient profile avatar has a camera badge and opens the same editor: dentists can manage patient photos (including records without portal accounts); patient users edit their own photo through /settings/photo. Initials remain the fallback for missing, unreadable, or offline photos. Existing purple UI/components and touch sizing are preserved.
+
+The editor accepts JPEG/PNG/WebP originals up to 10 MB and 40 megapixels, with a circular crop preview, zoom and horizontal/vertical positioning, and a Center photo action. Canvas exports a 512x512 JPEG, omitting original metadata. Cancel/X/Escape confirms discarding a selected photo; removal has a separate confirmation; saving/reading blocks dismissal. Errors remain in the editor for retry. The modal is portaled to document.body so the compact sticky/backdrop-filter header cannot constrain its fixed positioning.
+
+Patient photos belong to the patient row, shared by dentist record view and portal account, including accounts created later. Dentist photos belong to the user row. Auth/login/settings return photoVersion; patient lists and dashboard include photo_version. Account-menu, Settings, profile, list/card, search, dashboard, and migration avatars fetch the corresponding authenticated photo endpoint. Saving/removing immediately updates the auth snapshot and visible avatars. Session checks refresh photo metadata changed from another device/dentist. Blob URLs are revoked after owner/version changes and unmount; broken images fall back to initials. PWA uses NetworkOnly for photos instead of caching mutable account images.
+
+Backend: GET/PUT/DELETE /api/settings/photo for the signed-in user; GET /api/patients/:code/photo allows dentists or the patient who owns the record, while PUT/DELETE on that route is dentist-only. Ownership comes from authenticated IDs and DB records, never request-body IDs. Authentication/session checks and temporary-password restrictions remain in force. Uploads have a 2 MB server cap, JPEG byte/dimension checks, random storage names, and a per-account rate limit. Storage uses authenticated Cloudinary assets when configured, otherwise uploads/avatars on local disk; private Cloudinary downloads are proxied through the server using expiring signed URLs (official reference: https://cloudinary.com/documentation/control_access_to_media). Photo responses are private/no-store. Replaced/removed files are cleaned up; row locks serialize concurrent replacements; failed DB writes clean up their newly uploaded file. Update/delete actions are audited with readable labels.
+
+| File | Type | Purpose |
+|---|---|---|
+| `server/db/migrations/022_add_profile_photos.js` | NEW | Idempotent nullable photo_file/photo_version fields on users and patients. |
+| `server/src/config/photoUpload.js`, `server/src/utils/profilePhoto.js` | NEW | Bounded JPEG upload, content/dimension validation and whitelisted owner tables. |
+| `server/src/models/photoModel.js` | NEW | Photo metadata and transactional replacement with row locking. |
+| `server/src/services/photoStorageService.js` | NEW | Private Cloudinary/local storage, file resolution and cleanup. |
+| `server/src/controllers/photos.controller.js` | NEW | Owner/role checks, authenticated image delivery, save/remove and audit events. |
+| `server/src/routes/settings.routes.js`, `server/src/routes/patients.routes.js` | MODIFIED | Photo endpoint registration with authentication and dentist-only record writes. |
+| `server/src/middleware/rateLimit.js` | MODIFIED | Photo changes limited per authenticated account. |
+| `server/src/models/userModel.js`, `server/src/services/authService.js`, `server/src/controllers/settings.controller.js` | MODIFIED | Shared patient/dentist photo metadata in account responses. |
+| `server/src/models/patientModel.js`, `server/src/models/dashboardModel.js` | MODIFIED | Photo metadata in lists/search/dashboard. |
+| `client/src/services/photos.js`, `client/src/hooks/usePhotoUrl.js` | NEW | Multipart writes and authenticated, cancellable blob loading/revocation. |
+| `client/src/utils/photoCrop.js` | NEW | Bounded square crop coordinates for portrait/landscape images. |
+| `client/src/components/common/ProfilePhotoEditor.jsx`, `client/src/components/common/ProfilePhotoButton.jsx` | NEW | Shared photo editor and visible/camera-badge entry points. |
+| `client/src/components/common/Avatar.jsx` | MODIFIED | Real photo rendering with initials fallback. |
+| `client/src/context/AuthContext.jsx`, `client/src/layouts/AppLayout.jsx` | MODIFIED | Immediate account-photo updates, snapshot/session synchronization, menu avatars. |
+| `client/src/pages/SettingsPage.jsx`, `client/src/pages/PatientProfilePage.jsx` | MODIFIED | Own-account and dentist patient-photo editing controls. |
+| `client/src/pages/PatientsListPage.jsx`, `client/src/pages/DashboardPage.jsx`, `client/src/components/common/PatientSearchPalette.jsx`, `client/src/components/migration/LegacyTreatmentEntry.jsx` | MODIFIED | Consistent record photos throughout existing avatar views. |
+| `client/src/utils/auditAction.js`, `client/vite.config.js`, `.gitignore` | MODIFIED | Audit labels, photo cache bypass, and exclusion of locally stored photos from Git. |
+| `client/test/photoCrop.test.js`, `server/test/profilePhotos.test.js` | NEW | Crop bounds, content validation, ownership/role gates, shared patient identity, and failed-write cleanup. |
+
+Validation: full suite passed (21 tests); lint had no errors (existing warnings); production build and git diff --check passed. Actual headless Edge exercised the full browser -> local Express -> local MySQL -> local image-storage flow with temporary fixture accounts. Verified dentist upload and reload persistence, live crop preview changes, editor fit at 360/768/1024/1366, patient self-upload and shared record photo version, dentist editing from the compact chart header, patient Settings/profile photo display, remove confirmation/Keep photo/confirmed removal, 404 after deletion, 401 without auth, 403 for another patient and patient writes to record endpoints, and 415 for disguised SVG/JPEG. No runtime exceptions. Screenshot visually inspected. Temporary fixture accounts, patient rows, their audit events and photo files were removed; diagnostic script removed. Tests disabled Cloudinary only in their own process, so no external photo was uploaded and no .env was changed.
+
+Migration 022 was applied to the configured localhost MySQL only (host explicitly checked before migration). Aiven was not migrated; migration 022 must run there before deploying this code because account queries reference the new columns. No commit, push, or deployment was performed.
+
+## Lazy avatars and shared session photo cache (2026-11-12)
+
+Requested scope: lazy loading and shared caching only. Avatar now observes its own DOM container with IntersectionObserver (zero prefetch margin); offscreen rows and CSS-hidden mobile/desktop copies do not start downloads. Scrolling/resizing updates visibility. Initials remain the same placeholder and the UI layout is unchanged. The open photo editor loads its preview immediately. Browsers without IntersectionObserver fall back to normal loading.
+
+A shared memory-only cache deduplicates both in-flight requests and blob URLs by the current sign-in and saved photoVersion UUID. This identity works for both account and patient-record endpoints because those reference the same saved image. Visible consumers share one downloaded blob and URL across navigation. Inactive entries are retained for reuse, with LRU budgets of 80 entries / 20 MB and a five-minute idle eviction threshold, checked during cache operations. Currently displayed entries are protected from eviction; all retained URLs are revoked on session clearing. There is no new persistent photo cache or service-worker caching.
+
+Successful upload inserts the freshly cropped JPEG bytes into the cache, so the updated photo needs no follow-up GET. Replacement/removal invalidates prior versions, aborts superseded requests, revokes old URLs, and redirects mounted consumers with stale version props to the replacement (or initials after removal). Version aliases are bounded. Logout, expired/revoked-session cleanup, login/account switches, and password token rotation clear the session cache. Late responses from an old session cannot repopulate it. Auth photo-version synchronization notifies cache consumers after commit to avoid updates during React rendering. Failed downloads keep the initials fallback, with a short cooldown before a future subscription can retry.
+
+| File | Type | Purpose |
+|---|---|---|
+| `client/src/utils/photoCache.js` | NEW | Shared session cache, concurrent request deduplication, bounded unused-image retention, safe invalidation/cleanup. |
+| `client/src/hooks/usePhotoUrl.js` | MODIFIED | Visibility observation and useSyncExternalStore subscription to cached photo URLs. |
+| `client/src/components/common/Avatar.jsx` | MODIFIED | Observe the real avatar element without changing existing sizing, styling, or fallback. |
+| `client/src/services/photos.js` | MODIFIED | Shared cache instance; successful writes update/invalidate cached images using the previous version. |
+| `client/src/components/common/ProfilePhotoEditor.jsx` | MODIFIED | Pass the prior photo version for precise update/removal invalidation. |
+| `client/src/context/AuthContext.jsx` | MODIFIED | Clear on sign-out/token changes and synchronize account-photo version changes after commit. |
+| `client/test/photoCache.test.js` | NEW | Concurrent reuse, navigation reuse, old-prop invalidation/removal, logout/account isolation, late-response suppression, failed-request recovery, LRU/byte/idle budgets. |
+| `CLAUDE.md` | MODIFIED | Document behavior, scope, and verification. |
+
+Validation: full suite passed (28 tests); lint had no errors (existing warnings); production build passed; git diff --check passed. Headless Edge checked the real app with intercepted sample API responses and a 20-patient list: initial desktop viewport downloaded 7 patient photos, fresh 360px viewport downloaded 3, hidden alternate layouts stayed idle, and scrolling loaded newly visible rows. Account menu + Settings + editor reused one GET and one blob URL across navigation. Upload reused saved crop bytes without another GET; remove cleared visible copies immediately; logout revoked every retained URL. Patient Settings/profile and responsive account-avatar switches reused cached bytes at 360/768/1024/1366. No runtime exceptions or console warnings. Screenshot visually inspected; temporary diagnostic script removed. These were functional request-count checks, not load/capacity testing. No backend/database changes for this optimization, no real accounts/photos modified, no commit, push, or deployment.
+
+
+## Release preparation for the requested commit/push (2026-11-12)
+
+This release includes the accumulated Adult/Baby tooth-set selection and age caution, shared chart toolbar, visible portal-account action, optional profile photos, and lazy/shared photo loading. All 28 tests and the production build passed; lint has no errors (existing warnings). Origin/main was fetched and matched the local main before preparing the commit.
+
+Aiven preflight found only migration 022 pending. Applied only 022_add_profile_photos.js to the configured Aiven database before pushing, then verified all four nullable photo_file/photo_version columns on users/patients and the migration record. Existing clinical/account records were preserved. This supersedes the earlier local-only migration status for this release. No credentials, local uploaded photos, diagnostic scripts, or screenshots are included in the commit.

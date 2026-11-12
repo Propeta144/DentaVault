@@ -10,6 +10,9 @@ import { EXTRA_PATIENT_FIELDS } from '../utils/patientFields.js'
 import { passwordProblems } from '../utils/passwordPolicy.js'
 import { isValidSurfaceList, CONDITION_PROCEDURE } from '../utils/treatmentChart.js'
 import { relationshipErrors } from '../utils/emergencyRelationship.js'
+import * as photosController from '../controllers/photos.controller.js'
+import { uploadPhoto } from '../config/photoUpload.js'
+import { photoUploadLimiter } from '../middleware/rateLimit.js'
 
 const router = Router()
 
@@ -151,6 +154,9 @@ router.post(
 router.get('/export', requireRole('dentist'), patientsController.exportCsv)
 
 router.get('/:code', patientsController.getOne)
+router.get('/:code/photo', photosController.get)
+router.put('/:code/photo', requireRole('dentist'), photoUploadLimiter, uploadPhoto.single('file'), photosController.save)
+router.delete('/:code/photo', requireRole('dentist'), photosController.remove)
 router.put('/:code', requireRole('dentist'), patientValidation, patientsController.update)
 router.delete('/:code', requireRole('dentist'), patientsController.remove)
 

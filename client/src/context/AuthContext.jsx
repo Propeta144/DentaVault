@@ -3,6 +3,7 @@ import api, { SESSION_ENDED_EVENT } from '../services/api'
 import IdleWarningModal from '../components/common/IdleWarningModal'
 import { prefetchDashboard, clearDashboardCache } from '../services/dashboard'
 import { OFFLINE_SESSION_KEY, readOfflineSession, saveOfflineSession } from '../utils/offlineSession'
+import { photoCache } from '../services/photos'
 
 const AuthContext = createContext(null)
 const TOKEN_KEY = 'dentavault_token'
@@ -55,6 +56,16 @@ export function AuthProvider({ children }) {
   const [signInInfo, setSignInInfo] = useState(() => readJson(sessionStorage, SIGN_IN_INFO_KEY))
   const [idleSecondsLeft, setIdleSecondsLeft] = useState(null)
   const warningShown = useRef(false)
+  const previousPhoto = useRef(null)
+
+  // Notify shared avatars after commit, hindi sa loob ng setUser updater.
+  useEffect(() => {
+    const token = localStorage.getItem(TOKEN_KEY), previous = previousPhoto.current
+    if (user && previous?.token === token && previous.id === user.id && previous.version !== user.photoVersion) {
+      photoCache.replace(token, previous.version, user.photoVersion)
+    }
+    previousPhoto.current = user ? { token, id: user.id, version: user.photoVersion } : null
+  }, [user])
 
   const clearSession = useCallback(() => {
     localStorage.removeItem(TOKEN_KEY)
@@ -64,6 +75,7 @@ export function AuthProvider({ children }) {
     setUser(null)
     setIdleSecondsLeft(null)
     clearDashboardCache()
+    photoCache.clear()
     // Belt-and-suspenders na lang 'to on top ng per-identity cache-key
     // scoping sa vite.config.js: kapag malinis yung logout, walang
     // matitirang cached patient data ng session na 'to sa service worker's
@@ -170,7 +182,16 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     if (!user) return undefined
     function checkSession() {
-      if (document.visibilityState === 'visible') api.get('/auth/me').catch(() => {})
+      if (document.visibilityState !== 'visible') return
+      const token = localStorage.getItem(TOKEN_KEY)
+      api.get('/auth/me').then(({ data }) => {
+        if (localStorage.getItem(TOKEN_KEY) !== token) return
+        setUser(current => {
+          if (!current || current.id !== data.user.id || current.photoVersion === data.user.photoVersion) return current
+          saveOfflineSession(localStorage, token, data.user)
+          return data.user
+        })
+      }).catch(() => {})
     }
     const timer = setInterval(checkSession, SESSION_CHECK_MS)
     document.addEventListener('visibilitychange', checkSession)
@@ -228,6 +249,7 @@ export function AuthProvider({ children }) {
   async function login(email, password) {
     const { data } = await api.post('/auth/login', { email, password })
     localStorage.setItem(TOKEN_KEY, data.token)
+    photoCache.clear()
     saveOfflineSession(localStorage, data.token, data.user)
     touchActivity()
     // Dentist → Dashboard ang susunod: kunin na agad ang data habang
@@ -247,6 +269,7 @@ export function AuthProvider({ children }) {
   async function changePassword(currentPassword, newPassword) {
     const { data } = await api.post('/auth/change-password', { currentPassword, newPassword })
     localStorage.setItem(TOKEN_KEY, data.token)
+    photoCache.clear()
     saveOfflineSession(localStorage, data.token, data.user)
     if (signInInfo?.passwordUpgradeRequired) {
       const info = { ...signInInfo, passwordUpgradeRequired: false }
@@ -264,6 +287,15 @@ export function AuthProvider({ children }) {
     setSignInInfo(info)
   }
 
+  const updatePhotoVersion = useCallback((photoVersion) => {
+    setUser(current => {
+      if (!current) return current
+      const updated = { ...current, photoVersion }
+      saveOfflineSession(localStorage, localStorage.getItem(TOKEN_KEY), updated)
+      return updated
+    })
+  }, [])
+
   return (
     <AuthContext.Provider
       value={{
@@ -275,6 +307,7 @@ export function AuthProvider({ children }) {
         logout: () => logout(null),
         changePassword,
         dismissSignInNotice,
+        updatePhotoVersion,
       }}
     >
       {children}

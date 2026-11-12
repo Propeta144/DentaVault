@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
-import { PenLine, Undo2, Save, X, Baby, Smile } from 'lucide-react'
+import { PenLine, Undo2, Save, X } from 'lucide-react'
+import { defaultDentition, dentitionLabel, isDentition } from '../../utils/dentition'
 import Tooth3D from './Tooth3D'
 import { groupPenDrafts, splitPenStroke, undoPenStroke } from '../../utils/penDrafts'
 import Gingiva from './Gingiva'
@@ -33,7 +34,7 @@ const NO_CHART = {}
 // proposal's "lazy loading for resource-intensive modules such as the 3D
 // dental chart" requirement.
 // alerts: { allergies, medicalHistory }, ipinapakita sa chart entry modal (pati sa 3D pen)
-export default function Odontogram3D({ patientId, canEdit, onPendingChange, alerts }) {
+export default function Odontogram3D({ patientId, canEdit, onPendingChange, alerts, dateOfBirth, dentition: selectedDentition, onDentitionChange }) {
   const [entries, setEntries] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -57,9 +58,6 @@ export default function Odontogram3D({ patientId, canEdit, onPendingChange, aler
     return grouped
   }, [pending])
   const controlsRef = useRef(null)
-  // Permanent (32) o Baby teeth (20) — Feature #30. null = hindi pa pumipili
-  // ang user: Baby teeth kapag baby teeth lang ang may record (bata pa).
-  const [dentitionChoice, setDentitionChoice] = useState(null)
 
   useEffect(() => {
     onPendingChange?.(hasPending)
@@ -81,8 +79,13 @@ export default function Odontogram3D({ patientId, canEdit, onPendingChange, aler
   const chartByTooth = useMemo(() => groupChartEntries(entries), [entries])
   const hasPrimary = entries.some((e) => isPrimaryTooth(e.tooth_number))
   const hasPermanent = entries.some((e) => !isPrimaryTooth(e.tooth_number))
-  const dentition = dentitionChoice ?? (hasPrimary && !hasPermanent ? 'primary' : 'permanent')
+  const dentition = isDentition(selectedDentition) ? selectedDentition : defaultDentition(dateOfBirth, entries)
   const scene = DENTITION_SCENES[dentition]
+
+  // Sa shared toolbar ang selector; pareho ang active set at chart pagkatapos mag-load.
+  useEffect(() => {
+    if (!loading && !error && !isDentition(selectedDentition)) onDentitionChange?.(dentition)
+  }, [loading, error, selectedDentition, dentition, onDentitionChange])
 
   const handleStrokeComplete = useCallback((toothNumber, stroke) => {
     const segments = splitPenStroke(toothNumber, stroke, crypto.randomUUID())
@@ -131,6 +134,7 @@ export default function Odontogram3D({ patientId, canEdit, onPendingChange, aler
   return (
     <div>
       {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
+      <h3 className="mb-3 text-base font-semibold text-slate-900">{dentitionLabel(dentition)}</h3>
 
       {canEdit && (
         <div className="mb-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
@@ -234,46 +238,16 @@ export default function Odontogram3D({ patientId, canEdit, onPendingChange, aler
           individual tooth surfaces impractical on small screens. */}
       {/* Permanent / Baby teeth: nasa pending state ang drafts, kaya
           nananatili kahit magpalit ng dentition. */}
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        {canEdit && (
-          <label className="flex items-center gap-2 text-base font-medium text-slate-700">
-            Select tooth
-            <select value="" disabled={penActive || hasPending}
-              onChange={(event) => openSurface(event.target.value, 'occlusal')}
-              className="min-h-11 rounded-md border border-slate-300 bg-white px-3 py-2.5 text-base text-slate-900 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-100 disabled:opacity-50">
-              <option value="">Choose tooth...</option>
-              {scene.rows.flat().map((toothNumber) => <option key={toothNumber} value={toothNumber}>Tooth {toothNumber}</option>)}
-            </select>
-          </label>
-        )}
-        <div className="flex gap-1.5 rounded-lg border border-slate-200 bg-slate-100 p-1" role="group" aria-label="Teeth shown">
-          {[
-            { code: 'permanent', label: 'Permanent', icon: Smile },
-            { code: 'primary', label: 'Baby teeth', icon: Baby },
-          ].map(({ code, label, icon: Icon }) => (
-            <button
-              key={code}
-              type="button"
-              aria-pressed={dentition === code}
-              onClick={() => setDentitionChoice(code)}
-              className={`flex min-h-9 items-center gap-1.5 whitespace-nowrap rounded-md px-3 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-                dentition === code ? 'bg-white text-sky-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-              }`}
-            >
-              <Icon className="h-4 w-4" />
-              {label}
-            </button>
-          ))}
-        </div>
+      {((dentition === 'permanent' && hasPrimary) || (dentition === 'primary' && hasPermanent)) && <div className="mb-3">
         {dentition === 'permanent' && hasPrimary && (
           <p className="text-sm text-slate-500">This patient also has baby teeth on record.</p>
         )}
         {dentition === 'primary' && hasPermanent && (
-          <p className="text-sm text-slate-500">This patient also has permanent teeth on record.</p>
+          <p className="text-sm text-slate-500">This patient also has adult teeth on record.</p>
         )}
-      </div>
+      </div>}
 
-      <div className="h-[480px] overflow-hidden rounded-xl border border-slate-200 bg-slate-50 shadow-sm">
+      <div data-dentition={dentition} className="h-[480px] overflow-hidden rounded-xl border border-slate-200 bg-slate-50 shadow-sm">
         {/* key: bagong camera kapag nagpalit ng set (mas maliit ang arch ng bata) */}
         <Canvas key={dentition} shadows camera={{ position: scene.camera, fov: 45 }}>
           <SceneLights />
@@ -339,6 +313,7 @@ export default function Odontogram3D({ patientId, canEdit, onPendingChange, aler
           defaultConditionCode={selection.strokes ? selection.conditionCode : undefined}
           strokes={selection.strokes}
           alerts={alerts}
+          dateOfBirth={dateOfBirth}
           onClose={() => setSelection(null)}
           onSubmit={handleSaveEntry}
           onDelete={canEdit && !selection.strokes ? async (entryId) => {

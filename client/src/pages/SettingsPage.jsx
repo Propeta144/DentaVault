@@ -9,10 +9,10 @@ import { PROFILE_PATH, profileState } from '../utils/selectedPatient'
 import PageLoader from '../components/common/PageLoader'
 import Avatar from '../components/common/Avatar'
 import StatusBadge from '../components/common/StatusBadge'
+import ProfilePhotoButton from '../components/common/ProfilePhotoButton'
 
-// Settings (dentist at patient). Read-only na impormasyon na dating walang
-// mapupuntahan:
-// - Account: pangalan, email, role + Change password (dati nasa account menu lang)
+// Settings (dentist at patient): account details at sariling profile photo.
+// - Account: pangalan, email, role, photo, at Change password
 // - Pag-upload ng X-ray sa patient portal (#27; ang email/Mailgun ay
 //   tinanggal sa #32)
 // - Dentist: gaano katagal itinatago ang audit log (Feature #10, RA 10173)
@@ -34,7 +34,7 @@ function Card({ icon: Icon, title, children }) {
 }
 
 export default function SettingsPage() {
-  const { user } = useAuth()
+  const { user, updatePhotoVersion } = useAuth()
   const isDentist = user?.role === 'dentist'
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
@@ -116,7 +116,7 @@ export default function SettingsPage() {
         <Card icon={KeyRound} title="Account">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex min-w-0 items-center gap-3">
-              <Avatar firstName={firstName} lastName={lastName} size="lg" tone="dark" />
+              <Avatar firstName={firstName} lastName={lastName} size="lg" tone="dark" photoUrl="/settings/photo" photoVersion={user.photoVersion} />
               <div className="min-w-0">
                 <p className="truncate text-base font-semibold text-slate-900">{data.account.fullName}</p>
                 <p className="truncate text-sm text-slate-500">{data.account.email}</p>
@@ -125,13 +125,16 @@ export default function SettingsPage() {
                 </div>
               </div>
             </div>
-            <Link
-              to="/change-password"
-              className="flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-md border border-slate-300 bg-white px-4 text-base font-medium text-slate-700 transition-colors hover:bg-slate-50"
-            >
-              <KeyRound className="h-4 w-4" />
-              Change password
-            </Link>
+            <div className="flex flex-col gap-2 sm:items-end">
+              <ProfilePhotoButton endpoint="/settings/photo" version={user.photoVersion} onSaved={updatePhotoVersion} />
+              <Link
+                to="/change-password"
+                className="flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-md border border-slate-300 bg-white px-4 text-base font-medium text-slate-700 transition-colors hover:bg-slate-50"
+              >
+                <KeyRound className="h-4 w-4" />
+                Change password
+              </Link>
+            </div>
           </div>
         </Card>
 

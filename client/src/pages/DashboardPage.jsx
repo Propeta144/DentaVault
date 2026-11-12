@@ -65,7 +65,7 @@ function RecentPatients({ patients }) {
             state={profileState(p.patient_code)}
             className="flex min-h-14 items-center gap-3 rounded-lg px-2 py-2.5 transition-colors hover:bg-slate-50"
           >
-            <Avatar firstName={p.first_name} lastName={p.last_name} size="sm" />
+            <Avatar firstName={p.first_name} lastName={p.last_name} size="sm" photoUrl={`/patients/${p.patient_code}/photo`} photoVersion={p.photo_version} />
             <span className="min-w-0 flex-1">
               <span className="block truncate text-base font-medium text-slate-900">{listName(p)}</span>
               {/* Birthday: para matukoy ang magkapangalan */}

@@ -74,7 +74,7 @@ function PatientPicker({ onPick }) {
                 onClick={() => onPick(p)}
                 className="flex min-h-11 w-full items-center gap-3 px-4 py-2 text-left hover:bg-sky-50"
               >
-                <Avatar firstName={p.first_name} lastName={p.last_name} size="sm" />
+                <Avatar firstName={p.first_name} lastName={p.last_name} size="sm" photoUrl={`/patients/${p.patient_code}/photo`} photoVersion={p.photo_version} />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-medium text-slate-900">{listName(p)}</span>
                   <span className="block text-sm text-slate-500">
@@ -194,7 +194,7 @@ export default function LegacyTreatmentEntry({ initialPatient = null }) {
       {patient && saved === null && (
         <form onSubmit={handleSave} noValidate className="space-y-4">
           <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
-            <Avatar firstName={patient.first_name} lastName={patient.last_name} size="sm" />
+            <Avatar firstName={patient.first_name} lastName={patient.last_name} size="sm" photoUrl={`/patients/${patient.patient_code}/photo`} photoVersion={patient.photo_version} />
             <div className="min-w-0 flex-1">
               <p className="truncate font-medium text-slate-900">{listName(patient)}</p>
               <p className="text-sm text-slate-500">Born {formatDate(patient.date_of_birth)}</p>

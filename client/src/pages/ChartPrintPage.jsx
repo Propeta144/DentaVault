@@ -8,9 +8,11 @@ import IntraoralExam from '../components/chart/IntraoralExam'
 import PageLoader from '../components/common/PageLoader'
 import PrintHeader from '../components/common/PrintHeader'
 import { formatDate, formatDateTime } from '../utils/formatDate'
+import { defaultDentition, dentitionEntries, isDentition } from '../utils/dentition'
 
 export default function ChartPrintPage() {
-  const id = usePrintState()?.patientCode
+  const printState = usePrintState()
+  const id = printState?.patientCode
   const [patient, setPatient] = useState(null)
   // Para sa Findings list sa ilalim (Feature #22); ang Odontogram2D ay may
   // sariling kuha ng chart, gaya ng dati
@@ -30,6 +32,7 @@ export default function ChartPrintPage() {
   if (!id) return <p className="p-6 text-slate-500">Open this page from the patient profile's Print button.</p>
   if (error) return <p className="p-6 text-red-600">{error}</p>
   if (!patient || !entries) return <PageLoader fullScreen />
+  const dentition = isDentition(printState?.dentition) ? printState.dentition : defaultDentition(patient.date_of_birth, entries)
 
   return (
     <div className="mx-auto max-w-3xl bg-white p-8 text-slate-900">
@@ -58,11 +61,11 @@ export default function ChartPrintPage() {
         </div>
       </div>
 
-      <Odontogram2D patientId={id} canEdit={false} printMode />
+      <Odontogram2D patientId={id} canEdit={false} printMode dateOfBirth={patient.date_of_birth} dentition={dentition} />
 
       <IntraoralExam patientId={id} printMode />
 
-      <ChartFindings entries={entries} />
+      <ChartFindings entries={dentitionEntries(entries, dentition)} />
 
       <p className="mt-8 text-xs text-slate-400">
         Generated {formatDateTime(new Date())} · DentaVault

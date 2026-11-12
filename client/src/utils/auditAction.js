@@ -29,6 +29,8 @@ export function humanizeAction(action) {
 // groupAuditLogs), hal. 6 na VIEW_XRAY → "Viewed 6 X-rays".
 // Kapag may bagong action code sa server, idagdag din dito.
 const ACTION_LABELS = {
+  UPDATE_PROFILE_PHOTO: { label: 'Updated a profile photo' },
+  DELETE_PROFILE_PHOTO: { label: 'Removed a profile photo' },
   LOGIN_SUCCESS: { label: 'Signed in' },
   LOGOUT: { label: 'Signed out' },
   LOGIN_FAILED: { label: 'Failed sign-in attempt', plural: (n) => `${n} failed sign-in attempts` },

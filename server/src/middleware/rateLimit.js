@@ -1,6 +1,15 @@
 import { rateLimit, ipKeyGenerator } from 'express-rate-limit'
 import { recordAuditLog } from '../models/auditLogModel.js'
 
+export const photoUploadLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 30,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  keyGenerator: req => `photo:${req.user.userId}`,
+  message: { error: 'Too many photo changes. Please try again later.' },
+})
+
 // Proteksyon laban sa brute force (paulit-ulit na paghula ng password).
 // MALING subok lang ang binibilang (`skipSuccessfulRequests`), kaya hindi
 // naaapektuhan ang normal na pag-login. Pagkalampas sa limit, 429 hanggang

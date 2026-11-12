@@ -5,7 +5,7 @@ import pool from '../config/db.js'
 // yung patient account.
 export async function findUserByEmail(email) {
   const [rows] = await pool.execute(
-    `SELECT u.*, p.patient_code
+    `SELECT u.*, p.patient_code, p.photo_version AS patient_photo_version
      FROM users u
      LEFT JOIN patients p ON p.id = u.patient_id
      WHERE u.email = :email LIMIT 1`,
@@ -24,7 +24,8 @@ export async function findUserById(id) {
   const [rows] = await pool.execute(
     `SELECT u.id, u.patient_id AS patientId, p.patient_code AS patientCode, u.role, u.email,
             u.full_name AS fullName, u.is_active AS isActive,
-            u.must_change_password AS mustChangePassword, u.token_version AS tokenVersion
+            u.must_change_password AS mustChangePassword, u.token_version AS tokenVersion,
+            CASE WHEN u.role = 'patient' THEN p.photo_version ELSE u.photo_version END AS photoVersion
      FROM users u
      LEFT JOIN patients p ON p.id = u.patient_id
      WHERE u.id = :id LIMIT 1`,

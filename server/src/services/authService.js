@@ -110,6 +110,7 @@ export async function login({ email, password, ipAddress }) {
       patientCode: user.patient_code,
       email: user.email,
       fullName: user.full_name,
+      photoVersion: user.role === 'patient' ? user.patient_photo_version : user.photo_version,
       mustChangePassword,
       passwordUpgradeRequired,
     },

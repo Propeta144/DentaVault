@@ -111,6 +111,12 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
         navigateFallback: '/index.html',
         runtimeCaching: [
+          // Mutable account photos: laging authenticated at fresh; walang
+          // persistent photo cache kapag nag-remove o nagpalit ng account.
+          {
+            urlPattern: ({ url }) => /^\/api\/(?:settings\/photo|patients\/[^/]+\/photo)$/.test(url.pathname),
+            handler: 'NetworkOnly',
+          },
           // Order matters: Workbox uses the FIRST matching route. The X-ray
           // image rule must come before the general /api/ rule below, or
           // its broad `startsWith('/api/')` check claims image requests

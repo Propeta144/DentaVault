@@ -110,7 +110,7 @@ export async function getMonthlyTrend() {
 // kailangang itanong sa susunod na bisita, bago mag-treatment.
 export async function getAllergiesNotRecorded({ limit = 5 } = {}) {
   const [rows] = await pool.execute(
-    `SELECT p.patient_code, p.first_name, p.last_name, p.date_of_birth
+    `SELECT p.patient_code, p.first_name, p.last_name, p.date_of_birth, p.photo_version
      FROM patients p
      WHERE p.deleted_at IS NULL AND (p.allergies IS NULL OR TRIM(p.allergies) = '')
      ORDER BY p.last_name, p.first_name

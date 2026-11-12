@@ -124,7 +124,7 @@ export default function PatientSearchPalette({ onClose }) {
                     i === active ? 'bg-sky-50' : ''
                   }`}
                 >
-                  <Avatar firstName={p.first_name} lastName={p.last_name} size="sm" />
+                  <Avatar firstName={p.first_name} lastName={p.last_name} size="sm" photoUrl={`/patients/${p.patient_code}/photo`} photoVersion={p.photo_version} />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-base font-medium text-slate-900">{listName(p)}</span>
                     {/* Birthday: para matukoy ang magkapangalan (hal. dalawang

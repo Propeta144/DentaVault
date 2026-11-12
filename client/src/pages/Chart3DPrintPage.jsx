@@ -7,7 +7,7 @@ import PageLoader from '../components/common/PageLoader'
 import PrintHeader from '../components/common/PrintHeader'
 import ChartFindings from '../components/chart/ChartFindings'
 import IntraoralExam from '../components/chart/IntraoralExam'
-import { isPrimaryTooth } from '../constants/dental'
+import { defaultDentition, dentitionEntries, dentitionLabel, isDentition } from '../utils/dentition'
 import ConditionLegend from '../components/chart/ConditionLegend'
 import { formatDate, formatDateTime } from '../utils/formatDate'
 
@@ -26,13 +26,11 @@ function Snapshot({ shot, className = '' }) {
 }
 
 export default function Chart3DPrintPage() {
-  const id = usePrintState()?.patientCode
+  const printState = usePrintState()
+  const id = printState?.patientCode
   const [patient, setPatient] = useState(null)
   const [entries, setEntries] = useState(null)
   const [shots, setShots] = useState(null)
-  // Baby teeth (Feature #30): hiwalay na set ng larawan, kinukunan PAGKATAPOS
-  // ng permanent (isang WebGL canvas lang sa isang pagkakataon)
-  const [primaryShots, setPrimaryShots] = useState(null)
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -54,8 +52,8 @@ export default function Chart3DPrintPage() {
   if (!patient || !entries) return <PageLoader fullScreen />
 
   const byKey = Object.fromEntries((shots || []).map((s) => [s.key, s]))
-  const hasPrimary = entries.some((e) => isPrimaryTooth(e.tooth_number))
-  const ready = shots && (!hasPrimary || primaryShots)
+  const dentition = isDentition(printState?.dentition) ? printState.dentition : defaultDentition(patient.date_of_birth, entries)
+  const ready = Boolean(shots)
 
   return (
     <div className="mx-auto max-w-3xl bg-white p-8 text-slate-900">
@@ -71,7 +69,7 @@ export default function Chart3DPrintPage() {
         </button>
       </div>
 
-      <PrintHeader title="Dental Chart (3D)" />
+      <PrintHeader title={`Dental Chart (3D) · ${dentitionLabel(dentition)}`} />
 
       <div className="mb-6 grid grid-cols-2 gap-2 border-b border-slate-200 pb-4 text-sm">
         <div>
@@ -88,7 +86,7 @@ export default function Chart3DPrintPage() {
       {!shots ? (
         <>
           <PageLoader label="Preparing 3D views..." />
-          <Chart3DSnapshots entries={entries} onDone={setShots} onError={handleSnapshotError} />
+          <Chart3DSnapshots entries={entries} dentition={dentition} onDone={setShots} onError={handleSnapshotError} />
         </>
       ) : (
         <div className="space-y-4">
@@ -108,32 +106,6 @@ export default function Chart3DPrintPage() {
         </div>
       )}
 
-      {shots && hasPrimary && (
-        <div className="mt-6 break-inside-avoid">
-          <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">Baby teeth</h2>
-          {!primaryShots ? (
-            <>
-              <PageLoader label="Preparing baby teeth views..." />
-              <Chart3DSnapshots
-                entries={entries}
-                dentition="primary"
-                viewKeys={['front', 'upper', 'lower']}
-                onDone={setPrimaryShots}
-                onError={handleSnapshotError}
-              />
-            </>
-          ) : (
-            <div className="space-y-4">
-              <Snapshot shot={primaryShots.find((s) => s.key === 'front')} className="mx-auto w-3/4" />
-              <div className="grid grid-cols-2 gap-4">
-                <Snapshot shot={primaryShots.find((s) => s.key === 'upper')} />
-                <Snapshot shot={primaryShots.find((s) => s.key === 'lower')} />
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
       <div className="mt-6 break-inside-avoid">
         <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">Legend</h2>
         <ConditionLegend expanded />
@@ -141,7 +113,7 @@ export default function Chart3DPrintPage() {
 
       <IntraoralExam patientId={id} printMode />
 
-      <ChartFindings entries={entries} />
+      <ChartFindings entries={dentitionEntries(entries, dentition)} />
 
       <p className="mt-8 text-xs text-slate-400">
         Generated {formatDateTime(new Date())} · DentaVault

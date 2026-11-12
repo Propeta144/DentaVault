@@ -32,10 +32,12 @@ import CreatePortalAccountModal from '../components/patients/CreatePortalAccount
 import ResetPortalPasswordModal from '../components/patients/ResetPortalPasswordModal'
 import Modal from '../components/common/Modal'
 import Avatar from '../components/common/Avatar'
+import ProfilePhotoButton from '../components/common/ProfilePhotoButton'
 import DropdownMenu from '../components/common/DropdownMenu'
 import EmptyState from '../components/common/EmptyState'
 import StatusBadge from '../components/common/StatusBadge'
 import Odontogram2D from '../components/chart/Odontogram2D'
+import DentitionSelector from '../components/chart/DentitionSelector'
 import Chart3DErrorBoundary from '../components/chart/Chart3DErrorBoundary'
 import { ALL_TEETH, surfaceLetters } from '../constants/dental'
 import MedicalAlertBadge, { PatientAlertStrip } from '../components/common/MedicalAlertBadge'
@@ -128,7 +130,7 @@ export default function PatientProfilePage() {
   // Patient Code galing sa history state, hindi sa URL (tignan utils/selectedPatient.js)
   const id = useSelectedPatientCode()
   const navigate = useNavigate()
-  const { user } = useAuth()
+  const { user, updatePhotoVersion } = useAuth()
   const isDentist = user.role === 'dentist'
   const [patient, setPatient] = useState(null)
   const [treatments, setTreatments] = useState([])
@@ -140,6 +142,10 @@ export default function PatientProfilePage() {
     ['history', 'chart', 'xrays'].includes(location.state?.tab) ? location.state.tab : 'history',
   )
   const [chartView, setChartView] = useState('2d')
+  // Per-patient choice/default, shared by the toolbar, 2D/3D and print handoff.
+  const [chartDentitionSelection, setChartDentitionSelection] = useState(null)
+  const chartDentition = chartDentitionSelection?.patientId === id ? chartDentitionSelection.value : null
+  const changeChartDentition = useCallback((value) => setChartDentitionSelection({ patientId: id, value }), [id])
   // Pagkabukas ng profile, ihanda na ang 3D chart (tingnan ang preloadOdontogram3D)
   useEffect(() => (isDentist ? preloadOdontogram3D() : undefined), [isDentist])
 
@@ -257,12 +263,20 @@ export default function PatientProfilePage() {
   })
   const alerts = { allergies: patient.allergies, medicalHistory: patient.medical_history }
 
+  const ownsPatientPhoto = user.role === 'patient' && user.patientCode === id
+  const photoVersion = ownsPatientPhoto ? user.photoVersion : patient.photo_version
+  const photoEndpoint = ownsPatientPhoto ? '/settings/photo' : `/patients/${id}/photo`
+  const patientAvatar = (size) => {
+    const avatar = <Avatar firstName={patient.first_name} lastName={patient.last_name} size={size} photoUrl={photoEndpoint} photoVersion={photoVersion} />
+    return isDentist || ownsPatientPhoto ? (
+      <ProfilePhotoButton endpoint={photoEndpoint} version={photoVersion} onSaved={(version) => {
+        setPatient(current => ({ ...current, photo_version: version }))
+        if (ownsPatientPhoto) updatePhotoVersion(version)
+      }}>{avatar}</ProfilePhotoButton>
+    ) : avatar
+  }
+
   const moreActions = [
-    portalAccount === null && {
-      label: 'Create portal account',
-      icon: KeyRound,
-      onClick: () => setCreatingAccount(true),
-    },
     portalAccount && {
       label: 'Reset portal password',
       icon: RotateCcw,
@@ -280,6 +294,44 @@ export default function PatientProfilePage() {
       <ClipboardPlus className="h-4 w-4" />
       Add Treatment
     </button>
+  )
+
+  // Parehong portal action sa full at compact header. Phone: sariling row
+  // para laging mabasa ang label, habang magkatabi pa rin sa mas maluwag na screen.
+  const patientActions = (compact = false) => (
+    <div className="grid w-full grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 sm:flex sm:w-auto sm:flex-wrap">
+      {addTreatmentButton()}
+      <button
+        type="button"
+        onClick={() => setEditing(true)}
+        aria-label="Edit patient details"
+        className="flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-base font-medium text-slate-700 transition-colors hover:bg-slate-50"
+      >
+        <Pencil className="h-4 w-4" />
+        {!compact && <span className="hidden sm:inline">Edit</span>}
+      </button>
+      {portalAccount !== undefined && (
+        <div className="col-span-3 row-start-2 flex min-h-11 items-center">
+          {portalAccount ? (
+            <span role="status">
+              <StatusBadge variant={portalAccount.isActive === false || portalAccount.isActive === 0 ? 'amber' : 'emerald'} icon={KeyRound}>
+                {portalAccount.isActive === false || portalAccount.isActive === 0 ? 'Portal inactive' : 'Portal active'}
+              </StatusBadge>
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setCreatingAccount(true)}
+              className="flex min-h-11 w-full items-center justify-center gap-2 whitespace-nowrap rounded-md border border-slate-300 bg-white px-4 text-base font-medium text-slate-700 transition-colors hover:bg-slate-50 sm:w-auto"
+            >
+              <KeyRound className="h-4 w-4" />
+              Create portal account
+            </button>
+          )}
+        </div>
+      )}
+      <DropdownMenu label="More patient actions" items={moreActions} />
+    </div>
   )
 
   // Chart at X-rays tab: maikling header (critique 2026-10-25). Dati ~310px
@@ -300,7 +352,7 @@ export default function PatientProfilePage() {
         >
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
             <div className="flex min-w-0 items-center gap-3">
-              <Avatar firstName={patient.first_name} lastName={patient.last_name} size="sm" />
+              {patientAvatar('sm')}
               <div className="min-w-0">
                 <h1 className="truncate text-lg font-semibold text-slate-900">{fullName(patient)}</h1>
                 <p className="text-sm text-slate-600">
@@ -317,20 +369,7 @@ export default function PatientProfilePage() {
                 </p>
               )}
             </div>
-            {isDentist && (
-              <div className="flex items-center gap-2">
-                {addTreatmentButton()}
-                <button
-                  type="button"
-                  onClick={() => setEditing(true)}
-                  aria-label="Edit patient details"
-                  className="flex h-11 w-11 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-700 transition-colors hover:bg-slate-50"
-                >
-                  <Pencil className="h-4 w-4" />
-                </button>
-                <DropdownMenu label="More patient actions" items={moreActions} />
-              </div>
-            )}
+            {isDentist && patientActions(true)}
           </div>
         </section>
       ) : (
@@ -340,9 +379,9 @@ export default function PatientProfilePage() {
           isang tingin lang: sino, ilang taon, may allergy ba, at ano ang
           puwedeng gawin. (Treatment History tab lang; tingnan compactHeader) */
       <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div className="flex min-w-0 items-center gap-4">
-            <Avatar firstName={patient.first_name} lastName={patient.last_name} size="lg" />
+            {patientAvatar('lg')}
             <div className="min-w-0">
               {!isDentist && (
                 <p className="text-pretty text-sm font-medium text-sky-700">Hi, {patient.first_name}! This is your dental record.</p>
@@ -362,23 +401,7 @@ export default function PatientProfilePage() {
             </div>
           </div>
 
-          {isDentist && (
-            <div className="flex items-center gap-2">
-              {addTreatmentButton('flex-1 sm:flex-none')}
-              {/* Phone: icon lang ang Edit, para buong salita pa rin ang
-                  "Add Treatment" (dati nahahati sa dalawang linya sa 360px) */}
-              <button
-                type="button"
-                onClick={() => setEditing(true)}
-                aria-label="Edit patient details"
-                className="flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-base font-medium text-slate-700 transition-colors hover:bg-slate-50 sm:px-4"
-              >
-                <Pencil className="h-4 w-4" />
-                <span className="hidden sm:inline">Edit</span>
-              </button>
-              <DropdownMenu label="More patient actions" items={moreActions} />
-            </div>
-          )}
+          {isDentist && patientActions()}
         </div>
 
         {/* Allergies at Medical History: laging kita, bago ang kahit anong
@@ -525,41 +548,44 @@ export default function PatientProfilePage() {
         {tab === 'chart' && (
           <div>
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-              <div className="flex gap-1.5 rounded-lg border border-slate-200 bg-slate-100 p-1">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (chartView === '3d' && has3DPendingDrawing) {
-                      setConfirmLeave3D(true)
-                      return
-                    }
-                    setChartView('2d')
-                  }}
-                  aria-pressed={chartView === '2d'}
-                  className={`flex min-h-11 items-center gap-1.5 rounded-md px-3 text-sm font-medium transition-colors ${
-                    chartView === '2d' ? 'bg-white text-sky-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  <LayoutGrid className="h-4 w-4" />
-                  2D Chart
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setChartView('3d')}
-                  aria-pressed={chartView === '3d'}
-                  className={`flex min-h-11 items-center gap-1.5 rounded-md px-3 text-sm font-medium transition-colors ${
-                    chartView === '3d' ? 'bg-white text-sky-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  <Box className="h-4 w-4" />
-                  3D Chart
-                </button>
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex gap-1.5 rounded-lg border border-slate-200 bg-slate-100 p-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (chartView === '3d' && has3DPendingDrawing) {
+                        setConfirmLeave3D(true)
+                        return
+                      }
+                      setChartView('2d')
+                    }}
+                    aria-pressed={chartView === '2d'}
+                    className={`flex min-h-11 items-center gap-1.5 rounded-md px-3 text-sm font-medium transition-colors ${
+                      chartView === '2d' ? 'bg-white text-sky-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <LayoutGrid className="h-4 w-4" />
+                    2D Chart
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setChartView('3d')}
+                    aria-pressed={chartView === '3d'}
+                    className={`flex min-h-11 items-center gap-1.5 rounded-md px-3 text-sm font-medium transition-colors ${
+                      chartView === '3d' ? 'bg-white text-sky-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <Box className="h-4 w-4" />
+                    3D Chart
+                  </button>
+                </div>
+                <DentitionSelector value={chartDentition} onChange={changeChartDentition} />
               </div>
               <button
                 type="button"
                 // Sumusunod sa bukas na view: 2D → 2D print, 3D → 3D print (Feature #22)
                 onClick={() =>
-                  openPrintTab(`${PROFILE_PATH}/chart/${chartView === '3d' ? 'print-3d' : 'print'}`, profileState(id))
+                  openPrintTab(`${PROFILE_PATH}/chart/${chartView === '3d' ? 'print-3d' : 'print'}`, { ...profileState(id), dentition: chartDentition })
                 }
                 className="flex min-h-11 items-center gap-1.5 rounded-md px-2 text-base font-medium text-slate-600 transition-colors hover:bg-slate-50 hover:text-sky-700"
               >
@@ -570,11 +596,11 @@ export default function PatientProfilePage() {
 
             <div className="overflow-x-auto">
               {chartView === '2d' ? (
-                <Odontogram2D patientId={id} canEdit={isDentist} alerts={alerts} />
+                <Odontogram2D key={id} patientId={id} canEdit={isDentist} alerts={alerts} dateOfBirth={patient.date_of_birth} dentition={chartDentition} onDentitionChange={changeChartDentition} />
               ) : (
                 <Chart3DErrorBoundary onSwitchTo2D={() => setChartView('2d')}>
                   <Suspense fallback={<PageLoader label="Loading 3D chart..." />}>
-                    <Odontogram3D patientId={id} canEdit={isDentist} onPendingChange={setHas3DPendingDrawing} alerts={alerts} />
+                    <Odontogram3D key={id} patientId={id} canEdit={isDentist} onPendingChange={setHas3DPendingDrawing} alerts={alerts} dateOfBirth={patient.date_of_birth} dentition={chartDentition} onDentitionChange={changeChartDentition} />
                   </Suspense>
                 </Chart3DErrorBoundary>
               )}
