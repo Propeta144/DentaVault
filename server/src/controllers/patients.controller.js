@@ -11,6 +11,7 @@ import { csvField } from '../utils/csv.js'
 import { FIELD_LIMITS, clinicToday, isValidToothNumber } from '../utils/validators.js'
 import { EXTRA_PATIENT_FIELDS } from '../utils/patientFields.js'
 import { queryText, queryInt } from '../utils/query.js'
+import { changedPatientFields } from '../utils/auditDetails.js'
 
 function assertValid(req) {
   const errors = validationResult(req)
@@ -164,6 +165,7 @@ export const update = asyncHandler(async (req, res) => {
     action: 'UPDATE_PATIENT',
     entityType: 'patient',
     entityId: patient.id,
+    details: { changedFields: changedPatientFields(existing, patient) },
     ipAddress: req.ip,
   })
 
@@ -283,13 +285,19 @@ export const updateTreatment = asyncHandler(async (req, res) => {
     patientId: patient.id,
     updatedBy: req.user.userId,
   })
+  const previous = treatmentSnapshot(before)
+  const current = treatmentSnapshot(treatment)
+  const labels = { procedureName: 'Procedure', toothNumber: 'Tooth', surfaces: 'Surfaces', treatmentDate: 'Treatment date', notes: 'Treatment notes' }
+  const changedFields = Object.keys(previous).filter((field) => JSON.stringify(previous[field]) !== JSON.stringify(current[field])).map((field) => labels[field])
 
   await recordAuditLog({
     userId: req.user.userId,
     action: 'UPDATE_TREATMENT',
     entityType: 'treatment',
     entityId: treatment.id,
-    details: { patientId: patient.id, previous: treatmentSnapshot(before), chartChange },
+    details: {
+      patientId: patient.id, previous, current, chartChange, changedFields,
+    },
     ipAddress: req.ip,
   })
 
@@ -299,7 +307,7 @@ export const updateTreatment = asyncHandler(async (req, res) => {
 // Delete (maling entry): kasama ang marka nito sa chart
 export const deleteTreatment = asyncHandler(async (req, res) => {
   const { patient, treatment } = await findPatientTreatment(req)
-  const chartEntriesRemoved = await treatmentModel.deleteTreatment(treatment.id)
+  const chartEntriesRemoved = await treatmentModel.deleteTreatment(treatment.id, { patientId: patient.id })
 
   await recordAuditLog({
     userId: req.user.userId,

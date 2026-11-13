@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { listXrays, uploadXray } from '../../services/xrays'
 import UploadXrayForm from './UploadXrayForm'
@@ -19,22 +19,34 @@ export default function PatientXraysSection({ patientId }) {
   const [error, setError] = useState('')
   const [viewing, setViewing] = useState(null)
   const [comparing, setComparing] = useState(null)
+  const requestVersion = useRef(0)
 
-  const load = useCallback(() => {
-    setLoading(true)
-    listXrays(patientId)
-      .then(setXrays)
-      .catch((err) => setError(err.response?.data?.error || 'Failed to load X-rays'))
-      .finally(() => setLoading(false))
+  const load = useCallback((silent = false) => {
+    const version = ++requestVersion.current
+    if (!silent) setLoading(true)
+    return listXrays(patientId)
+      .then((rows) => {
+        if (version !== requestVersion.current) return
+        setError('')
+        setXrays(rows)
+        // File access puwedeng mag-mark reviewed sa server. Tahimik ang
+        // metadata refresh para hindi mawala ang viewer o annotation drafts.
+        setViewing((current) => current ? rows.find((x) => x.id === current.id) || current : null)
+      })
+      .catch((err) => { if (version === requestVersion.current) setError(err.response?.data?.error || 'Failed to load X-rays') })
+      .finally(() => { if (version === requestVersion.current) setLoading(false) })
   }, [patientId])
+  const refreshMetadata = useCallback(() => load(true), [load])
+  const invalidateRequests = useCallback(() => { requestVersion.current++ }, [])
 
   useEffect(() => {
     load()
-  }, [load])
+    return invalidateRequests
+  }, [load, invalidateRequests])
 
   async function handleUpload(payload) {
     await uploadXray(patientId, payload)
-    load()
+    await load(true)
   }
 
   if (loading) return <PageLoader label="Loading X-rays..." />
@@ -63,18 +75,20 @@ export default function PatientXraysSection({ patientId }) {
 
       {viewing && (
         <XrayViewer
+          key={viewing.id}
           xray={viewing}
           patientCode={patientId}
           canAnnotate={isDentist}
+          onOpened={isDentist ? refreshMetadata : undefined}
           canDelete={isDentist || (viewing.source === 'patient_upload' && !viewing.reviewed_at)}
           onClose={() => {
             setViewing(null)
-            load()
+            load(true)
           }}
         />
       )}
 
-      {comparing && <CompareView xrays={comparing} onClose={() => setComparing(null)} />}
+      {comparing && <CompareView xrays={comparing} onOpened={isDentist ? refreshMetadata : undefined} onClose={() => { setComparing(null); load(true) }} />}
     </div>
   )
 }

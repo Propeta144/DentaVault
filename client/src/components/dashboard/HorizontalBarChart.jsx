@@ -12,7 +12,7 @@
 // `minScale`: pinakamababang dulo ng scale. Dati ang pinakamalaking bilang
 // ang dulo, kaya kapag 2 ang max, kalahati na ng bar ang "1" (pinalalaki ang
 // maliliit na bilang, critique 2026-10-25).
-export default function HorizontalBarChart({ data, showLegend = false, legend, minScale = 1 }) {
+export default function HorizontalBarChart({ data, showLegend = false, legend, minScale = 1, onSelect }) {
   if (!data || data.length === 0 || data.every((d) => d.value === 0)) {
     return <p className="text-sm text-slate-600">No data yet.</p>
   }
@@ -37,20 +37,19 @@ export default function HorizontalBarChart({ data, showLegend = false, legend, m
         </div>
       )}
       <div className="space-y-2.5">
-        {data.map((d) => (
-          <div key={d.label} className="flex items-center gap-3" title={d.tooltip ?? `${d.label}: ${d.value}`}>
-            <span className="w-36 shrink-0 truncate text-xs text-slate-600">{d.label}</span>
-            <div className="h-5 flex-1 overflow-hidden rounded-r bg-slate-100">
-              <div
-                className="h-5 rounded-r"
-                style={{ width: `${(d.value / max) * 100}%`, backgroundColor: d.color }}
-              />
-            </div>
-            <span className="w-8 shrink-0 text-right text-xs font-medium text-slate-700">
-              {d.value}
-            </span>
-          </div>
-        ))}
+        {data.map((d) => {
+          const Row = onSelect ? 'button' : 'div'
+          return (
+            <Row key={d.procedure || d.label} {...(onSelect ? { type: 'button', onClick: () => onSelect(d), 'aria-label': `${d.label}: ${d.value}. View matching treatments.` } : {})}
+              className={`flex w-full items-center gap-3 text-left ${onSelect ? 'min-h-11 rounded-md px-1 transition-colors hover:bg-sky-50 focus-visible:outline-2 focus-visible:outline-sky-600' : ''}`} title={d.tooltip ?? `${d.label}: ${d.value}`}>
+              <span className="w-28 shrink-0 truncate text-xs text-slate-600 sm:w-36">{d.label}</span>
+              <span className="block h-5 flex-1 overflow-hidden rounded-r bg-slate-100">
+                <span className="block h-5 rounded-r" style={{ width: `${(d.value / max) * 100}%`, backgroundColor: d.color }} />
+              </span>
+              <span className="w-8 shrink-0 text-right text-xs font-medium text-slate-700">{d.value}</span>
+            </Row>
+          )
+        })}
       </div>
     </div>
   )

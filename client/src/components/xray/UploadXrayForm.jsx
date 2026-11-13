@@ -1,8 +1,9 @@
-import { useEffect, useId, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { Upload, ScanLine, FileText, X } from 'lucide-react'
 import { useToast } from '../../context/ToastContext'
 import { FIELD_LIMITS, MAX_XRAY_FILE_BYTES } from '../../constants/fieldLimits'
 import { todayISO } from '../../utils/formatDate'
+import { uploadProgressPercent } from '../../utils/xrayView'
 
 const ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf']
 
@@ -36,6 +37,8 @@ export default function UploadXrayForm({
   const [error, setError] = useState('')
   const [dragging, setDragging] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [progress, setProgress] = useState(null)
+  const inFlight = useRef(false)
 
   // Object URL para sa preview; nililinis kapag napalitan/natanggal ang file
   useEffect(() => {
@@ -49,6 +52,7 @@ export default function UploadXrayForm({
   }, [file])
 
   function pickFile(candidate) {
+    if (inFlight.current) return
     setError('')
     if (!candidate) return
     if (!ACCEPTED_TYPES.includes(candidate.type)) {
@@ -66,6 +70,7 @@ export default function UploadXrayForm({
 
   async function handleSubmit(e) {
     e.preventDefault()
+    if (inFlight.current) return
     if (!file) {
       setError('Choose a file first')
       return
@@ -75,9 +80,12 @@ export default function UploadXrayForm({
       return
     }
     setError('')
+    inFlight.current = true
+    setProgress(0)
     setSubmitting(true)
     try {
-      await onUpload({ file, notes, takenDate })
+      // 100% ay naipadala na ang bytes; success lang kapag sumagot ang server.
+      await onUpload({ file, notes, takenDate, onUploadProgress: (event) => setProgress(uploadProgressPercent(event)) })
       showToast(successMessage, { type: 'success' })
       setFile(null)
       setNotes('')
@@ -91,7 +99,9 @@ export default function UploadXrayForm({
       setError(message)
       showToast(message, { type: 'error' })
     } finally {
+      inFlight.current = false
       setSubmitting(false)
+      setProgress(null)
     }
   }
 
@@ -112,6 +122,7 @@ export default function UploadXrayForm({
         <input
           id={ids.file}
           type="file"
+          disabled={submitting}
           accept={ACCEPTED_TYPES.join(',')}
           onChange={(e) => {
             pickFile(e.target.files[0])
@@ -135,15 +146,16 @@ export default function UploadXrayForm({
                 {file.name}
               </p>
               <p className="text-sm text-slate-500">{formatSize(file.size)}</p>
-              <label htmlFor={ids.file} className="mt-1 inline-flex min-h-9 cursor-pointer items-center text-sm font-medium text-sky-700 hover:underline">
+              <label htmlFor={ids.file} aria-disabled={submitting} className={`mt-1 inline-flex min-h-11 items-center text-sm font-medium text-sky-700 ${submitting ? 'pointer-events-none opacity-50' : 'cursor-pointer hover:underline'}`}>
                 Choose a different file
               </label>
             </div>
             <button
               type="button"
+              disabled={submitting}
               onClick={() => setFile(null)}
               aria-label="Remove selected file"
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50"
             >
               <X className="h-5 w-5" />
             </button>
@@ -192,6 +204,7 @@ export default function UploadXrayForm({
           <input
             id={ids.date}
             type="date"
+            disabled={submitting}
             max={todayISO()}
             className={inputClass}
             value={takenDate}
@@ -204,6 +217,7 @@ export default function UploadXrayForm({
           </label>
           <input
             id={ids.notes}
+            disabled={submitting}
             className={inputClass}
             maxLength={FIELD_LIMITS.notes}
             value={notes}
@@ -211,6 +225,16 @@ export default function UploadXrayForm({
           />
         </div>
       </div>
+
+      {submitting && (
+        <div className="space-y-1.5">
+          <p role="status" className="text-sm font-medium text-sky-800">
+            {progress === 100 ? 'Upload sent. Saving X-ray…' : progress === null ? 'Uploading X-ray…' : `Uploading X-ray… ${progress}%`}
+          </p>
+          <progress aria-label="X-ray upload progress" max={100} value={progress ?? undefined}
+            className="block h-3 w-full overflow-hidden rounded-full accent-sky-600" />
+        </div>
+      )}
 
       <button
         type="submit"

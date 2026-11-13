@@ -11,5 +11,6 @@ router.use(authenticate)
 // entries — dentist-only, gaya ng ibang clinic-wide (hindi single-record)
 // na view.
 router.get('/dashboard', requireRole('dentist'), dashboardController.get)
+router.get('/dashboard/records', requireRole('dentist'), dashboardController.records)
 
 export default router

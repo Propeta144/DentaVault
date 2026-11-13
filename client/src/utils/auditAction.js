@@ -1,4 +1,5 @@
-import { conditionLabel } from '../constants/dental'
+import { conditionLabel } from '../constants/dental.js'
+import { formatDate } from './formatDate.js'
 
 // Ginagamit parehong AuditLogPage (full table) at DashboardPage (recent
 // activity feed) — cosmetic grouping lang naman 'to, para scannable pa rin
@@ -29,6 +30,8 @@ export function humanizeAction(action) {
 // groupAuditLogs), hal. 6 na VIEW_XRAY → "Viewed 6 X-rays".
 // Kapag may bagong action code sa server, idagdag din dito.
 const ACTION_LABELS = {
+  VIEW_CHART_COMPARISON: { label: 'Compared dental charts' },
+  RESTORE_CHART_ENTRY: { label: 'Restored chart markings (Undo/Redo)' },
   UPDATE_PROFILE_PHOTO: { label: 'Updated a profile photo' },
   DELETE_PROFILE_PHOTO: { label: 'Removed a profile photo' },
   LOGIN_SUCCESS: { label: 'Signed in' },
@@ -122,6 +125,17 @@ const DETAIL_FORMATTERS = {
   chartChange: (v) => CHART_CHANGE_LABELS[v] ?? v,
   chartEntriesRemoved: (v) => (Number(v) > 0 ? 'Removed from the dental chart too' : 'Was not on the chart'),
   fromChart: () => 'Added from the dental chart',
+  changedFields: (v) => Array.isArray(v) ? `Changed fields: ${v.join(', ')}` : '',
+  procedureName: (v) => `Procedure: ${v}`,
+  treatmentDate: (v) => `Treatment date: ${formatDate(v)}`,
+  dateFrom: (v) => `From: ${formatDate(v)}`,
+  dateTo: (v) => `To: ${formatDate(v)}`,
+  period: (v) => v === 'all' ? 'All time' : '',
+  kind: (v) => `Records: ${v === 'xrays' ? 'X-rays' : v === 'treatments' ? 'Treatments' : v}`,
+  procedure: (v) => `Procedure: ${v}`,
+  page: (v) => `Page ${v}`,
+  viewDays: (v) => `View events: ${v} days`,
+  changeDays: (v) => `Change events: ${v} days`,
   deleted: (v) =>
     [v?.procedureName, v?.toothNumber && (v.toothNumber === 'ALL' ? 'all teeth' : `tooth ${v.toothNumber}`), v?.treatmentDate]
       .filter(Boolean)
@@ -131,8 +145,9 @@ const DETAIL_FORMATTERS = {
 export function formatAuditDetails(details) {
   if (!details || typeof details !== 'object') return ''
   return Object.entries(details)
-    .filter(([key, value]) => !HIDDEN_DETAIL_KEYS.has(key) && value !== null && value !== '' && value !== undefined)
-    .map(([key, value]) => (DETAIL_FORMATTERS[key] ? DETAIL_FORMATTERS[key](value) : `${key}: ${value}`))
+    .filter(([key, value]) => !HIDDEN_DETAIL_KEYS.has(key) && Object.hasOwn(DETAIL_FORMATTERS, key) && value !== null && value !== '' && value !== undefined)
+    .map(([key, value]) => DETAIL_FORMATTERS[key](value))
+    .filter(Boolean)
     .join(' · ')
 }
 
@@ -151,6 +166,12 @@ export function auditPatientName(log) {
 const GROUPABLE = new Set(['VIEW_XRAY', 'VIEW_HELD_XRAY', 'CREATE_CHART_ENTRY', 'ANNOTATE_XRAY', 'LOGIN_FAILED'])
 const GROUP_WINDOW_MS = 2 * 60 * 1000
 
+function recordIdentity(log) {
+  if (log.patient_code) return `patient:${log.patient_code}`
+  if (log.entity_type && log.entity_id != null) return `${log.entity_type}:${log.entity_id}`
+  return log.action === 'LOGIN_FAILED' ? 'no-patient' : `unresolved:${log.id}`
+}
+
 // Bawat group: { ...unang log (pinakabago), count, logs: [lahat] }.
 // Display lang ito; buo pa rin ang bawat entry sa database.
 export function groupAuditLogs(logs) {
@@ -162,7 +183,9 @@ export function groupAuditLogs(logs) {
       GROUPABLE.has(log.action) &&
       last.action === log.action &&
       last.user_id === log.user_id &&
-      auditPatientName(last) === auditPatientName(log) &&
+      last.ip_address === log.ip_address &&
+      recordIdentity(last) === recordIdentity(log) &&
+      new Date(last.created_at).toDateString() === new Date(log.created_at).toDateString() &&
       Math.abs(new Date(last.created_at) - new Date(log.created_at)) <= GROUP_WINDOW_MS
     if (canMerge) {
       last.count += 1

@@ -123,3 +123,17 @@ input[type='password']::-ms-clear {
     }
   }
 }
+
+/* Accent sa mismong dashboard statistic lang. Hindi kasama ang parent
+   card, labels o ibang controls; disabled tiles keep their loading state. */
+@layer utilities {
+  @media screen and (hover: hover) and (pointer: fine) {
+    .overview-stat:where(:not(:disabled, [aria-disabled='true'])):hover {
+      background-color: var(--color-sky-600);
+      color: white;
+    }
+    .overview-stat:where(:not(:disabled, [aria-disabled='true'])):hover > span {
+      color: inherit;
+    }
+  }
+}

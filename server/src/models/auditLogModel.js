@@ -1,5 +1,6 @@
 import pool from '../config/db.js'
 import { limitOffset } from '../utils/sqlLimit.js'
+import { publicAuditDetails } from '../utils/auditDetails.js'
 
 // Dapat tawagin 'to sa bawat write action, at bawat pag-view ng sensitive
 // data (patient records, x-rays). Tignan yung RA 10173 requirement sa
@@ -24,10 +25,7 @@ export async function recordAuditLog({ userId, action, entityType, entityId, det
 // Kailangan i-parse pabalik dito sa bawat read path, kung hindi, makukuha
 // ng caller string kung saan object naman yung inaasahan ng UI.
 function parseDetails(row) {
-  if (row.details && typeof row.details === 'string') {
-    row.details = JSON.parse(row.details)
-  }
-  return row
+  return { ...row, details: publicAuditDetails(row.details) }
 }
 
 // Kung KANINONG patient ang isang log entry. Dati "patient #1" /
@@ -60,7 +58,7 @@ const AUDIT_FROM = `
 // tapos AND ang pagsasama nila. `excludeActions`: galing lang sa sariling
 // code (hal. Dashboard), hindi sa user input, at placeholders pa rin ang
 // gamit.
-function buildAuditLogQuery({ search, action, dateFrom, dateTo, excludeActions = [] }) {
+export function buildAuditLogQuery({ search, action, dateFrom, dateTo, userId, patientCode, excludeActions = [] }) {
   const conditions = []
   const params = {}
 
@@ -83,13 +81,22 @@ function buildAuditLogQuery({ search, action, dateFrom, dateTo, excludeActions =
     conditions.push('al.action = :action')
     params.action = action
   }
+  if (userId === 'system') conditions.push('al.user_id IS NULL')
+  else if (userId !== undefined) {
+    conditions.push('al.user_id = :userId')
+    params.userId = userId
+  }
+  if (patientCode) {
+    conditions.push('rp.patient_code = :patientCode')
+    params.patientCode = patientCode
+  }
   if (dateFrom) {
     conditions.push('al.created_at >= :dateFrom')
     params.dateFrom = `${dateFrom} 00:00:00`
   }
   if (dateTo) {
-    conditions.push('al.created_at <= :dateTo')
-    params.dateTo = `${dateTo} 23:59:59`
+    conditions.push('al.created_at < DATE_ADD(:dateTo, INTERVAL 1 DAY)')
+    params.dateTo = dateTo
   }
 
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
@@ -99,24 +106,41 @@ function buildAuditLogQuery({ search, action, dateFrom, dateTo, excludeActions =
 // 'To yung nagpapagana sa audit log viewer page (dentist-only). Newest
 // first, kasi halos palagi naman, recent activity ang pinapansin ng
 // dentist kapag chinicheck niya kung "sino gumawa ng ano".
-export async function listAuditLogs({ limit, offset, search, action, dateFrom, dateTo, excludeActions }) {
-  const { where, params } = buildAuditLogQuery({ search, action, dateFrom, dateTo, excludeActions })
+export async function listAuditLogs({ limit, offset, search, action, dateFrom, dateTo, userId, patientCode, excludeActions }, db = pool) {
+  const { where, params } = buildAuditLogQuery({ search, action, dateFrom, dateTo, userId, patientCode, excludeActions })
 
-  const [rows] = await pool.execute(
+  const [rows] = await db.execute(
     `SELECT al.id, al.user_id, u.full_name AS user_name, u.role AS user_role,
             al.action, al.entity_type, al.entity_id, al.details, al.ip_address, al.created_at,
-            CONCAT(rp.first_name, ' ', rp.last_name) AS patient_name
+            rp.patient_code, CONCAT(rp.first_name, ' ', rp.last_name) AS patient_name
      ${AUDIT_FROM}
      ${where}
      ORDER BY al.created_at DESC, al.id DESC
      ${limitOffset(limit, offset)}`,
     params,
   )
-  const [[{ total }]] = await pool.execute(
+  const [[{ total }]] = await db.execute(
     `SELECT COUNT(*) AS total ${AUDIT_FROM} ${where}`,
     params,
   )
   return { rows: rows.map(parseDetails), total }
+}
+
+// Audit participants lang, kasama ang soft-deleted records na may history.
+// Parehong identity resolution sa logs at filters, kaya hindi name-match lang.
+export async function listAuditFilterOptions({ kind, search = '' }, db = pool) {
+  const params = { search: `%${search}%` }
+  const patient = kind === 'patients'
+  const select = patient
+    ? `rp.patient_code AS value, CONCAT(rp.first_name, ' ', rp.last_name) AS name, rp.date_of_birth, rp.deleted_at`
+    : `al.user_id AS value, COALESCE(u.full_name, 'Former account') AS name, u.role, u.email`
+  const where = patient
+    ? `rp.patient_code IS NOT NULL AND (CONCAT(rp.first_name, ' ', rp.last_name) LIKE :search OR rp.date_of_birth LIKE :search)`
+    : `al.user_id IS NOT NULL AND (COALESCE(u.full_name, 'Former account') LIKE :search OR u.email LIKE :search OR u.role LIKE :search)`
+  const [rows] = await db.execute(
+    `SELECT DISTINCT ${select} ${AUDIT_FROM} WHERE ${where} ORDER BY name ASC, value ASC ${limitOffset(21)}`, params,
+  )
+  return { options: rows.slice(0, 20).map((row) => ({ ...row, value: String(row.value) })), hasMore: rows.length > 20 }
 }
 
 // Yung distinct action codes na talagang nasa table, para sa filter

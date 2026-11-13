@@ -98,9 +98,9 @@ export function mostCommon(list) {
 // contours. A stroke is *collected*, not committed — it's handed to the
 // parent on release via `onStrokeComplete`, which decides whether to keep
 // it as part of a still-unsaved mark (so the dentist can draw several
-// strokes, undo, and only then explicitly save — see Odontogram3D). This
+// strokes and only then explicitly save — see Odontogram3D). This
 // component just renders whatever `strokes` it's given (redrawing fully
-// whenever that list changes, e.g. after an undo) and reports raw points
+// whenever that list changes, e.g. after discarding) and reports raw points
 // while a new one is in progress.
 function InkLayer({ geometry, strokes = [], paintEnabled, penColor, penConditionCode, onStrokeComplete, onPaintStart, onPaintEnd }) {
   const canvas = useMemo(() => {
@@ -141,7 +141,7 @@ function InkLayer({ geometry, strokes = [], paintEnabled, penColor, penCondition
 
   // Redraw ng drafts para sa ngiping ito lang. Bawat segment ay may sariling
   // condition, kaya palette changes o bagong guhit ay hindi nagre-recolor
-  // ng nauna. Undo/save ay nag-aalis lang ng kaukulang drafts.
+  // ng nauna. Save/discard ay nag-aalis lang ng kaukulang drafts.
   useEffect(() => {
     ctx.clearRect(0, 0, INK_CANVAS_SIZE, INK_CANVAS_SIZE)
     for (const stroke of strokes) {
@@ -319,6 +319,7 @@ export default function Tooth3D({
   toothNumber,
   chartState,
   canEdit,
+  selected = false,
   paintEnabled,
   surfaceSelectionEnabled = false,
   onSurfaceSelect,
@@ -347,7 +348,7 @@ export default function Tooth3D({
   const extents = toothExtents(toothNumber)
   // Lahat ng "wala na ang ngipin" (Extracted, Missing, Congenitally Missing...)
   const isExtracted = isMissingCondition(chartState.whole?.condition_code)
-  const canSelect = canEdit && surfaceSelectionEnabled && Boolean(onSurfaceSelect)
+  const canSelect = surfaceSelectionEnabled && Boolean(onSurfaceSelect)
   const [hoveredSurface, setHoveredSurface] = useState(null)
   const visibleHover = canSelect ? hoveredSurface : null
 
@@ -406,7 +407,7 @@ export default function Tooth3D({
     // `position` = gitna ng cervical line (leeg ng ngipin, kung saan lumalabas
     // sa gums). Dito umiikot ang labial tilt (`tiltX`), tapos inaangat ang
     // crown nang kalahating taas niya papunta sa kagat.
-    <group position={position} rotation={[0, rotationY, 0]} scale={highlighted ? 1.15 : 1}>
+    <group position={position} rotation={[0, rotationY, 0]} scale={highlighted ? 1.15 : 1} userData={{ toothNumber, selected }}>
       <group rotation={[tiltX, 0, 0]}>
         {/* Isang group (three.js: scale → rotation → position): mirror X,
             baligtad para sa upper, tapos inaangat ang crown mula sa leeg */}
@@ -415,6 +416,13 @@ export default function Tooth3D({
           rotation={[0, 0, flipUpper ? Math.PI : 0]}
           scale={[mirrorX ? -scale : scale, scale, scale]}
         >
+          {/* Purple silhouette lang ang selection; hindi binabago ang saved
+              condition colors o ginagawang clinical marking ang highlight. */}
+          {toothGeometry && selected && (
+            <mesh geometry={toothGeometry} scale={1.07} raycast={() => null}>
+              <meshBasicMaterial color="#6f2dbd" side={THREE.BackSide} />
+            </mesh>
+          )}
           {toothGeometry && (
             <mesh castShadow receiveShadow geometry={toothGeometry}
               raycast={canSelect ? THREE.Mesh.prototype.raycast : () => null}

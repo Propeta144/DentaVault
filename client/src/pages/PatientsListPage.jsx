@@ -12,11 +12,13 @@ import {
   Users,
   ChevronLeft,
   ChevronRight,
+  Eye,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { listPatients, getPatient, exportPatientsCsv } from '../services/patients'
 import EditPatientModal from '../components/patients/EditPatientModal'
 import DeletePatientModal from '../components/patients/DeletePatientModal'
+import PatientPreviewModal from '../components/patients/PatientPreviewModal'
 import StatusBadge from '../components/common/StatusBadge'
 import { AllergyFlag } from '../components/common/MedicalAlertBadge'
 import Avatar from '../components/common/Avatar'
@@ -71,6 +73,7 @@ export default function PatientsListPage() {
   const [error, setError] = useState('')
   const [editingPatient, setEditingPatient] = useState(null)
   const [deletingPatient, setDeletingPatient] = useState(null)
+  const [previewPatient, setPreviewPatient] = useState(null)
   const [exporting, setExporting] = useState(false)
   const isDentist = user.role === 'dentist'
 
@@ -135,6 +138,10 @@ export default function PatientsListPage() {
   ]
 
   const hasSearch = Boolean(search.trim())
+  const previewButton = (p) => isDentist && (
+    <button type="button" onClick={(event) => { event.stopPropagation(); setPreviewPatient(p) }} aria-label={`Preview ${listName(p)}`} title="Quick patient preview"
+      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-slate-600 transition-colors hover:bg-sky-50 hover:text-sky-700"><Eye className="h-4 w-4" aria-hidden="true" /></button>
+  )
 
   return (
     <div>
@@ -280,7 +287,7 @@ export default function PatientsListPage() {
                       <ImportedBadge patient={p} />
                     </div>
                   </div>
-                  {isDentist && <DropdownMenu label={`Actions for ${listName(p)}`} items={rowActions(p)} />}
+                  <div className="flex shrink-0 items-center">{previewButton(p)}{isDentist && <DropdownMenu label={`Actions for ${listName(p)}`} items={rowActions(p)} />}</div>
                 </div>
                 <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1 border-t border-slate-100 pt-3 text-sm">
                   <div>
@@ -355,6 +362,7 @@ export default function PatientsListPage() {
                     <td className="hidden whitespace-nowrap px-4 py-2.5 text-slate-600 xl:table-cell">{formatDate(p.created_at)}</td>
                     <td className="px-2 py-2.5 text-right">
                       <div className="flex items-center justify-end">
+                        {previewButton(p)}
                         {isDentist && <DropdownMenu label={`Actions for ${listName(p)}`} items={rowActions(p)} />}
                         <ChevronRight className="h-4 w-4 text-slate-300 group-hover:text-sky-600" aria-hidden="true" />
                       </div>
@@ -402,6 +410,8 @@ export default function PatientsListPage() {
       {editingPatient && (
         <EditPatientModal patient={editingPatient} onClose={() => setEditingPatient(null)} onSaved={handleSaved} />
       )}
+
+      {previewPatient && <PatientPreviewModal key={previewPatient.patient_code} summary={previewPatient} onClose={() => setPreviewPatient(null)} />}
 
 
       {deletingPatient && (

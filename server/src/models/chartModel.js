@@ -1,5 +1,6 @@
 import pool from '../config/db.js'
 import AppError from '../utils/AppError.js'
+import { withChartMutation } from '../services/chartMutationService.js'
 import { WHOLE_TOOTH_CONDITIONS } from '../utils/validators.js'
 
 // mysql2 returns JSON columns as raw text, not a parsed value — same gotcha
@@ -49,25 +50,15 @@ export async function getToothHistory(patientId, toothNumber) {
 }
 
 export async function createChartEntry({ patientId, toothNumber, surface, conditionCode, notes, strokeData, recordedBy }) {
-  const [result] = await pool.execute(
-    `INSERT INTO chart_entries (patient_id, tooth_number, surface, condition_code, notes, stroke_data, recorded_by)
-     VALUES (:patientId, :toothNumber, :surface, :conditionCode, :notes, :strokeData, :recordedBy)`,
-    {
-      patientId,
-      toothNumber,
-      surface,
-      conditionCode,
-      notes: notes ?? null,
-      strokeData: strokeData ? JSON.stringify(strokeData) : null,
-      recordedBy,
-    },
-  )
-  const [rows] = await pool.execute(
-    `SELECT ce.*, u.full_name AS dentist_name FROM chart_entries ce
-     JOIN users u ON u.id = ce.recorded_by WHERE ce.id = :id`,
-    { id: result.insertId },
-  )
-  return parseStrokeData(rows[0])
+  return withChartMutation({ patientId }, async (connection) => {
+    const [result] = await connection.execute(
+      `INSERT INTO chart_entries (patient_id, tooth_number, surface, condition_code, notes, stroke_data, recorded_by)
+       VALUES (:patientId, :toothNumber, :surface, :conditionCode, :notes, :strokeData, :recordedBy)`,
+      { patientId, toothNumber, surface, conditionCode, notes: notes ?? null, strokeData: strokeData ? JSON.stringify(strokeData) : null, recordedBy },
+    )
+    const [rows] = await connection.execute(`SELECT ce.*, u.full_name AS dentist_name FROM chart_entries ce JOIN users u ON u.id = ce.recorded_by WHERE ce.id = :id`, { id: result.insertId })
+    return parseStrokeData(rows[0])
+  })
 }
 
 const ALL_SURFACES = ['whole', 'mesial', 'distal', 'occlusal', 'facial', 'lingual']
@@ -75,15 +66,7 @@ const ALL_SURFACES = ['whole', 'mesial', 'distal', 'occlusal', 'facial', 'lingua
 // Removal markers ang pinakabagong entries; sa labas ng ROW_NUMBER filter
 // tinatanggal sa current view para hindi bumalik ang mas lumang kondisyon.
 export async function clearChartEntry({ patientId, entryId, recordedBy }) {
-  const connection = await pool.getConnection()
-  try {
-    await connection.beginTransaction()
-    const [selected] = await connection.execute(
-      'SELECT * FROM chart_entries WHERE id = :entryId AND patient_id = :patientId',
-      { entryId, patientId },
-    )
-    const entry = selected[0]
-    if (!entry) throw new AppError('Chart entry not found', 404)
+  return withChartMutation({ patientId, entryId }, async (connection, entry) => {
     const [rows] = await connection.execute(
       `SELECT * FROM chart_entries WHERE patient_id = :patientId AND tooth_number = :toothNumber
        ORDER BY recorded_at DESC, id DESC FOR UPDATE`,
@@ -104,14 +87,8 @@ export async function clearChartEntry({ patientId, entryId, recordedBy }) {
           notes: 'Condition removed from chart', recordedBy },
       )
     }
-    await connection.commit()
     return { entry, whole, surfaces }
-  } catch (err) {
-    await connection.rollback()
-    throw err
-  } finally {
-    connection.release()
-  }
+  })
 }
 
 // Yung whole-tooth fact (extracted, o na-restore pabalik sa present/healthy),
@@ -128,10 +105,7 @@ export async function clearChartEntry({ patientId, entryId, recordedBy }) {
 // hindi lang 'extracted' — hal. legit ding whole-tooth fact yung
 // full-coverage crown.
 export async function createWholeToothEntry({ patientId, toothNumber, conditionCode, notes, recordedBy }) {
-  const connection = await pool.getConnection()
-  try {
-    await connection.beginTransaction()
-
+  return withChartMutation({ patientId }, async (connection) => {
     let wholeEntryId = null
     for (const surface of ALL_SURFACES) {
       const [result] = await connection.execute(
@@ -142,20 +116,9 @@ export async function createWholeToothEntry({ patientId, toothNumber, conditionC
       if (surface === 'whole') wholeEntryId = result.insertId
     }
 
-    await connection.commit()
-
-    const [rows] = await pool.execute(
-      `SELECT ce.*, u.full_name AS dentist_name FROM chart_entries ce
-       JOIN users u ON u.id = ce.recorded_by WHERE ce.id = :id`,
-      { id: wholeEntryId },
-    )
+    const [rows] = await connection.execute(`SELECT ce.*, u.full_name AS dentist_name FROM chart_entries ce JOIN users u ON u.id = ce.recorded_by WHERE ce.id = :id`, { id: wholeEntryId })
     return parseStrokeData(rows[0])
-  } catch (err) {
-    await connection.rollback()
-    throw err
-  } finally {
-    connection.release()
-  }
+  })
 }
 
 // Intraoral Examination (migration 017): isang kasalukuyang record bawat

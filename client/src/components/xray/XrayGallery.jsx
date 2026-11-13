@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Columns2, Mail, UploadCloud, ScanLine, UserRound } from 'lucide-react'
 import XrayThumbnail from './XrayThumbnail'
-import StatusBadge from '../common/StatusBadge'
+import XrayReviewBadge from './XrayReviewBadge'
 import EmptyState from '../common/EmptyState'
 import { formatDate } from '../../utils/formatDate'
 
@@ -12,8 +12,6 @@ function xrayDate(xray) {
 
 // Mga X-ray na hindi ang dentist ang nag-upload: may "New" hanggang mabuksan
 // niya. Sa patient, "Waiting for review" ang lumalabas (#27).
-const REVIEWABLE_SOURCES = ['email_inbound', 'patient_upload']
-
 const SOURCE_LABELS = {
   email_inbound: { icon: Mail, label: 'Email' }, // lumang record lang (bago ang #32)
   patient_upload: { icon: UserRound, label: 'Patient' },
@@ -98,16 +96,16 @@ export default function XrayGallery({ xrays, onOpen, onCompare, canUpload = fals
                 />
               </label>
             )}
-            {REVIEWABLE_SOURCES.includes(xray.source) && !xray.reviewed_at && viewerRole !== 'patient' && (
+            {viewerRole !== 'patient' && (
               <div className="absolute right-1 top-1">
-                <StatusBadge variant="amber">New</StatusBadge>
+                <XrayReviewBadge xray={xray} />
               </div>
             )}
-            {/* Patient: buong-lapad na strip (hindi badge sa itaas-kanan) para hindi
-                tumama sa compare checkbox sa makitid na thumbnail sa phone */}
-            {REVIEWABLE_SOURCES.includes(xray.source) && !xray.reviewed_at && viewerRole === 'patient' && (
-              <div className="absolute inset-x-0 bottom-6 bg-sky-600/90 px-2 py-0.5 text-center text-xs font-medium text-white">
-                Waiting for review
+            {/* Sa ilalim ang patient review status para mabasa rin sa phone.
+                Parehong pending at Reviewed ay galing sa saved server metadata. */}
+            {viewerRole === 'patient' && (
+              <div className="pointer-events-none absolute inset-x-0 bottom-7 flex justify-center px-1">
+                <XrayReviewBadge xray={xray} viewerRole={viewerRole} />
               </div>
             )}
             <div className="absolute bottom-0 flex w-full items-center justify-between gap-1 bg-slate-900/75 px-2 py-1 text-xs text-white">

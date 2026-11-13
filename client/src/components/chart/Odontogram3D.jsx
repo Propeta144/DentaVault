@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
-import { PenLine, Undo2, Save, X } from 'lucide-react'
+import { PenLine, Save, X } from 'lucide-react'
 import { defaultDentition, dentitionLabel, isDentition } from '../../utils/dentition'
 import Tooth3D from './Tooth3D'
-import { groupPenDrafts, splitPenStroke, undoPenStroke } from '../../utils/penDrafts'
+import { groupPenDrafts, splitPenStroke } from '../../utils/penDrafts'
 import Gingiva from './Gingiva'
 import { DENTITION_SCENES, SceneLights, groupChartEntries } from './chartScene'
 import ChartEntryModal from './ChartEntryModal'
+import ToothDetailsModal from './ToothDetailsModal'
 import { CONDITIONS, SURFACES, conditionColor, conditionLabel, isPrimaryTooth } from '../../constants/dental'
 import ConditionLegend from './ConditionLegend'
 
@@ -34,7 +35,7 @@ const NO_CHART = {}
 // proposal's "lazy loading for resource-intensive modules such as the 3D
 // dental chart" requirement.
 // alerts: { allergies, medicalHistory }, ipinapakita sa chart entry modal (pati sa 3D pen)
-export default function Odontogram3D({ patientId, canEdit, onPendingChange, alerts, dateOfBirth, dentition: selectedDentition, onDentitionChange }) {
+export default function Odontogram3D({ patientId, canEdit, onPendingChange, alerts, dateOfBirth, dentition: selectedDentition, onDentitionChange, selectedTooth, onToothSelect }) {
   const [entries, setEntries] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -90,14 +91,12 @@ export default function Odontogram3D({ patientId, canEdit, onPendingChange, aler
   const handleStrokeComplete = useCallback((toothNumber, stroke) => {
     const segments = splitPenStroke(toothNumber, stroke, crypto.randomUUID())
     setPending((prev) => [...prev, ...segments])
-  }, [])
-
-  function handleUndo() {
-    setPending(undoPenStroke)
-  }
+    onToothSelect?.(toothNumber)
+  }, [onToothSelect])
 
   function handleSaveMark(group = pendingGroups[0]) {
     if (!group?.drafts) return
+    onToothSelect?.(group.toothNumber)
     setSelection({ toothNumber: group.toothNumber, surface: group.surface,
       conditionCode: group.conditionCode, strokes: group.drafts.map((draft) => draft.uv),
       draftIds: group.drafts.map((draft) => draft.id) })
@@ -113,7 +112,7 @@ export default function Odontogram3D({ patientId, canEdit, onPendingChange, aler
       strokeData: payload.strokeData ? [...existingStrokes, ...payload.strokeData] : payload.strokeData })
     if (selection?.draftIds) {
       const savedIds = new Set(selection.draftIds)
-      setPending((drafts) => drafts.filter((draft) => !savedIds.has(draft.id)))
+      setPending((prev) => prev.filter((draft) => !savedIds.has(draft.id)))
     }
     await load(true)
     setHighlightedTooth(payload.toothNumber)
@@ -125,7 +124,8 @@ export default function Odontogram3D({ patientId, canEdit, onPendingChange, aler
   }
 
   function openSurface(toothNumber, surface) {
-    if (!canEdit || penActive || hasPending) return
+    if (penActive || hasPending) return
+    onToothSelect?.(toothNumber)
     setSelection({ toothNumber, surface })
   }
 
@@ -188,19 +188,11 @@ export default function Odontogram3D({ patientId, canEdit, onPendingChange, aler
               <span className="text-sm text-amber-800">
                 {pendingGroups.length} unsaved {pendingGroups.length === 1 ? 'mark' : 'marks'} on {Object.keys(pendingByTooth).length} {Object.keys(pendingByTooth).length === 1 ? 'tooth' : 'teeth'}. Review and save each surface separately.
               </span>
-              <div className="ml-auto flex gap-2">
-                <button
-                  type="button"
-                  onClick={handleUndo}
-                  className="flex min-h-9 items-center gap-1.5 rounded-md border border-amber-300 bg-white px-3 text-sm font-medium text-amber-800 hover:bg-amber-100"
-                >
-                  <Undo2 className="h-3.5 w-3.5" />
-                  Undo
-                </button>
+              <div className="ml-auto flex flex-wrap gap-2">
                 <button
                   type="button"
                   onClick={() => setPending([])}
-                  className="flex min-h-9 items-center gap-1.5 rounded-md border border-amber-300 bg-white px-3 text-sm font-medium text-amber-800 hover:bg-amber-100"
+                  className="flex min-h-11 items-center gap-1.5 rounded-md border border-amber-300 bg-white px-3 text-sm font-medium text-amber-800 hover:bg-amber-100"
                 >
                   <X className="h-3.5 w-3.5" />
                   Discard All
@@ -208,7 +200,8 @@ export default function Odontogram3D({ patientId, canEdit, onPendingChange, aler
                 <button
                   type="button"
                   onClick={() => handleSaveMark()}
-                  className="flex min-h-9 items-center gap-1.5 rounded-md bg-emerald-600 px-3 text-sm font-semibold text-white hover:bg-emerald-700"
+                  disabled={!hasPending}
+                  className="flex min-h-11 items-center gap-1.5 rounded-md bg-emerald-600 px-3 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
                 >
                   <Save className="h-3.5 w-3.5" />
                   Save Next Mark
@@ -247,7 +240,7 @@ export default function Odontogram3D({ patientId, canEdit, onPendingChange, aler
         )}
       </div>}
 
-      <div data-dentition={dentition} className="h-[480px] overflow-hidden rounded-xl border border-slate-200 bg-slate-50 shadow-sm">
+      <div data-dentition={dentition} data-selected-tooth={selectedTooth || undefined} className="h-[480px] overflow-hidden rounded-xl border border-slate-200 bg-slate-50 shadow-sm">
         {/* key: bagong camera kapag nagpalit ng set (mas maliit ang arch ng bata) */}
         <Canvas key={dentition} shadows camera={{ position: scene.camera, fov: 45 }}>
           <SceneLights />
@@ -260,7 +253,7 @@ export default function Odontogram3D({ patientId, canEdit, onPendingChange, aler
           />
           {scene.arches.map((arch) => (
             <Gingiva key={arch.upper ? 'upper' : 'lower'} arch={arch}
-              blockSurfaceSelection={canEdit && !penActive && !hasPending && !selection} />
+              blockSurfaceSelection={!penActive && !hasPending && !selection} />
           ))}
           {scene.rows.map((row, rowIndex) =>
             row.map((toothNumber, i) => {
@@ -287,6 +280,7 @@ export default function Odontogram3D({ patientId, canEdit, onPendingChange, aler
                   onPaintStart={() => setOrbitEnabled(false)}
                   onPaintEnd={() => setOrbitEnabled(true)}
                   highlighted={toothNumber === highlightedTooth}
+                  selected={toothNumber === selectedTooth}
                 />
               )
             }),
@@ -300,10 +294,15 @@ export default function Odontogram3D({ patientId, canEdit, onPendingChange, aler
       </div>
 
       {!canEdit && (
-        <p className="mt-3 text-sm text-slate-600">Only the dentist can update the chart.</p>
+        <p className="mt-3 text-sm text-slate-600">Tap a tooth to view recorded findings and treatments. Drag to rotate.</p>
       )}
 
-      {selection && (
+      {selection && !canEdit && (
+        <ToothDetailsModal patientId={patientId} toothNumber={selection.toothNumber}
+          surface={selection.surface} toothState={chartByTooth[selection.toothNumber] || NO_CHART}
+          alerts={alerts} onClose={() => setSelection(null)} />
+      )}
+      {selection && canEdit && (
         <ChartEntryModal
           patientId={patientId}
           toothNumber={selection.toothNumber}

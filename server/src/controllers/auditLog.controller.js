@@ -3,6 +3,8 @@ import { recordAuditLog } from '../models/auditLogModel.js'
 import asyncHandler from '../utils/asyncHandler.js'
 import { getRetentionConfig } from '../services/auditRetentionService.js'
 import { queryText, queryInt } from '../utils/query.js'
+import { auditFilters } from '../utils/auditFilters.js'
+import AppError from '../utils/AppError.js'
 
 // Pang-araw-araw na ingay: pagbukas ng mga page at matagumpay na
 // pag-sign in/out. Nakatago sa default view ng Audit Log (critique
@@ -18,14 +20,14 @@ export const list = asyncHandler(async (req, res) => {
   const offset = (page - 1) * limit
   const action = queryText(req.query.action)
   const hideRoutine = queryText(req.query.routine) === 'hide' && !action
+  const filters = auditFilters(req.query)
 
   const { rows, total } = await auditLogModel.listAuditLogs({
     limit,
     offset,
     search: queryText(req.query.search),
     action,
-    dateFrom: queryText(req.query.dateFrom),
-    dateTo: queryText(req.query.dateTo),
+    ...filters,
     excludeActions: hideRoutine ? ROUTINE_ACTIONS : [],
   })
 
@@ -59,4 +61,14 @@ export const list = asyncHandler(async (req, res) => {
 export const listActions = asyncHandler(async (req, res) => {
   const actions = await auditLogModel.listDistinctActions()
   res.json({ actions })
+})
+
+export const filterOptions = asyncHandler(async (req, res) => {
+  const kind = req.query.kind
+  if (!['users', 'patients'].includes(kind)) throw new AppError('Choose users or patients.')
+  const search = queryText(req.query.search) || ''
+  if (search.length > 150) throw new AppError('Use a shorter filter search.')
+  const result = await auditLogModel.listAuditFilterOptions({ kind, search })
+  await recordAuditLog({ userId: req.user.userId, action: 'VIEW_AUDIT_LOG', ipAddress: req.ip })
+  res.json(result)
 })

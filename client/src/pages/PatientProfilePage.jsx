@@ -27,6 +27,7 @@ import IntraoralExam from '../components/chart/IntraoralExam'
 import PatientInfoRecord, { healthAlerts } from '../components/patients/PatientInfoRecord'
 import PatientXraysSection from '../components/xray/PatientXraysSection'
 import EditPatientModal from '../components/patients/EditPatientModal'
+import MissingPatientInfo from '../components/patients/MissingPatientInfo'
 import DeletePatientModal from '../components/patients/DeletePatientModal'
 import CreatePortalAccountModal from '../components/patients/CreatePortalAccountModal'
 import ResetPortalPasswordModal from '../components/patients/ResetPortalPasswordModal'
@@ -39,7 +40,7 @@ import StatusBadge from '../components/common/StatusBadge'
 import Odontogram2D from '../components/chart/Odontogram2D'
 import DentitionSelector from '../components/chart/DentitionSelector'
 import Chart3DErrorBoundary from '../components/chart/Chart3DErrorBoundary'
-import { ALL_TEETH, surfaceLetters } from '../constants/dental'
+import { ALL_TEETH, isPrimaryTooth, surfaceLetters } from '../constants/dental'
 import MedicalAlertBadge, { PatientAlertStrip } from '../components/common/MedicalAlertBadge'
 import PageLoader from '../components/common/PageLoader'
 import { useSelectedPatientCode, openPrintTab, profileState, PROFILE_PATH } from '../utils/selectedPatient'
@@ -146,6 +147,13 @@ export default function PatientProfilePage() {
   const [chartDentitionSelection, setChartDentitionSelection] = useState(null)
   const chartDentition = chartDentitionSelection?.patientId === id ? chartDentitionSelection.value : null
   const changeChartDentition = useCallback((value) => setChartDentitionSelection({ patientId: id, value }), [id])
+  // Selection lang ang shared, hindi ang bukas na editor. Paglipat ng view,
+  // naka-highlight pa rin ang ngipin nang walang kusang pagbukas ng modal.
+  const [chartToothSelection, setChartToothSelection] = useState(null)
+  const selectedTooth = chartToothSelection?.patientId === id
+    && (!chartDentition || isPrimaryTooth(chartToothSelection.toothNumber) === (chartDentition === 'primary'))
+    ? chartToothSelection.toothNumber : null
+  const selectChartTooth = useCallback((toothNumber) => setChartToothSelection({ patientId: id, toothNumber }), [id])
   // Pagkabukas ng profile, ihanda na ang 3D chart (tingnan ang preloadOdontogram3D)
   useEffect(() => (isDentist ? preloadOdontogram3D() : undefined), [isDentist])
 
@@ -197,13 +205,11 @@ export default function PatientProfilePage() {
   // add to Treatment History") ay lalabas pagbalik sa tab na ito. Ang chart
   // naman ay laging binabasa ulit pagbukas ng Dental Chart tab.
   // (Ang unang pagbukas ay galing na sa load() sa itaas.)
-  const historyLoaded = useRef(false)
+  const previousTab = useRef(tab)
   useEffect(() => {
-    if (tab !== 'history') return
-    if (!historyLoaded.current) {
-      historyLoaded.current = true
-      return
-    }
+    const from = previousTab.current
+    previousTab.current = tab
+    if (tab !== 'history' || from === 'history') return
     reloadTreatments().catch(() => {})
   }, [tab, reloadTreatments])
 
@@ -232,7 +238,7 @@ export default function PatientProfilePage() {
   const age = calculateAge(patient.date_of_birth)
 
   const tabClass = (name) =>
-    `flex min-h-11 flex-1 items-center justify-center gap-1.5 whitespace-nowrap border-b-2 px-1 pb-2 text-base font-medium transition-colors sm:flex-none ${
+    `flex min-h-11 flex-1 items-center justify-center gap-1.5 whitespace-nowrap border-b-2 px-1 pb-2 text-sm font-medium transition-colors sm:flex-none sm:text-base ${
       tab === name ? 'border-sky-600 text-sky-700' : 'border-transparent text-slate-600 hover:text-slate-900'
     }`
 
@@ -427,30 +433,32 @@ export default function PatientProfilePage() {
       </section>
       )}
 
+      <MissingPatientInfo patient={patient} forPatient={!isDentist} onEdit={isDentist ? () => setEditing(true) : undefined} />
+
       {/* ================= TABS: buong lapad =================
           Dati 8/12 lang ng lapad (may Patient Details sa kaliwa), kaya
           maliit ang Dental Chart sa laptop. */}
       <section className="min-h-[420px] rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-        {/* 320px: mas maliit na gap at walang icon para kasya ang 3 tab nang walang scroll */}
+        {/* Tatlong tab: text-only sa phone, icons sa sm pataas para kasya. */}
         <div
-          className="mb-6 flex gap-2 overflow-x-auto border-b border-slate-200 min-[360px]:gap-4 sm:gap-6"
+          className="mb-6 flex gap-2 overflow-x-auto border-b border-slate-200 min-[360px]:gap-3 sm:gap-6"
           role="tablist"
           aria-label="Patient record"
           onKeyDown={handleTabKeyDown}
         >
           <button {...tabProps('history')}>
-            <ClipboardList className="hidden h-4 w-4 min-[360px]:block" aria-hidden="true" />
-            {/* Maikling label sa phone para kasya ang 3 tab (dati natatago ang X-rays) */}
+            <ClipboardList className="hidden h-4 w-4 sm:block" aria-hidden="true" />
+            {/* Maikling label sa phone para kasya ang lahat ng tab. */}
             <span className="sm:hidden">History</span>
             <span className="hidden sm:inline">Treatment History</span>
           </button>
           <button {...tabProps('chart')}>
-            <Grid3x3 className="hidden h-4 w-4 min-[360px]:block" aria-hidden="true" />
+            <Grid3x3 className="hidden h-4 w-4 sm:block" aria-hidden="true" />
             <span className="sm:hidden">Chart</span>
             <span className="hidden sm:inline">Dental Chart</span>
           </button>
           <button {...tabProps('xrays')}>
-            <ScanLine className="hidden h-4 w-4 min-[360px]:block" aria-hidden="true" />
+            <ScanLine className="hidden h-4 w-4 sm:block" aria-hidden="true" />
             X-rays
           </button>
         </div>
@@ -580,6 +588,7 @@ export default function PatientProfilePage() {
                   </button>
                 </div>
                 <DentitionSelector value={chartDentition} onChange={changeChartDentition} />
+                {selectedTooth && <span role="status" className="text-sm font-medium text-sky-700">Selected tooth: {selectedTooth}</span>}
               </div>
               <button
                 type="button"
@@ -596,11 +605,11 @@ export default function PatientProfilePage() {
 
             <div className="overflow-x-auto">
               {chartView === '2d' ? (
-                <Odontogram2D key={id} patientId={id} canEdit={isDentist} alerts={alerts} dateOfBirth={patient.date_of_birth} dentition={chartDentition} onDentitionChange={changeChartDentition} />
+                <Odontogram2D key={id} patientId={id} canEdit={isDentist} alerts={alerts} dateOfBirth={patient.date_of_birth} dentition={chartDentition} onDentitionChange={changeChartDentition} selectedTooth={selectedTooth} onToothSelect={selectChartTooth} />
               ) : (
                 <Chart3DErrorBoundary onSwitchTo2D={() => setChartView('2d')}>
                   <Suspense fallback={<PageLoader label="Loading 3D chart..." />}>
-                    <Odontogram3D key={id} patientId={id} canEdit={isDentist} onPendingChange={setHas3DPendingDrawing} alerts={alerts} dateOfBirth={patient.date_of_birth} dentition={chartDentition} onDentitionChange={changeChartDentition} />
+                    <Odontogram3D key={id} patientId={id} canEdit={isDentist} onPendingChange={setHas3DPendingDrawing} alerts={alerts} dateOfBirth={patient.date_of_birth} dentition={chartDentition} onDentitionChange={changeChartDentition} selectedTooth={selectedTooth} onToothSelect={selectChartTooth} />
                   </Suspense>
                 </Chart3DErrorBoundary>
               )}

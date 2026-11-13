@@ -4,7 +4,7 @@ export function listXrays(patientId) {
   return api.get(`/patients/${patientId}/xrays`).then((r) => r.data.xrays)
 }
 
-export function uploadXray(patientId, { file, notes, takenDate }) {
+export function uploadXray(patientId, { file, notes, takenDate, onUploadProgress }) {
   const formData = new FormData()
   formData.append('file', file)
   if (notes) formData.append('notes', notes)
@@ -12,6 +12,7 @@ export function uploadXray(patientId, { file, notes, takenDate }) {
   return api
     .post(`/patients/${patientId}/xrays`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
+      onUploadProgress,
     })
     .then((r) => r.data.xray)
 }

@@ -48,6 +48,8 @@ export default function Tooth({
   labelPosition = 'below',
   chartState,
   canEdit,
+  canInteract = canEdit,
+  selected = false,
   highlighted,
   onSurfaceClick,
   onWholeClick,
@@ -101,12 +103,13 @@ export default function Tooth({
       transform={`translate(${x},${y}) scale(${scale})`}
       filter="url(#tooth-shadow)"
       className={`group outline-none ${highlighted ? 'motion-safe:animate-[pulse_1s_ease-in-out_2]' : ''}`}
-      {...(canEdit
+      {...(canInteract
         ? {
             id: `tooth-${toothNumber}`,
             role: 'button',
             tabIndex,
             'aria-label': ariaLabel,
+            'aria-pressed': selected,
             onKeyDown: handleKeyDown,
             onFocus,
           }
@@ -115,7 +118,7 @@ export default function Tooth({
       {/* Mas malaking tap area (hanggang kalahati ng puwang sa katabing
           ngipin): sa tablet ~42px lang ang lapad ng ngipin. Ang pagtapik sa
           gilid ay bubukas sa Occlusal; sa modal itinatama ang surface. */}
-      {canEdit && (
+      {canInteract && (
         <rect
           x={-4}
           y={-4}
@@ -127,7 +130,7 @@ export default function Tooth({
         />
       )}
       {/* Focus ring (keyboard lang): SVG ay walang maaasahang CSS outline */}
-      {canEdit && (
+      {canInteract && (
         <rect
           x={-5}
           y={-5}
@@ -138,13 +141,13 @@ export default function Tooth({
           stroke="#6f2dbd"
           strokeWidth={3}
           pointerEvents="none"
-          className="opacity-0 group-focus-visible:opacity-100"
+          className={selected ? 'opacity-100' : 'opacity-0 group-focus-visible:opacity-100'}
         />
       )}
       {isMissing ? (
         <g
-          onClick={() => canEdit && onWholeClick(toothNumber)}
-          className={canEdit ? 'cursor-pointer transition-all duration-150 hover:brightness-90' : ''}
+          onClick={() => canInteract && onWholeClick(toothNumber)}
+          className={canInteract ? 'cursor-pointer transition-all duration-150 hover:brightness-90' : ''}
         >
           <title>{`Tooth ${toothNumber}: ${conditionLabel(wholeEntry.condition_code)}`}</title>
           <polygon
@@ -184,12 +187,12 @@ export default function Tooth({
                 stroke={UNMARKED_STROKE}
                 strokeWidth={0.75}
                 strokeLinejoin="round"
-                onClick={() => canEdit && onSurfaceClick(toothNumber, surfaceCode)}
+                onClick={() => canInteract && onSurfaceClick(toothNumber, surfaceCode)}
                 // Kulay ng primary buttons sa hover lang; babalik sa recorded
                 // condition color pag-alis ng pointer. Read-only/print: walang hover.
-                className={canEdit ? 'cursor-pointer transition-colors duration-150 hover:fill-sky-600 hover:stroke-sky-700' : ''}
+                className={canInteract ? 'cursor-pointer transition-colors duration-150 hover:fill-sky-600 hover:stroke-sky-700' : ''}
               >
-                {canEdit && <title>{`Tooth ${toothNumber}, ${surfaceLabel(surfaceCode)}`}</title>}
+                {canInteract && <title>{`Tooth ${toothNumber}, ${surfaceLabel(surfaceCode)}`}</title>}
               </polygon>
             )
           })}

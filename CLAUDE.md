@@ -2341,3 +2341,261 @@ Validation: full suite passed (28 tests); lint had no errors (existing warnings)
 This release includes the accumulated Adult/Baby tooth-set selection and age caution, shared chart toolbar, visible portal-account action, optional profile photos, and lazy/shared photo loading. All 28 tests and the production build passed; lint has no errors (existing warnings). Origin/main was fetched and matched the local main before preparing the commit.
 
 Aiven preflight found only migration 022 pending. Applied only 022_add_profile_photos.js to the configured Aiven database before pushing, then verified all four nullable photo_file/photo_version columns on users/patients and the migration record. Existing clinical/account records were preserved. This supersedes the earlier local-only migration status for this release. No credentials, local uploaded photos, diagnostic scripts, or screenshots are included in the commit.
+
+## Batch 1: tooth details and synchronized selection (2026-11-13)
+
+Completed A1/A3/E1 from the improvement checklist. The existing dentist condition editor now expands into both condition history and treatment history for the selected FDI tooth. Full-mouth consultations/procedures are included with an explicit Full mouth badge; records for other teeth are excluded. Each history resource has independent failure feedback and a retry action. Failed requests are not presented as an empty clinical history.
+
+Patients can click/tap teeth in both 2D and 3D to open a read-only panel with current recorded findings, dates, notes, and the same treatment/condition history. Empty or cleared surfaces are not described as healthy. Whole-tooth copies are collapsed in current findings while later surface changes and distinct notes remain visible. Patient panels contain no edit form or save/delete controls. Existing authenticated patient ownership checks and dentist-only write routes remain in force; no new endpoint, database migration, or dependency was needed.
+
+Selected tooth state belongs to the patient profile, survives 2D/3D switching, and works with adult and baby teeth. A purple SVG outline in 2D and a purple silhouette in 3D identify selection without overwriting condition colors. Selection is scoped to its patient and shown only in the matching dentition; switching renderers does not reopen an editor. Keyboard navigation/Enter works for patient 2D inspection. Pen drafts, unsaved-drawing safeguards, and print charts retain their behavior; print charts have no interactive selection or highlight. The existing purple UI and modal components are reused.
+
+| File | Type | Purpose |
+|---|---|---|
+| `client/src/components/chart/ToothHistory.jsx` | NEW | Shared read-only history, tooth/full-mouth treatment filtering, independent errors and retry. |
+| `client/src/components/chart/ToothDetailsModal.jsx` | NEW | Patient viewing panel for current findings and history. |
+| `client/src/utils/toothDetails.js` | NEW | FDI treatment filtering and safe whole-tooth finding deduplication. |
+| `client/src/components/chart/ChartEntryModal.jsx` | MODIFIED | Use shared history inside the existing dentist editor. |
+| `client/src/pages/PatientProfilePage.jsx` | MODIFIED | Shared, patient-scoped tooth selection and selected-tooth label. |
+| `client/src/components/chart/Odontogram2D.jsx`, `Tooth.jsx` | MODIFIED | Patient inspection, keyboard access, persistent selected outline, non-interactive print mode. |
+| `client/src/components/chart/Odontogram3D.jsx`, `Tooth3D.jsx` | MODIFIED | Patient surface inspection, shared selection, separate visual outline, retained edit/paint permissions. |
+| `client/test/toothDetails.test.js` | NEW | Tooth/dentition treatment isolation, full-mouth inclusion, surface overrides, distinct notes, and unrecorded/cleared findings. |
+| `CLAUDE.md` | MODIFIED | Document scope and verification. |
+
+Validation: all 31 tests passed. Lint has no errors (existing warnings), and the production build passed. Headless Edge exercised 29 checks using intercepted fictional patient records: dentist history and save, 2D/3D selection in both directions, adult/baby selection, patient read-only 2D/3D clicks and keyboard inspection, phone layout, unrecorded/extracted findings, independent request failures and retry, patient selection isolation during SPA navigation, and non-interactive print charts. The patient flow issued zero writes; a dentist save was checked against its exact mock request and refreshed chart. No unmatched endpoints or runtime exceptions. Desktop and phone captures were visually inspected. No live patient/account data was changed, and no commit/push/deployment was performed.
+
+## 2D edge highlight clipping fix (2026-11-13)
+
+| File | Type | Purpose |
+|---|---|---|
+| `client/src/components/chart/Odontogram2D.jsx` | MODIFIED | Add symmetric 12-unit horizontal SVG padding so the first/last teeth's selection/focus outlines, strokes, and shadows fit inside the viewport. Shared layout applies to adult and baby teeth without changing condition colors or surface hit targets. |
+
+Validation: 32 headless Edge checks passed for all eight outer teeth (18/28/48/38 and 55/65/85/75), both dentist and patient roles, at desktop 1366px and phone 390px. Measured the entire selected outline including stroke against both SVG and scroller bounds after focusing each edge tooth; desktop screenshots were visually inspected. Production build passed; lint has no errors (existing warnings). No clinical data or database changes.
+
+## Batch 2: X-ray viewing, upload progress, and review status (2026-11-13)
+
+Completed C1/C2/C4/E2/E4 from the improvement checklist. The existing X-ray viewer now has an explicit Pan tool (mouse/touch and keyboard-scrollable viewport), Show/Hide annotations, and a collapsible Adjust image bar with brightness/contrast sliders and Reset adjustments. Clicking the zoom percentage fits the image again; zoom is proportional and can fit large panoramic/portrait images on phones. Explicit wrapper/image dimensions and max-w-none prevent responsive image CSS from distorting the enlarged image or blocking horizontal panning. Adjustments affect only the image's CSS filter; hiding annotations changes overlay visibility only. Neither changes stored files, annotation coordinates, saved payloads, or print data. Pending annotations and the existing discard confirmation survive tool changes, failures, and metadata refreshes. Patient accounts have viewing controls without dentist annotation actions. PDF files use an authenticated original-document link instead of unsupported image controls; file-load failures have a Retry file action.
+
+UploadXrayForm now receives native Axios upload progress through the existing service. It shows percentage when the browser knows the total, indeterminate progress otherwise, and Upload sent. Saving X-ray after sending 100% while waiting for the server response. Success is shown only after the upload request succeeds. File changes/removal and editable fields are disabled in flight; an immediate request guard prevents double submission. Errors keep the selected file for retry. Background gallery refreshes retain the form/viewer instead of unmounting them.
+
+A shared review badge shows New/Waiting for review or Reviewed based on source and the server's saved reviewed_at. Clinic uploads without a review timestamp are not mislabeled as pending patient submissions. Gallery, viewer, and inbox reuse this status. The existing server behavior of marking patient submissions reviewed on dentist file access is unchanged; a silent metadata refresh after opening a file updates the viewer badge without dropping annotation drafts. Existing authentication, record ownership, and write permissions remain in force. No backend/schema changes or new dependencies.
+
+| File | Type | Purpose |
+|---|---|---|
+| `client/src/components/xray/XrayViewer.jsx` | MODIFIED | Viewing adjustments, explicit pan, annotation visibility, fit/zoom, correct image sizing, file retry/PDF fallback. |
+| `client/src/components/xray/UploadXrayForm.jsx` | MODIFIED | Native upload progress, server-saving phase, guarded submission and retry. |
+| `client/src/services/xrays.js` | MODIFIED | Forward onUploadProgress through the existing multipart request. |
+| `client/src/components/xray/PatientXraysSection.jsx` | MODIFIED | Silent request-versioned metadata refresh preserving viewer/form state and drafts. |
+| `client/src/components/xray/XrayGallery.jsx`, `client/src/pages/XrayInboxPage.jsx` | MODIFIED | Consistent pending/reviewed presentation. |
+| `client/src/components/xray/XrayReviewBadge.jsx` | NEW | Shared status badge using saved review metadata. |
+| `client/src/utils/xrayView.js` | NEW | Fit bounds, upload progress normalization, review labels. |
+| `client/test/xrayView.test.js` | NEW | Panoramic/portrait fitting, known/unknown progress totals and review-source semantics. |
+| `CLAUDE.md` | MODIFIED | Document implementation and verification. |
+
+Validation: all 34 tests passed; production build passed; lint has no errors (existing warnings). Headless Edge passed 19 viewer checks plus two metadata/draft checks: CSS-only adjustments, unchanged annotation pixels, hide/show, mouse/touch pan, phone controls, readonly patient access, PDF fallback, file retry, metadata changes, pen drawing and save/retry payloads, print handoff, and missing metadata without draft loss. Ten additional browser checks used real native XHR multipart transfers under network throttling to a temporary localhost-only mock server: rejected invalid/oversized files, intermediate upload percentages, waiting after 100%, success/reset/status, failure retention, retry, and duplicate-submission prevention. No live server/database/Cloudinary uploads were used; mock server and browser were closed. Screenshots were visually inspected. No commit/push/deployment.
+
+## X-ray +/− zoom focus and fitted-image limit fix (2026-11-13)
+
+The user reported that viewer +/− zoom felt like the image was being pulled. Browser measurements confirmed proportional scaling, but the previous upper-left anchor moved the inspected area away from the viewport center, and the fixed 400% native-size ceiling could stop zoom on small images. Button zoom now records the image point at the viewport center and restores it in useLayoutEffect after resizing, including after panning. A scroll-safe centered grid keeps the image/annotation overlay centered whenever an axis fits; explicit dimensions retain the original aspect ratio. Browser scroll anchoring is disabled inside this manually controlled viewport.
+
+Initial Fit uses the available full viewer box without transient scrollbar subtraction and can enlarge small source files beyond 400%. The user-zoom ceiling is at least eight times the fitted scale (with the prior 400% baseline available for larger sources). The zoom percentage remains relative to source pixels, and clicking it restores Fit. Mouse-wheel behavior remains native scrolling; the reported issue was specifically the viewer's +/− buttons.
+
+| File | Type | Purpose |
+|---|---|---|
+| `client/src/components/xray/XrayViewer.jsx` | MODIFIED | Center-preserving +/− zoom, scroll-safe centering, scrollbar-independent Fit, fit-relative zoom ceiling. |
+| `client/src/utils/xrayView.js` | MODIFIED | Remove the native-size upper cap from initial Fit. |
+| `client/test/xrayView.test.js` | MODIFIED | Verify that small sources fit the viewport even above 400%. |
+| `CLAUDE.md` | MODIFIED | Record cause, behavior, and validation. |
+
+Validation: all three targeted X-ray utility tests passed. Headless Edge passed 45 measured zoom checks across panoramic, portrait, and small images on desktop 1366px and phone 390px: actual rendered width/height increase and decrease proportionally, focal point stays in place, small images zoom past the old cap, overlays match image bounds, pan remains usable, and Fit restores the complete image. Five additional checks verified centered zoom after panning, real pen/text placement and saved coordinates at zoom, annotation-only save payloads, and no app runtime exceptions/unmatched endpoints. Used only mock records and generated test images; no live files or patient records were changed. Production build passed; lint has no errors (existing warnings).
+
+## Batch 3: dashboard reporting dates and record drill-down (2026-11-13)
+
+Local implementation of D1/D3/D4, retaining the existing purple overview, patient-first sections, chart palette, and existing hover/focus values (D2). Reporting presets: this month (default), last month, last 6 months, last 12 months, and a custom inclusive range of up to 24 calendar months. Treatment totals, procedure counts and monthly treatment activity use treatment date; X-ray totals use upload date. Monthly registrations use patient creation date. All queries honor both range boundaries, including partial months, and months without activity remain zero-filled. Deleted patients are excluded; deleted X-rays are excluded from totals and record lists.
+
+Active patients links to the existing patient list. Treatment and X-ray totals open paginated matching records; procedure rows open the exact procedure filter. Nonstandard/legacy procedure names get individual rows in the existing Other category so each drill-down remains unambiguous. Record links pass patient code and the appropriate history/X-rays tab through existing router state; patient identifiers remain absent from the address bar. The record panel shows patient name and birth date, record date, procedure/tooth or filename/review status, and has loading, empty and retry states.
+
+The active patient count remains all active records. Tooth conditions remain the current chart snapshot; recent patients, needs-attention items and recent activity remain current, independent of the reporting range. These scopes are explicitly labeled. Long monthly charts scroll within their panel, without overflowing the page. The range-scoped cache deduplicates requests, retains at most six ranges, clears on logout and prevents pre-logout responses from repopulating it. Page effects ignore superseded responses; totals and procedure controls wait for the selected range rather than opening old results. Request errors appear near the reporting controls with Retry. Both dashboard endpoints retain authentication and dentist-only server authorization, and reads are audited. No migration, new dependency, production write, commit or push.
+
+| File | Type | Purpose |
+|---|---|---|
+| `client/src/pages/DashboardPage.jsx` | MODIFIED | Reporting range, clickable statistics, exact procedure selection, scoped loading/errors and matching-record panel. |
+| `client/src/components/dashboard/DashboardDateFilter.jsx` | NEW | Reporting presets and accessible inline custom-date validation. |
+| `client/src/components/dashboard/DashboardRecordsModal.jsx` | NEW | Paginated read-only matches and patient/tab links, with empty/error/retry states. |
+| `client/src/components/dashboard/HorizontalBarChart.jsx` | MODIFIED | Optional accessible procedure buttons; retain palette, scaling and exact values. |
+| `client/src/components/dashboard/MonthlyTrendChart.jsx` | MODIFIED | Selected-period labels, year labels for longer ranges, contained horizontal scrolling and tap/focus tooltips. |
+| `client/src/services/dashboard.js` | MODIFIED | Range-scoped request/cache handling, logout generation guard and record-list API wrapper. |
+| `client/src/utils/dashboardRange.js` | NEW | Clinic-date presets and range validation. |
+| `server/src/utils/dashboardRange.js` | NEW | Strict range validation and calendar-month keys. |
+| `server/src/models/dashboardModel.js` | MODIFIED | Bounded aggregates, zero-filled monthly data and parameterized, paginated record reads using matching count/list filters. |
+| `server/src/controllers/dashboard.controller.js` | MODIFIED | Validate dates and record filters, return the authoritative range, audit reads. |
+| `server/src/routes/dashboard.routes.js` | MODIFIED | Dentist-only GET /dashboard/records alongside the existing dashboard endpoint. |
+| `client/test/dashboardRange.test.js` | NEW | Year-boundary/leap-year presets and invalid custom ranges. |
+| `server/test/dashboard.test.js` | NEW | Range validation, early request rejection, both route role gates, bound procedure names, deletion/date predicates and zero-filled cross-year months. |
+| `CLAUDE.md` | MODIFIED | Record implementation and validation. |
+
+Validation: all 41 repository tests passed; the seven new targeted tests also passed after the final range change. Thirty browser checks passed with isolated mock API responses: 360/768/1024/1366px layout, totals and exact procedure filters, pagination, patient history/X-ray routing, presets, custom ranges, long charts, exact-value focus, invalid dates, failed-request retry, empty matches, stale-result blocking, patient role exclusion and no app runtime exceptions/unmatched endpoints or patient writes. Final production build passed; client lint passed with existing warnings and no errors. Browser fixtures and model mocks did not connect to the live database.
+
+## Dashboard filter follow-up: automatic selection and All time (2026-11-13)
+
+Supersedes Batch 3's initial current-month default and separate Apply dates card. The Reporting period selector now sits inside the existing purple Clinic overview panel, alongside the title and the explicit Showing label, above the clickable totals. All time is the default and can be reselected after any filter. Presets update immediately; complete, valid custom dates apply after a 350ms input debounce. Incomplete or invalid custom drafts keep the last valid report visible with its actual scope labeled; errors appear alongside the inputs. The Apply dates button and separate white filter card are removed. Desktop and mobile retain the existing brand/UI patterns.
+
+All time is represented explicitly as period=all, including in the cache key and matching-record requests. The server also defaults an omitted/empty date filter to All time. All-time aggregates and matching lists omit date predicates, retaining older imported treatments and records beyond the custom 24-month limit. The monthly chart starts with the earliest recorded patient/treatment activity and zero-fills through the current/latest activity month. Custom date ranges retain strict validation and the existing 24-calendar-month limit. Patient/deleted-record exclusions, dentist authorization and auditing remain in place. The record panel labels All time correctly; bounded date filters retain inclusive labels.
+
+| File | Type | Purpose |
+|---|---|---|
+| `client/src/components/dashboard/DashboardDateFilter.jsx` | MODIFIED | Automatic presets/custom dates, All time option, compact controls for the purple panel. |
+| `client/src/pages/DashboardPage.jsx` | MODIFIED | Integrated overview layout, stable range change callback, accurate All time/current range labels. |
+| `client/src/components/dashboard/DashboardRecordsModal.jsx` | MODIFIED | All time label for unbounded matching records. |
+| `client/src/services/dashboard.js` | MODIFIED | Cache distinguishes All time from bounded dates. |
+| `client/src/utils/dashboardRange.js` | MODIFIED | All time default and shared range-key helper. |
+| `server/src/utils/dashboardRange.js` | MODIFIED | All time default, explicit period validation and rejection of conflicting/partial date filters. |
+| `server/src/models/dashboardModel.js` | MODIFIED | Unbounded totals/procedures/record reads, all-history monthly trend without custom-range truncation. |
+| `client/test/dashboardRange.test.js` | MODIFIED | Default All time and independent cache keys. |
+| `server/test/dashboard.test.js` | MODIFIED | All time validation, older records retained in aggregates/trend/drill-down, bounded-range regression checks. |
+| `CLAUDE.md` | MODIFIED | Record revised behavior and checks. |
+
+Validation: eight targeted tests passed; production build and client lint passed (existing warnings, no errors). Twenty-one headless Edge checks passed using mock records: All time default/reset and unbounded drill-down, no Apply button, controls inside the existing purple overview, immediate preset changes, incomplete/invalid custom drafts held without requests, automatic valid custom application/recovery, older all-history activity, and default/custom layouts at 360/768/1024/1366px. Desktop/phone screenshots were visually inspected. No app runtime errors, unmatched fixture requests or patient record writes. No database migration, dependency, commit or push.
+
+## Selective overview hover and restored subtle UI states (2026-11-13)
+
+Clinic overview is now a white bordered card with dark labels, purple figures and the existing automatic All time/date controls. Only the individual statistic under the pointer gets the magenta/purple background with white labels. The containing card, heading, filter and neighboring statistics stay white. Disabled statistics do not gain hover colors. The previous broad hover override was removed: patient rows, recent patients, profile tabs, audit checkbox labels, navigation, links, menus and other controls retain their existing component-specific hover styles. Existing primary purple button hover remains. Clinical chart colors, status badges, avatars, medical alerts and danger states retain their original styling; temporary global-hover attributes were removed from Avatar, StatusBadge and AppLayout.
+
+| File | Type | Purpose |
+|---|---|---|
+| `client/src/pages/DashboardPage.jsx` | MODIFIED | White overview, dark labels/purple figures and explicit overview-stat targets. |
+| `client/src/components/dashboard/DashboardDateFilter.jsx` | MODIFIED | Appropriate dark labels, borders, field focus and readable validation for the white overview. |
+| `client/src/index.css` | MODIFIED | Small, pointer/screen-only hover rule for enabled overview-stat elements and their immediate labels; no global interactive overrides. |
+| `CLAUDE.md` | MODIFIED | Document final selective design and validation. |
+
+Validation: 16 browser checks passed using mock records, including white card and unchanged neighboring figures while hovering one statistic, reset on mouse leave, readable dropdown, restored recent-patient/medical alert styles, original primary button hover, subtle patient rows/profile tabs/audit labels, disabled statistics, and viewport fit at 360/768/1024/1366px. Visually inspected a hovered overview screenshot. Production build passed; lint passed with existing warnings and no errors. No patient record writes, backend change, commit or push.
+
+## Batch 4: patient timeline, quick preview and missing information (2026-11-13)
+
+Local implementation of B1/B3/B4 and E3. The existing allergy/medical history alerts and health-question warnings (B2) are reused. Patient records now have a Timeline tab alongside the original History, Chart and X-rays tabs. It combines consultation records, other treatments and X-ray metadata, newest date first and grouped by clinical calendar day. Consultation is a separate filter, not a duplicated treatment event. X-rays use the taken date when available, otherwise their upload date; the row distinguishes taken/uploaded dates. Unknown dates remain visible in a separate final group. Type filters show All activity, Consultations, Treatments or X-rays. Initially 30 matching rows render, with Show more for longer histories. Existing treatment history and X-ray tabs remain available through explicit row actions.
+
+The same timeline is available read-only in the patient portal and uses the existing owner-scoped selection and authorized endpoints. It reads only X-ray metadata: no file/thumbnail fetch or review-status write occurs just by opening the timeline. Existing review badges are reused. Partial source failures retain available records and show which source failed with Retry; an unavailable source is not represented as a complete empty history. Data requests ignore stale/unmounted responses.
+
+A visible eye button in the dentist's desktop/mobile patient list opens a quick preview without leaving the list. It reads the existing audited patient endpoint and shows identity/birth date, contact information, emergency contact, last recorded visit, existing medical alerts and relevant health answers. The panel supports loading/error/retry, uses the shared Modal and links to the correct full record through existing router state. Patient row/name navigation remains unchanged.
+
+The profile and preview show a collapsible amber notice identifying blank required fields. It mirrors current registration presence requirements, including conditional Other relationship detail, without making optional email/history/health questions required. None is a recorded allergy answer, not missing information. Dentists can open the existing guarded patient editor from the profile notice; portal users are told to ask the clinic to update details. No existing record is rewritten automatically. Profile tabs keep keyboard navigation and all four labels fit at phone widths; phone text is compact, desktop layout remains familiar. Latest selective dashboard hover and existing clinical colors remain unchanged.
+
+| File | Type | Purpose |
+|---|---|---|
+| `client/src/pages/PatientsListPage.jsx` | MODIFIED | Explicit preview eye controls on desktop/mobile, isolated from row navigation. |
+| `client/src/pages/PatientProfilePage.jsx` | MODIFIED | Timeline tab for both roles, missing-field notice, existing edit action and four-tab keyboard/mobile layout. |
+| `client/src/components/patients/PatientPreviewModal.jsx` | NEW | Audited, read-only quick preview, reused alerts, error/retry and full-record link. |
+| `client/src/components/patients/PatientTimeline.jsx` | NEW | Combined metadata timeline, type filters, day grouping, progressive rendering and partial-source retry. |
+| `client/src/components/patients/MissingPatientInfo.jsx` | NEW | Required-field notice with exact labels and role-appropriate next action. |
+| `client/src/utils/patientCompleteness.js` | NEW | Presence-only completeness helper for existing required fields. |
+| `client/src/utils/patientTimeline.js` | NEW | Clinic-date normalization, distinct event keys/types, deterministic chronological sort and date groups. |
+| `client/test/patientRecords.test.js` | NEW | Required/optional/conditional fields, timezone/leap dates, source preservation, event identity/order and undated groups. |
+| `CLAUDE.md` | MODIFIED | Record implementation and checks. |
+
+Validation: all 47 repository tests passed (including five new patient-record tests). Thirty headless Edge checks passed with isolated mock records: preview without route navigation, medical/health warnings, exact missing fields, preview retry, correct patient/full-record link, existing edit integration, combined timeline/order/type filters, metadata-only X-ray reads without review mutation, partial-failure retry, 30-row expansion, empty history, read-only own-record portal access despite alternate router state, and role-appropriate missing-info guidance. Preview layout checked at 360/768/1024/1366px and profile/timeline tabs at 320/360/768/1024/1366px. Preview/timeline screenshots visually inspected. Production build and lint passed (existing warnings, no errors). No app runtime exceptions, unmatched fixture endpoints or patient writes. No new API, database migration, dependency, production action, commit or push.
+
+## Batch 5: exact audit filters and expandable recorded details (2026-11-13)
+
+Audit Log now has searchable exact User and Patient selectors alongside existing keyword/action/date filters. User selection can identify the dentist, patient accounts, former accounts with retained audit references, or System / no account. Patient choices come from audit history, include birth dates for same-name records and retain soft-deleted patients. The filter-options endpoint is dentist-only, caps each result at 20, supports debounced search and indicates when more search refinement is needed. Selected IDs/codes are used only as request identities, never displayed as record numbers. Exact user/patient filters combine with existing filters using AND and reset pagination to page 1. Date filters validate real dates and ordering and include the entire end day through an exclusive next-day bound. Clear filters also resets the routine-event toggle. Request failures have Retry and do not display stale rows; superseded responses are ignored. The combobox supports keyboard selection, Escape, clear, retry and reopening while its input remains focused.
+
+Each event/group has View details. Desktop expands into a full-width row below its compact summary, avoiding a tall narrow details cell; mobile/tablet cards expand inline. Grouped events retain individual action/time/actor/IP and safe recorded descriptions. Treatment Before/After values appear only when actually stored; older previous-only events are labeled Previously recorded with no after-values invented. Events without extra recorded data say so. Newly updated patient events record changed field names, and future treatment edits record current as well as previous clinical fields. Patient updates do not copy address/phone/medical field values into changedFields. Grouping now uses stable patient/entity identity, actor, IP and day, so same-name patients or different IPs are not silently merged.
+
+Audit API details are projected through an allowlist without changing stored historical logs. Password/token-like unknown payload fields, clinical notes, internal detail IDs and server/archive paths are omitted from responses. Only documented primitive metadata, changed field names and selected clinical snapshot fields are rendered; unknown fields are not dumped as JSON in the UI. Existing account/patient/date access remains authenticated and dentist-only, and audit/filter reads are themselves audited. Existing import row validation and result counts already cover the original import recommendations and were retained. No migration, dependency, production record edit, commit or push.
+
+| File | Type | Purpose |
+|---|---|---|
+| `client/src/pages/AuditLogPage.jsx` | MODIFIED | Exact selectors, grouped date controls, filter reset, request cancellation/retry and full-width desktop disclosures. |
+| `client/src/components/audit/AuditEntityFilter.jsx` | NEW | Accessible searchable single-choice selector with bounded results, keyboard, clear and retry. |
+| `client/src/components/audit/AuditEventDetails.jsx` | NEW | Safe event descriptions and recorded Before/After/deleted values, shared by table/card displays. |
+| `client/src/services/auditLogs.js` | MODIFIED | Exact selector request parameters and filter-options API. |
+| `client/src/utils/auditAction.js` | MODIFIED | Known metadata summaries and stable grouping identities/IP/day. |
+| `client/src/utils/auditDetails.js` | NEW | Selected clinical snapshot rows with readable values and no raw payload rendering. |
+| `server/src/models/auditLogModel.js` | MODIFIED | Matching count/page predicates, exact identities, historical participant choices and safe detail projection. |
+| `server/src/controllers/auditLog.controller.js` | MODIFIED | Strict selector/date validation and audited filter-option reads. |
+| `server/src/routes/auditLog.routes.js` | MODIFIED | Dentist-only filter-options endpoint. |
+| `server/src/controllers/patients.controller.js` | MODIFIED | Record changed patient field names and current treatment state for future updates. |
+| `server/src/utils/auditFilters.js` | NEW | Exact identity/date validation before database access. |
+| `server/src/utils/auditDetails.js` | NEW | API detail allowlist and patient field-name comparison. |
+| `client/test/auditDetails.test.js` | NEW | Safe clinical formatting and separate grouping for same-name patients/different IPs. |
+| `server/test/auditLog.test.js` | NEW | Filter validation, all route role gates, bound/consistent SQL, deleted history, bounded options and redaction. |
+| `CLAUDE.md` | MODIFIED | Record behavior, historical limitations and validation. |
+
+Validation: all 55 repository tests passed, including eight new audit tests. Twenty-five browser checks passed using isolated mock logs: expanded stored before/after and legacy no-data behavior, no private note/password/path rendering, individual grouped events, user/patient combinations, same-name identity, deleted/system filters, keyboard selection, pagination reset, invalid date blocking, full clear, lookup/list retry, superseded-response handling, 360/768/1024/1366px layouts, mobile dropdown containment and patient-role exclusion. Four additional final-layout checks passed after grouping the date fields, for 29 browser checks total. Desktop/phone screenshots were visually inspected, including full-width desktop expansion. Final build and lint passed (existing warnings, no errors). No unmatched fixture requests, app runtime exceptions or patient record writes. Browser fixtures and model mocks did not use the live database.
+
+## Batch 6: chart comparison, Undo/Redo and X-ray slider (2026-11-14)
+
+Compare charts opens read-only 2D snapshots through two selected calendar dates, from either chart view and the patient's own portal. Dates apply automatically after validation; adult/baby selection switches both snapshots together. Differences include conditions, notes, drawings and removals. Blank surfaces mean unmarked, not recorded healthy findings. Comparison charts fit their panels and preserve clinical colors. These are reconstructed retained entries, not immutable snapshots: treatment edits/deletions can alter which older entries remain. The modal explains this limitation.
+
+Dentists can Undo/Redo up to 20 recent saved chart actions across 2D/3D switches in the current profile session. Saves, clears and saved drawings return signed 30-minute receipts containing row IDs/hashes without note/drawing payloads. Restoration appends entries transactionally and preserves Treatment History. Patient-row locks serialize chart and linked-treatment writers. Version checks reject concurrent changes, including same-value saves; signed continuation proofs permit consecutive local Undo/Redo despite newly appended restore rows. Altered/missing source rows, changed linked treatments and expired receipts produce conflicts that reset client history and refresh the chart. Saved Undo/Redo is disabled while 3D draft history remains.
+
+The 3D pen has draft Undo/Redo, with one pointer stroke per operation even across UV/surface segments. Saving a surface prunes only its saved segments from every draft history state so Redo cannot resurrect saved ink. Discard clears draft history; existing navigation guards also protect redoable drafts. Controls wrap on small screens. X-ray annotations have bounded Undo/Redo and an undoable Remove last mark action for saved annotations. New edits clear the redo branch; Save remains explicit and the existing close guard checks unsaved changes.
+
+X-ray comparison keeps fullscreen side-by-side viewing and adds a reveal slider for two images, controlled by pointer drag or an accessible range input. Manual overlay position, size and rotation, Swap and Reset affect viewing only. PDFs remain available through side-by-side document links. Failures have Retry; object URLs are revoked on close/retry, including late responses. Dentist file access refreshes review metadata without reopening comparison. No new dependency or database migration; selective dashboard hover and existing branding are preserved.
+
+| File | Type | Purpose |
+|---|---|---|
+| `server/src/services/chartUndoService.js` | NEW | Signed receipts/proofs, serialized transactions and append-only restoration with conflict/source checks. |
+| `server/src/models/chartModel.js` | MODIFIED | Receipt-bearing saves/clears and consistent-read date comparison. |
+| `server/src/models/treatmentModel.js` | MODIFIED | Shared patient lock for linked treatment changes and receipt-bearing chart/treatment saves. |
+| `server/src/controllers/chart.controller.js`, `server/src/routes/chart.routes.js` | MODIFIED | Owner-scoped comparison, dentist-only restore, validation and audit events. |
+| `server/src/controllers/patients.controller.js` | MODIFIED | Authorized patient identity for serialized treatment deletion. |
+| `client/src/hooks/useChartUndo.js` | NEW | Patient-scoped saved history, continuation proofs and conflict refresh. |
+| `client/src/utils/editHistory.js`, `client/src/utils/chartComparison.js` | NEW | Bounded draft/annotation history and semantic differences. |
+| `client/src/components/chart/ChartComparisonModal.jsx` | NEW | Date/dentition controls, read-only paired charts and differences. |
+| `client/src/components/chart/Odontogram2D.jsx`, `client/src/components/chart/Odontogram3D.jsx` | MODIFIED | Saved history callbacks, static snapshots and 3D draft Undo/Redo/pruning. |
+| `client/src/pages/PatientProfilePage.jsx` | MODIFIED | Shared history controls, comparison and guarded chart refresh. |
+| `client/src/components/xray/XrayViewer.jsx` | MODIFIED | Undo/Redo and undoable removal of annotations. |
+| `client/src/components/xray/CompareView.jsx`, `client/src/components/xray/PatientXraysSection.jsx` | MODIFIED | Reveal/alignment, file handling and review metadata refresh. |
+| `client/src/services/chart.js`, `client/src/utils/auditAction.js` | MODIFIED | API clients and action labels. |
+| `client/test/editHistory.test.js`, `server/test/chartUndo.test.js` | NEW | History, conflicts, authorization, rollback, reference preservation and comparison tests. |
+| `CLAUDE.md` | MODIFIED | Document behavior and validation. |
+
+Validation: all 66 repository tests passed, including 11 new tests. Server tests use an isolated transactional fake database. Forty-one headless Edge checks passed with fictional API fixtures: date validation/automatic refresh, read-only adult/baby snapshots and portal access, consecutive saved Undo/Redo, conflict reset, 3D draft Undo/Redo and partial-save pruning, saved 3D undo, slider reveal/drag/alignment/swap/reset, PDF fallback, annotation deletion/pen Undo/Redo and redo branching. Layout checks cover 320/768/1366px; comparison and slider screenshots were visually inspected. No app exceptions or unmatched fixture requests. Production build passed; lint has existing warnings and no errors. The dentist's account identity is preserved. No live database writes, production action, commit or push.
+
+
+## Remove redundant patient timeline and dental chart comparison (2026-11-14)
+
+The user requested a simpler patient record. This supersedes the Timeline portions of Batch 4 and dental chart comparison portions of Batch 6 above. Dentist and patient profiles now have only Treatment History, Dental Chart and X-rays. The Timeline tab/component/helper were removed; an obsolete `tab: 'timeline'` navigation state falls back to Treatment History. Keyboard navigation follows the three remaining tabs.
+
+Compare charts was removed from the shared 2D/3D toolbar, together with its modal, helper, client API, server endpoint/controller/query and comparison-only rendering props/tests. No stored patient, treatment, chart or X-ray records were deleted. The historical comparison audit label remains readable for retained audit events. Original chart editing, tooth details/history, printing, adult/baby selection, saved/draft Undo/Redo, patient preview, missing-info notices and X-ray comparison/slider remain available.
+
+| File | Type | Purpose |
+|---|---|---|
+| `client/src/pages/PatientProfilePage.jsx` | MODIFIED | Three tabs, updated keyboard order/fallback and chart comparison removal. |
+| `client/src/components/patients/PatientTimeline.jsx`, `client/src/utils/patientTimeline.js` | REMOVED | Remove timeline-specific UI and helpers. |
+| `client/src/components/chart/ChartComparisonModal.jsx`, `client/src/utils/chartComparison.js` | REMOVED | Remove dental chart comparison UI and helper. |
+| `client/src/components/chart/Odontogram2D.jsx`, `client/src/services/chart.js` | MODIFIED | Remove comparison-only snapshot props/API; preserve standard chart loading/history. |
+| `server/src/models/chartModel.js`, `server/src/controllers/chart.controller.js`, `server/src/routes/chart.routes.js` | MODIFIED | Remove unused comparison query/handler/route, preserve restore. |
+| `client/test/patientRecords.test.js`, `client/test/editHistory.test.js`, `server/test/chartUndo.test.js` | MODIFIED | Remove obsolete feature tests and retain completeness/history/restore authorization checks. |
+| `CLAUDE.md` | MODIFIED | Record the final simplified scope. |
+
+Validation: 62 remaining automated tests and 13 browser checks passed. Browser checks cover the three tabs, obsolete-tab fallback, keyboard navigation, retained treatment history, 2D editor/tooth history, 3D pen/saved history, X-ray slider, read-only portal and 320/768/1366px layout. No app exceptions or unmatched fixture requests. Production build and lint passed (existing warnings, no errors). Local browser checks use fictional fixtures; no production database writes, commit or push.
+
+
+## Remove Undo/Redo and clarify chart-to-treatment sync (2026-11-14)
+
+The user requested removal of Undo/Redo while retaining Delete condition with confirmation, tooth history and X-ray comparison. This supersedes Batch 6's saved/draft/annotation Undo/Redo scope. The profile toolbar/history hook, 3D draft history and X-ray annotation history controls/state have been removed. 3D retains Review/Save Next Mark/Discard All with pending-draft navigation guards; X-rays retain Remove last mark, explicit annotation Save and unsaved-close protection. Saved condition deletion and tooth history are unchanged. Historical restore audit events remain readable.
+
+Signed undo receipts, continuation proofs and the restore API were removed. A smaller chartMutationService retains atomic chart/treatment writes and the shared patient lock, including scoped/stale-safe deletion. No stored treatment/chart records were removed. The chart sync flow still writes one treatment linked to the applicable surface(s), preserves 3D stroke data for a surface, and rolls back both treatment and chart changes if a write fails.
+
+The shared 2D/3D ChartEntryModal now always renders the Also add to Treatment History section. It is enabled and checked by default for performed-treatment conditions (e.g. Filled, Root Canal Treated, Crown, Extracted). Before selection or for findings (e.g. Decayed/Fractured), it stays disabled with an explanation; findings remain chart/tooth-history records and are not mislabeled as performed treatment. A matching existing linked treatment defaults unchecked with duplicate-prevention guidance.
+
+An existing refresh bug was also fixed: when the initial profile tab was Dental Chart, a synced treatment was not fetched on the first visit to Treatment History because the old first-visit guard skipped the reload. The guard now tracks the previous tab and reloads on every actual transition into Treatment History, including that first transition, while initial History loading remains handled by the profile loader.
+
+| File | Type | Purpose |
+|---|---|---|
+| `client/src/pages/PatientProfilePage.jsx` | MODIFIED | Remove saved Undo/Redo and correct first transition into Treatment History. |
+| `client/src/components/chart/ChartEntryModal.jsx` | MODIFIED | Persistent sync section with enabled/default/duplicate and finding guidance. |
+| `client/src/components/chart/Odontogram2D.jsx`, `client/src/components/chart/Odontogram3D.jsx` | MODIFIED | Remove receipt callbacks/history; retain save/delete and plain pending drafts. |
+| `client/src/components/xray/XrayViewer.jsx` | MODIFIED | Remove Undo/Redo; retain annotation state, removal, save and close guards. |
+| `client/src/hooks/useChartUndo.js`, `client/src/utils/editHistory.js` | REMOVED | Remove unused history infrastructure. |
+| `client/src/utils/penDrafts.js`, `client/test/penDrafts.test.js`, `client/src/components/chart/Tooth3D.jsx` | MODIFIED | Remove unused pen undo helper/test assertions and update comments. |
+| `server/src/services/chartUndoService.js` | REMOVED | Remove signed restore/history logic. |
+| `server/src/services/chartMutationService.js` | NEW | Preserve patient locking, scoped entry access and transactional commits/rollback without history tokens. |
+| `server/src/models/chartModel.js`, `server/src/models/treatmentModel.js` | MODIFIED | Use the simpler shared mutation transaction. |
+| `client/src/services/chart.js`, `server/src/controllers/chart.controller.js`, `server/src/routes/chart.routes.js` | MODIFIED | Remove restore endpoint/client/receipts; retain sync and deletion routes. |
+| `client/test/editHistory.test.js`, `server/test/chartUndo.test.js` | REMOVED | Remove tests for removed features. |
+| `server/test/chartTreatmentSync.test.js` | NEW | Verify client/server sync mapping, linked whole/surface/stroke saves, atomic rollback and treatment-preserving deletion/stale/owner checks. |
+| `CLAUDE.md` | MODIFIED | Document final scope, root cause and verification. |
+
+Validation: all 56 automated tests and 23 browser checks passed. Browser checks use fictional API fixtures: 2D/3D/pen sync, first History transition refresh, enabled/disabled/linked defaults, chart-only findings, delete confirmation/cancel/retained treatment, removed Undo/Redo, retained tooth history and X-ray slider, and 320/768/1366px editor layout. No app exceptions or unexpected endpoints. Four new server model/contract tests use an isolated transactional fake database. Production build passed; lint has existing warnings and no errors. No production data writes, migration, commit or push.

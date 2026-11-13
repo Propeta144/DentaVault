@@ -1,4 +1,16 @@
 import pool from '../config/db.js'
+import { monthKeys } from '../utils/dashboardRange.js'
+import { limitOffset } from '../utils/sqlLimit.js'
+import { clinicToday } from '../utils/validators.js'
+
+// All time ay walang date predicate, para kasama rin ang older imported records.
+function dateFilter(column, range) {
+  return range.period === 'all' ? '' : `AND ${column} >= :dateFrom AND ${column} < DATE_ADD(:dateTo, INTERVAL 1 DAY)`
+}
+
+function dateParams(range) {
+  return range.period === 'all' ? {} : { dateFrom: range.dateFrom, dateTo: range.dateTo }
+}
 
 export async function getActivePatientCount() {
   const [[{ count }]] = await pool.execute(
@@ -7,37 +19,40 @@ export async function getActivePatientCount() {
   return count
 }
 
-export async function getTreatmentsThisMonthCount() {
+export async function getTreatmentCount(range) {
   const [[{ count }]] = await pool.execute(
     `SELECT COUNT(*) AS count
      FROM treatments t
      JOIN patients p ON p.id = t.patient_id AND p.deleted_at IS NULL
-     WHERE t.treatment_date >= DATE_FORMAT(CURDATE(), '%Y-%m-01')`,
+     WHERE 1 = 1 ${dateFilter('t.treatment_date', range)}`,
+    dateParams(range),
   )
   return count
 }
 
-export async function getXraysThisMonthCount() {
+export async function getXrayCount(range) {
   const [[{ count }]] = await pool.execute(
     `SELECT COUNT(*) AS count
      FROM xray_images x
      JOIN patients p ON p.id = x.patient_id AND p.deleted_at IS NULL
-     WHERE x.created_at >= DATE_FORMAT(CURDATE(), '%Y-%m-01')`,
+     WHERE x.deleted_at IS NULL ${dateFilter('x.created_at', range)}`,
+    dateParams(range),
   )
   return count
 }
 
 // Count per procedure name — LAHAT ng pangalan (walang LIMIT), kasi ang
-// frontend na ang nag-aayos: fixed order para sa 7 standard procedures
-// (may sariling kulay bawat isa), at pinagsasama sa "Other" ang iba —
-// kailangang kumpleto dito para tama ang bilang ng "Other".
-export async function getProcedureBreakdown() {
+// frontend na ang nag-aayos: fixed order ng standard procedures, tapos
+// sariling row ang custom/legacy names para exact ang drill-down filter.
+export async function getProcedureBreakdown(range) {
   const [rows] = await pool.execute(
     `SELECT t.procedure_name, COUNT(*) AS count
      FROM treatments t
      JOIN patients p ON p.id = t.patient_id AND p.deleted_at IS NULL
+     WHERE 1 = 1 ${dateFilter('t.treatment_date', range)}
      GROUP BY t.procedure_name
      ORDER BY count DESC`,
+    dateParams(range),
   )
   return rows
 }
@@ -66,43 +81,66 @@ export async function getConditionBreakdown() {
   return rows
 }
 
-// Last 6 calendar months, zero-filled — kasi yung GROUP BY, months na may
+// Mga buwan sa selected range, zero-filled — kasi yung GROUP BY, months na may
 // rows lang ang ibinabalik, kaya kung wala nito, mawawala na lang sa
 // chart yung mga buwan na walang activity, sa halip na lumabas bilang
 // zero-height bar.
-export async function getMonthlyTrend() {
-  const now = new Date()
-  const months = []
-  for (let i = 5; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-    months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`)
-  }
-  const sixMonthsAgo = `${months[0]}-01`
-
+export async function getMonthlyTrend(range) {
   const [newPatientRows] = await pool.execute(
     `SELECT DATE_FORMAT(created_at, '%Y-%m') AS month, COUNT(*) AS count
      FROM patients
-     WHERE deleted_at IS NULL AND created_at >= :sixMonthsAgo
+     WHERE deleted_at IS NULL ${dateFilter('created_at', range)}
      GROUP BY month`,
-    { sixMonthsAgo },
+    dateParams(range),
   )
   const [treatmentRows] = await pool.execute(
     `SELECT DATE_FORMAT(t.treatment_date, '%Y-%m') AS month, COUNT(*) AS count
      FROM treatments t
      JOIN patients p ON p.id = t.patient_id AND p.deleted_at IS NULL
-     WHERE t.treatment_date >= :sixMonthsAgo
+     WHERE 1 = 1 ${dateFilter('t.treatment_date', range)}
      GROUP BY month`,
-    { sixMonthsAgo },
+    dateParams(range),
   )
 
   const newPatientsByMonth = Object.fromEntries(newPatientRows.map((r) => [r.month, r.count]))
   const treatmentsByMonth = Object.fromEntries(treatmentRows.map((r) => [r.month, r.count]))
+  const activityMonths = [...newPatientRows, ...treatmentRows].map((row) => row.month).sort()
+  const currentMonth = clinicToday().slice(0, 7)
+  const months = range.period === 'all'
+    ? monthKeys(`${activityMonths[0] || currentMonth}-01`, `${[currentMonth, ...activityMonths].sort().at(-1)}-01`)
+    : monthKeys(range.dateFrom, range.dateTo)
 
   return months.map((month) => ({
     month,
     newPatients: newPatientsByMonth[month] || 0,
     treatments: treatmentsByMonth[month] || 0,
   }))
+}
+
+// Parehong predicate ang count at list, para ang card/bar at drill-down ay
+// iisang bilang. Whitelisted ang table/column; bound parameters ang filters.
+export async function listDashboardRecords({ kind, procedure, period, dateFrom, dateTo, limit = 20, offset = 0 }, db = pool) {
+  const range = { period, dateFrom, dateTo }
+  const xray = kind === 'xrays'
+  const table = xray ? 'xray_images' : 'treatments'
+  const dateColumn = xray ? 'r.created_at' : 'r.treatment_date'
+  const where = `p.deleted_at IS NULL
+    ${xray ? 'AND r.deleted_at IS NULL' : ''}
+    ${dateFilter(dateColumn, range)}
+    ${!xray && procedure ? 'AND r.procedure_name = :procedure' : ''}`
+  const params = { ...dateParams(range), ...(!xray && procedure ? { procedure } : {}) }
+  const [[{ total }]] = await db.execute(
+    `SELECT COUNT(*) AS total FROM ${table} r JOIN patients p ON p.id = r.patient_id WHERE ${where}`, params,
+  )
+  const fields = xray
+    ? 'r.original_filename, r.created_at AS record_date, r.taken_date, r.source, r.reviewed_at'
+    : 'r.procedure_name, r.treatment_date AS record_date, r.tooth_number, r.surfaces'
+  const [rows] = await db.execute(
+    `SELECT r.id, p.patient_code, p.first_name, p.last_name, p.date_of_birth, ${fields}
+     FROM ${table} r JOIN patients p ON p.id = r.patient_id
+     WHERE ${where} ORDER BY ${dateColumn} DESC, r.id DESC ${limitOffset(limit, offset)}`, params,
+  )
+  return { rows, total }
 }
 
 // Patient-first na Dashboard: mga record na BLANGKO ang Allergies (hal.

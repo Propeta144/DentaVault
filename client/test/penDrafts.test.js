@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { groupPenDrafts, splitPenStroke, undoPenStroke } from '../src/utils/penDrafts.js'
+import { groupPenDrafts, splitPenStroke } from '../src/utils/penDrafts.js'
 
 test('pen drafts retain each condition across surfaces and teeth', () => {
   const drafts = [
@@ -17,13 +17,10 @@ test('pen drafts retain each condition across surfaces and teeth', () => {
   assert.equal(drafts[0].conditionCode, 'caries')
 })
 
-test('a stroke crossing surfaces is split; Undo removes the whole pointer stroke', () => {
-  const older = splitPenStroke('22', { conditionCode: 'filling', uv: [[.2, .5]] }, 'older')
+test('a stroke crossing surfaces keeps distinct segments', () => {
   const crossed = splitPenStroke('21', { conditionCode: 'caries', uv: [[.2, .5], [.2, .7], [.21, .71], [.2, .5]] }, 'crossed')
   assert.deepEqual(crossed.map((draft) => draft.surface), ['facial', 'occlusal', 'facial'])
   assert.equal(new Set(crossed.map((draft) => draft.id)).size, 3)
-  assert.deepEqual(undoPenStroke([...older, ...crossed]), older)
-  assert.deepEqual(undoPenStroke([]), [])
 })
 
 test('groups combine only matching tooth, surface, and condition; saved drafts can be removed without losing others', () => {

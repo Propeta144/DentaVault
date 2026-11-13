@@ -3,12 +3,12 @@ import { Link, useNavigate } from 'react-router-dom'
 import { Inbox, MailCheck, ScanLine, CheckCheck, ChevronLeft, ChevronRight, ArrowRight } from 'lucide-react'
 import { getXrayInbox, markXrayReviewed } from '../services/xrays'
 import { useToast } from '../context/ToastContext'
-import StatusBadge from '../components/common/StatusBadge'
 import EmptyState from '../components/common/EmptyState'
 import { SkeletonRows } from '../components/common/Skeleton'
 import { PROFILE_PATH, profileState } from '../utils/selectedPatient'
 import { listName } from '../utils/patientName'
 import { formatActivityTime, formatDate } from '../utils/formatDate'
+import XrayReviewBadge from '../components/xray/XrayReviewBadge'
 
 // X-ray Inbox (dentist): lahat ng X-ray na in-upload ng mga pasyente sa
 // patient portal (#27), sa buong clinic. Ayon sa proposal, "notified" dapat
@@ -24,9 +24,11 @@ const FILTERS = [
 ]
 
 function StatusCell({ xray }) {
-  if (!xray.reviewed_at) return <StatusBadge variant="amber">New</StatusBadge>
   return (
-    <span className="whitespace-nowrap text-sm text-slate-500">Reviewed {formatDate(xray.reviewed_at)}</span>
+    <span className="flex flex-wrap items-center gap-1.5">
+      <XrayReviewBadge xray={xray} />
+      {xray.reviewed_at && <span className="whitespace-nowrap text-sm text-slate-600">{formatDate(xray.reviewed_at)}</span>}
+    </span>
   )
 }
 

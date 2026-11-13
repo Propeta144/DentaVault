@@ -1,4 +1,5 @@
 import pool from '../config/db.js'
+import { lockChartPatient, withChartMutation } from '../services/chartMutationService.js'
 import { clinicToday } from '../utils/validators.js'
 import { TOOTH_SURFACES, chartPlanFor, normalizeSurfaces } from '../utils/treatmentChart.js'
 
@@ -117,6 +118,7 @@ async function insertTreatmentRow(conn, { patientId, procedureName, toothNumber,
 // Ibinabalik din ang `chartEntryCount` (0 = treatment lang).
 export async function createTreatment(input, { conn: outerConn } = {}) {
   const run = async (conn) => {
+    await lockChartPatient(conn, input.patientId)
     const id = await insertTreatmentRow(conn, input)
     const plan = chartPlanFor({
       procedureName: input.procedureName,
@@ -158,7 +160,7 @@ export async function createChartEntryWithTreatment({
   strokeData,
   recordedBy,
 }) {
-  return withTransaction(async (conn) => {
+  return withChartMutation({ patientId }, async (conn) => {
     const treatmentId = await insertTreatmentRow(conn, {
       patientId,
       procedureName,
@@ -190,6 +192,7 @@ const sameSet = (a, b) => a.length === b.length && a.every((x) => b.includes(x))
 // Ibinabalik: { treatment, chartChange: 'none' | 'updated' | 'replaced' | 'removed' | 'added' }
 export async function updateTreatment(id, input) {
   return withTransaction(async (conn) => {
+    await lockChartPatient(conn, input.patientId)
     const linked = await linkedChartEntries(conn, id)
     const surfaces = normalizeSurfaces(input.surfaces)
     await conn.execute(
@@ -254,8 +257,9 @@ export async function updateTreatment(id, input) {
 
 // Pagbura (maling entry): kasama ang marka nito sa chart. Ibinabalik ang
 // bilang ng nabura na chart entries (para sa audit log).
-export async function deleteTreatment(id) {
+export async function deleteTreatment(id, { patientId }) {
   return withTransaction(async (conn) => {
+    await lockChartPatient(conn, patientId)
     const [chart] = await conn.execute('DELETE FROM chart_entries WHERE treatment_id = :id', { id })
     await conn.execute('DELETE FROM treatments WHERE id = :id', { id })
     return chart.affectedRows

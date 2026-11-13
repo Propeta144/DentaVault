@@ -37,7 +37,7 @@ export default function MonthlyTrendChart({ data }) {
   const [active, setActive] = useState(null)
 
   if (!data || data.every((d) => d.newPatients === 0 && d.treatments === 0)) {
-    return <p className="py-8 text-center text-sm text-slate-500">No activity in the last 6 months yet.</p>
+    return <p className="py-8 text-center text-sm text-slate-500">No activity within the selected dates.</p>
   }
 
   const max = Math.max(...data.flatMap((d) => [d.newPatients, d.treatments]), 1)
@@ -59,85 +59,90 @@ export default function MonthlyTrendChart({ data }) {
         ))}
       </div>
 
-      <div className="flex gap-2">
-        {/* Y-axis ticks */}
-        <div className="relative w-6 shrink-0" style={{ height: CHART_HEIGHT }} aria-hidden="true">
-          {ticks.map((t) => (
-            <span
-              key={t}
-              className="absolute right-0 -translate-y-1/2 text-xs tabular-nums text-slate-500"
-              style={{ top: CHART_HEIGHT - (t / top) * CHART_HEIGHT }}
-            >
-              {t}
-            </span>
-          ))}
-        </div>
+      <div className="overflow-x-auto pb-2">
+        <div style={{ minWidth: Math.max(260, data.length * 56) }}>
+          <div className="flex gap-2">
+            {/* Y-axis ticks */}
+            <div className="relative w-6 shrink-0" style={{ height: CHART_HEIGHT }} aria-hidden="true">
+              {ticks.map((t) => (
+                <span
+                  key={t}
+                  className="absolute right-0 -translate-y-1/2 text-xs tabular-nums text-slate-500"
+                  style={{ top: CHART_HEIGHT - (t / top) * CHART_HEIGHT }}
+                >
+                  {t}
+                </span>
+              ))}
+            </div>
 
-        <div className="relative flex-1">
-          {/* Gridlines: 1px, solid, recessive */}
-          {ticks.map((t) => (
-            <div
-              key={t}
-              aria-hidden="true"
-              className={`absolute inset-x-0 h-px ${t === 0 ? 'bg-slate-300' : 'bg-slate-100'}`}
-              style={{ top: CHART_HEIGHT - (t / top) * CHART_HEIGHT }}
-            />
-          ))}
+            <div className="relative flex-1">
+              {/* Gridlines: 1px, solid, recessive */}
+              {ticks.map((t) => (
+                <div
+                  key={t}
+                  aria-hidden="true"
+                  className={`absolute inset-x-0 h-px ${t === 0 ? 'bg-slate-300' : 'bg-slate-100'}`}
+                  style={{ top: CHART_HEIGHT - (t / top) * CHART_HEIGHT }}
+                />
+              ))}
 
-          <div className="relative flex items-end justify-around" style={{ height: CHART_HEIGHT }}>
-            {data.map((d) => (
-              <div
-                key={d.month}
-                tabIndex={0}
-                role="img"
-                aria-label={`${monthLabel(d.month, 'MMMM yyyy')}: ${d.newPatients} new patients, ${d.treatments} treatments`}
-                onMouseEnter={() => setActive(d.month)}
-                onMouseLeave={() => setActive(null)}
-                onFocus={() => setActive(d.month)}
-                onBlur={() => setActive(null)}
-                // Mas malaki ang hit target kaysa sa bar mismo: buong column ng buwan
-                className="relative flex h-full flex-1 cursor-default items-end justify-center gap-0.5 rounded-sm outline-none focus-visible:bg-sky-50"
-              >
-                {series.map((s) => (
+              <div className="relative flex items-end justify-around" style={{ height: CHART_HEIGHT }}>
+                {data.map((d) => (
                   <div
-                    key={s.key}
-                    className="w-5 rounded-t transition-opacity"
-                    style={{
-                      height: `${(d[s.key] / top) * CHART_HEIGHT}px`,
-                      minHeight: d[s.key] > 0 ? 2 : 0,
-                      backgroundColor: s.color,
-                      opacity: active && active !== d.month ? 0.45 : 1,
-                    }}
-                  />
-                ))}
-
-                {active === d.month && (
-                  <div className="pointer-events-none absolute bottom-full z-10 mb-1 w-max rounded-md border border-slate-200 bg-white px-3 py-2 text-sm shadow-lg">
-                    <p className="mb-1 font-medium text-slate-900">{monthLabel(d.month, 'MMMM yyyy')}</p>
+                    key={d.month}
+                    tabIndex={0}
+                    role="img"
+                    aria-label={`${monthLabel(d.month, 'MMMM yyyy')}: ${d.newPatients} new patients, ${d.treatments} treatments`}
+                    onMouseEnter={() => setActive(d.month)}
+                    onMouseLeave={() => setActive(null)}
+                    onFocus={() => setActive(d.month)}
+                    onBlur={() => setActive(null)}
+                    onClick={() => setActive(d.month)}
+                    // Mas malaki ang hit target kaysa sa bar mismo: buong column ng buwan
+                    className="relative flex h-full flex-1 cursor-default items-end justify-center gap-0.5 rounded-sm outline-none focus-visible:bg-sky-50"
+                  >
                     {series.map((s) => (
-                      <p key={s.key} className="flex items-center gap-2 text-slate-600">
-                        <span className="h-0.5 w-3 rounded" style={{ backgroundColor: s.color }} />
-                        <span className="font-semibold tabular-nums text-slate-900">{d[s.key]}</span>
-                        {s.label}
-                      </p>
+                      <div
+                        key={s.key}
+                        className="w-5 rounded-t transition-opacity"
+                        style={{
+                          height: `${(d[s.key] / top) * CHART_HEIGHT}px`,
+                          minHeight: d[s.key] > 0 ? 2 : 0,
+                          backgroundColor: s.color,
+                          opacity: active && active !== d.month ? 0.45 : 1,
+                        }}
+                      />
                     ))}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
 
-      {/* Month labels, naka-align sa columns */}
-      <div className="mt-2 flex gap-2" aria-hidden="true">
-        <div className="w-6 shrink-0" />
-        <div className="flex flex-1 justify-around">
-          {data.map((d) => (
-            <span key={d.month} className="flex-1 text-center text-xs text-slate-500">
-              {monthLabel(d.month, 'MMM')}
-            </span>
-          ))}
+                    {active === d.month && (
+                      <div className={`pointer-events-none absolute top-2 z-10 w-max rounded-md border border-slate-200 bg-white px-3 py-2 text-sm shadow-lg ${d === data[0] ? 'left-0' : d === data[data.length - 1] ? 'right-0' : 'left-1/2 -translate-x-1/2'}`}>
+                        <p className="mb-1 font-medium text-slate-900">{monthLabel(d.month, 'MMMM yyyy')}</p>
+                        {series.map((s) => (
+                          <p key={s.key} className="flex items-center gap-2 text-slate-600">
+                            <span className="h-0.5 w-3 rounded" style={{ backgroundColor: s.color }} />
+                            <span className="font-semibold tabular-nums text-slate-900">{d[s.key]}</span>
+                            {s.label}
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Month labels, naka-align sa columns */}
+          <div className="mt-2 flex gap-2" aria-hidden="true">
+            <div className="w-6 shrink-0" />
+            <div className="flex flex-1 justify-around">
+              {data.map((d) => (
+                <span key={d.month} className="flex-1 text-center text-xs text-slate-500">
+                  {monthLabel(d.month, data.length > 6 ? 'MMM yy' : 'MMM')}
+                </span>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -147,7 +152,7 @@ export default function MonthlyTrendChart({ data }) {
           horizontal scroll sa phone. */}
       <div className="sr-only">
       <table>
-        <caption>New patients and treatments per month, last 6 months</caption>
+        <caption>New patients and treatments per month within the selected dates</caption>
         <thead>
           <tr>
             <th scope="col">Month</th>

@@ -1,5 +1,5 @@
 import { useId, useState } from 'react'
-import { AlertTriangle, ClipboardList, Clock, History, Loader2, Trash2 } from 'lucide-react'
+import { AlertTriangle, ClipboardList, Clock, Trash2 } from 'lucide-react'
 import Modal from '../common/Modal'
 import { PatientAlertStrip } from '../common/MedicalAlertBadge'
 import {
@@ -13,7 +13,7 @@ import {
   procedureForCondition,
   toothOrientation,
 } from '../../constants/dental'
-import { getToothHistory } from '../../services/chart'
+import ToothHistory from './ToothHistory'
 import { useToast } from '../../context/ToastContext'
 import { formatDate } from '../../utils/formatDate'
 import { FIELD_LIMITS } from '../../constants/fieldLimits'
@@ -186,9 +186,6 @@ export default function ChartEntryModal({
   const [addTreatmentChoice, setAddTreatmentChoice] = useState(null)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
-  const [showHistory, setShowHistory] = useState(false)
-  const [history, setHistory] = useState(null)
-  const [loadingHistory, setLoadingHistory] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [confirmAge, setConfirmAge] = useState(false)
   const ageCaution = dentitionAgeCaution(dateOfBirth, toothNumber)
@@ -215,21 +212,6 @@ export default function ChartEntryModal({
     setAddTreatmentChoice(null)
     setError('')
     setConditionCode(allowed.some((c) => c.code === nextEntry?.condition_code) ? nextEntry.condition_code : null)
-  }
-
-  function toggleHistory() {
-    if (showHistory) {
-      setShowHistory(false)
-      return
-    }
-    setShowHistory(true)
-    if (history === null) {
-      setLoadingHistory(true)
-      getToothHistory(patientId, toothNumber)
-        .then(setHistory)
-        .catch(() => setHistory([]))
-        .finally(() => setLoadingHistory(false))
-    }
   }
 
   async function handleSubmit(e, ageConfirmed = false) {
@@ -430,43 +412,7 @@ export default function ChartEntryModal({
           </div>
         )}
 
-        <div>
-          <button
-            type="button"
-            onClick={toggleHistory}
-            className="flex min-h-11 items-center gap-1.5 text-sm font-medium text-sky-600 hover:text-sky-700"
-          >
-            <History className="h-4 w-4" />
-            {showHistory ? 'Hide' : 'View'} full history for tooth {toothNumber}
-          </button>
-
-          {showHistory && (
-            <div className="mt-2 max-h-40 space-y-2 overflow-y-auto rounded-md border border-slate-200 p-2.5">
-              {loadingHistory && (
-                <p className="flex items-center gap-1.5 text-xs text-slate-500">
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                  Loading...
-                </p>
-              )}
-              {!loadingHistory && history?.length === 0 && (
-                <p className="text-xs text-slate-500">No history recorded yet.</p>
-              )}
-              {!loadingHistory &&
-                history?.map((h) => (
-                  <div key={h.id} className="border-b border-slate-100 pb-2 text-xs last:border-0 last:pb-0">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-medium text-slate-700">
-                        {surfaceLabelFor(h.surface)} · {h.is_cleared ? `Removed: ${conditionLabel(h.condition_code)}` : conditionLabel(h.condition_code)}
-                      </span>
-                      <span className="shrink-0 text-slate-500">{timeAgo(h.recorded_at)}</span>
-                    </div>
-                    {/* Walang "by Dr. ...": iisa lang ang dentist account */}
-                    {h.notes && <p className="mt-0.5 italic text-slate-600">"{h.notes}"</p>}
-                  </div>
-                ))}
-            </div>
-          )}
-        </div>
+        <ToothHistory key={toothNumber} patientId={patientId} toothNumber={toothNumber} />
 
         <div>
           <p id={`${formId}-condition`} className="mb-2 block text-base font-medium text-slate-700">
@@ -541,22 +487,25 @@ export default function ChartEntryModal({
           />
         </div>
 
-        {procedureName && (
-          <label className="flex min-h-11 cursor-pointer items-start gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2.5 text-base text-slate-700">
+          <label className={`flex min-h-11 items-start gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2.5 text-base text-slate-700 ${procedureName ? 'cursor-pointer' : ''}`}>
             <input
               type="checkbox"
               checked={addTreatment}
+              disabled={!procedureName || submitting}
               onChange={(e) => setAddTreatmentChoice(e.target.checked)}
               className="mt-0.5 h-5 w-5 shrink-0 accent-sky-600"
             />
             <span>
               Also add to Treatment History
               <span className="block text-sm text-slate-500">
-                {procedureName}, tooth {toothNumber}, today. Uncheck if this was done before (e.g. at another clinic).
+                {procedureName
+                  ? `${procedureName}, tooth ${toothNumber}, today. ${alreadyInHistory ? 'This condition already has a linked treatment. Leave unchecked to avoid a duplicate.' : 'Uncheck if this was done before (e.g. at another clinic).'}`
+                  : conditionCode
+                    ? 'This condition is a finding, not a performed treatment. It is recorded in the dental chart and tooth history.'
+                    : 'Choose a treatment condition, such as Filled, Root Canal Treated, Crown or Extracted, to enable this option.'}
               </span>
             </span>
           </label>
-        )}
 
         {onDelete && currentEntry && (
           <button type="button" disabled={submitting} onClick={() => { setError(''); setConfirmDelete(true) }}

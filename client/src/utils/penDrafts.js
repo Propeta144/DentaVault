@@ -28,8 +28,3 @@ export function groupPenDrafts(drafts) {
   }
   return [...groups.values()]
 }
-
-export function undoPenStroke(drafts) {
-  const lastId = drafts.at(-1)?.strokeId
-  return drafts.filter((draft) => draft.strokeId !== lastId)
-}

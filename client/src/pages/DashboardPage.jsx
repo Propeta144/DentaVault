@@ -1,10 +1,13 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { format } from 'date-fns'
 import { UserPlus, ScrollText, ArrowRight, Inbox, HelpCircle, CheckCircle2, ChevronRight, Users } from 'lucide-react'
 import { getDashboard, peekDashboard } from '../services/dashboard'
 import HorizontalBarChart from '../components/dashboard/HorizontalBarChart'
 import MonthlyTrendChart from '../components/dashboard/MonthlyTrendChart'
+import DashboardDateFilter from '../components/dashboard/DashboardDateFilter'
+import DashboardRecordsModal from '../components/dashboard/DashboardRecordsModal'
+import { dashboardPreset, dashboardRangeKey } from '../utils/dashboardRange'
 import { SkeletonBlock } from '../components/common/Skeleton'
 import Avatar from '../components/common/Avatar'
 import { AllergyFlag } from '../components/common/MedicalAlertBadge'
@@ -189,7 +192,8 @@ function buildOverview({ procedureBreakdown, conditionBreakdown }, showAllProced
   // Kulay ayon sa GRUPO ng procedure, sa FIXED na pagkakasunod (hindi sorted
   // by count): tignan PROCEDURE_CATEGORY_COLORS sa dashboardColors.js kung
   // bakit. Ang lumang "Crown / Bridge" ay lumalabas lang kapag may record pa.
-  // Ang hindi-standard na pangalan ay "Other".
+  // Ang hindi-standard na pangalan ay nasa Other na grupo, sariling row
+  // para mabuksan ang exact procedure nang hindi nagsasama ng iba.
   // Critique 2026-10-25: dati laging 21 row (karamihan 0), kaya nakatago na
   // ang 0 maliban kung "Show all". May label bawat bar, kaya ligtas pa rin
   // kahit magkatabi ang kulay na dati'y hindi.
@@ -202,6 +206,7 @@ function buildOverview({ procedureBreakdown, conditionBreakdown }, showAllProced
     // Lumang "Crown / Bridge" (bago hinati sa Crown at Bridge, #29): may "(old)" para hindi
     // mapagkamalang kapareho ng bagong Crown (critique 2026-10-25)
     label: RETIRED_PROCEDURES.includes(p) ? `${p.value} (old)` : procedureShortLabel(p.value),
+    procedure: p.value,
     value: procedureCounts[p.value] || 0,
     color: PROCEDURE_CATEGORY_COLORS[p.category],
     category: p.category,
@@ -211,13 +216,14 @@ function buildOverview({ procedureBreakdown, conditionBreakdown }, showAllProced
   }))
   const otherProcedures = procedureBreakdown.filter((p) => !knownProcedures.some((known) => known.value === p.procedure_name))
   if (otherProcedures.length > 0) {
-    allProcedureData.push({
-      label: PROCEDURE_OTHER.label,
-      value: otherProcedures.reduce((sum, p) => sum + p.count, 0),
+    allProcedureData.push(...otherProcedures.map((p) => ({
+      label: `${p.procedure_name} (other)`,
+      procedure: p.procedure_name,
+      value: p.count,
       color: PROCEDURE_OTHER.color,
       category: 'other',
-      tooltip: `Other: ${otherProcedures.map((p) => `${p.procedure_name} (${p.count})`).join(', ')}`,
-    })
+      tooltip: `${p.procedure_name}: ${p.count}`,
+    })))
   }
   const procedureData = showAllProcedures ? allProcedureData : allProcedureData.filter((d) => d.value > 0)
   const hiddenProcedures = allProcedureData.length - allProcedureData.filter((d) => d.value > 0).length
@@ -250,16 +256,26 @@ export default function DashboardPage() {
   const [data, setData] = useState(peekDashboard)
   const [error, setError] = useState('')
   const [showAllProcedures, setShowAllProcedures] = useState(false)
-
-  // Laging kinukuha ang bago. Kapag pumalya pero may lumang data na, iyon na
-  // lang ang ipinapakita (walang error box sa ibabaw ng gumaganang page).
-  useEffect(() => {
-    getDashboard()
-      .then(setData)
-      .catch((err) => {
-        if (!peekDashboard()) setError(err.response?.data?.error || 'Failed to load dashboard')
-      })
+  const [range, setRange] = useState(dashboardPreset)
+  const [selection, setSelection] = useState(null)
+  const [attempt, setAttempt] = useState(0)
+  const changeRange = useCallback((next) => {
+    setSelection(null)
+    setRange((current) => dashboardRangeKey(current) === dashboardRangeKey(next) ? current : next)
   }, [])
+
+  // Range-scoped ang cache at effect: hindi puwedeng mauna ang lumang
+  // request tapos matakpan ang totals ng mas bagong piniling dates.
+  useEffect(() => {
+    let active = true
+    setError('')
+    getDashboard(range)
+      .then((result) => { if (active) setData(result) })
+      .catch((err) => {
+        if (active) setError(err.response?.data?.error || 'Failed to load dashboard')
+      })
+    return () => { active = false }
+  }, [range, attempt])
 
   const recent = useMemo(
     () => (data ? groupAuditLogs(data.recentActivity).slice(0, RECENT_LIMIT) : []),
@@ -273,6 +289,9 @@ export default function DashboardPage() {
   const recentPatients = data?.recentPatients || []
   const allergiesNotRecorded = data?.allergiesNotRecorded || { rows: [], total: 0 }
   const overview = data ? buildOverview(data, showAllProcedures) : null
+  const rangeReady = Boolean(data?.range) && dashboardRangeKey(data.range) === dashboardRangeKey(range)
+  const allTime = range.period === 'all'
+  const periodLabel = allTime ? 'All time' : `${formatDate(range.dateFrom)} to ${formatDate(range.dateTo)} (inclusive)`
 
   return (
     <div className="space-y-8">
@@ -299,9 +318,10 @@ export default function DashboardPage() {
           Loading dashboard data
         </p>
       )}
-      {error && (
+      {error && !data && (
         <div role="alert" className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-base text-red-700">
           {error}
+          <button type="button" onClick={() => setAttempt((value) => value + 1)} className="ml-3 min-h-11 rounded-md border border-red-300 px-3 font-medium">Retry</button>
         </div>
       )}
 
@@ -335,43 +355,65 @@ export default function DashboardPage() {
         </section>
       </div>
 
-      {/* ===== 2. Clinic overview: nasa ibaba ng mga patient =====
-          Ang header ay ang purple na band ng official logo ("DENTAL CLINIC" sa
-          malalapad na puting letra), hindi generic na KPI tiles: parehong
-          itsura ng karatula ng clinic (bolder, critique 2026-10-25). */}
+      {/* White card para mas magaan ang dashboard; hover accent sa mismong
+          statistic lang, kasama ng existing purple figures at controls. */}
       <section aria-labelledby="dash-overview" className="space-y-4 pt-2">
-        <div className="rounded-xl bg-sky-700 px-5 py-4 text-white shadow-sm sm:px-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <h2 id="dash-overview" className="text-sm font-semibold uppercase tracking-[0.25em]">
-              Clinic overview
-            </h2>
-            <dl className="grid grid-cols-3 gap-4 sm:flex sm:gap-10">
-              {[
-                ['Active patients', stats?.activePatients],
-                ['Treatments this month', stats?.treatmentsThisMonth],
-                ['X‑rays this month', stats?.xraysThisMonth],
-              ].map(([label, value]) => (
-                <div key={label} className="flex flex-col-reverse">
-                  <dt className="text-xs uppercase tracking-[0.12em] text-sky-100">{label}</dt>
-                  <dd className="text-2xl font-semibold tabular-nums">
-                    {data ? value : <span aria-hidden="true" className="my-1 block h-6 w-10 rounded-md bg-white/25 motion-safe:animate-pulse" />}
-                  </dd>
-                </div>
-              ))}
-            </dl>
+        {error && data && (
+          <div role="alert" className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-base text-red-700">
+            {error}
+            <button type="button" onClick={() => setAttempt((value) => value + 1)} className="ml-3 min-h-11 rounded-md border border-red-300 px-3 font-medium">Retry</button>
           </div>
+        )}
+        <div className="rounded-xl border border-slate-200 bg-white px-5 py-4 text-slate-900 shadow-sm sm:px-6">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+            <div className="min-w-0">
+              <h2 id="dash-overview" className="text-sm font-semibold uppercase tracking-[0.25em]">Clinic overview</h2>
+              <p role="status" className="mt-2 text-sm text-slate-600">
+                Showing: {periodLabel}. {!rangeReady && !error && 'Updating report…'}
+              </p>
+            </div>
+            <DashboardDateFilter range={range} onChange={changeRange} />
+          </div>
+          <dl className="mt-4 grid grid-cols-3 gap-3 border-t border-slate-200 pt-4 sm:gap-10">
+            {[
+              ['Active patients', stats?.activePatients, 'patients'],
+              ['Treatments', stats?.treatmentsInRange, 'treatments'],
+              ['X-ray uploads', stats?.xraysInRange, 'xrays'],
+            ].map(([label, value, kind]) => (
+              <div key={kind}>
+                <dt className="sr-only">{label}</dt>
+                <dd>
+                  {kind === 'patients' ? (
+                    <Link to="/patients" className="overview-stat flex min-h-11 flex-col rounded-md p-2 transition-colors focus-visible:outline-2 focus-visible:outline-sky-600" aria-label={`Active patients: ${value ?? 'loading'}. View all patients.`}>
+                      <span className="text-2xl font-semibold tabular-nums text-sky-600">{data ? value : '…'}</span>
+                      <span className="text-xs uppercase tracking-[0.12em] text-slate-700">{label}</span>
+                      <span className="mt-1 text-xs text-slate-600">All active records</span>
+                    </Link>
+                  ) : (
+                    <button type="button" disabled={!rangeReady} onClick={() => setSelection({ kind })}
+                      className="overview-stat flex min-h-11 w-full flex-col rounded-md p-2 text-left transition-colors focus-visible:outline-2 focus-visible:outline-sky-600 disabled:opacity-60" aria-label={`${label}: ${rangeReady ? value : 'loading'}. View matching records.`}>
+                      <span className="text-2xl font-semibold tabular-nums text-sky-600">{rangeReady ? value : '…'}</span>
+                      <span className="text-xs uppercase tracking-[0.12em] text-slate-700">{label}</span>
+                      <span className="mt-1 text-xs text-slate-600">{allTime ? 'All time' : 'Selected dates'}</span>
+                    </button>
+                  )}
+                </dd>
+              </div>
+            ))}
+          </dl>
         </div>
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <section className={CARD}>
             <h3 className="mb-1 text-base font-semibold text-slate-900">Procedures performed</h3>
-            <p className="mb-4 text-sm text-slate-600">All treatments on record, by procedure.</p>
-            {overview ? (
-              <HorizontalBarChart data={overview.procedureData} legend={overview.procedureLegend} minScale={5} />
+            <p className="mb-4 text-sm text-slate-600">{allTime ? 'All recorded treatments.' : 'Treatments within the selected dates.'} Select a procedure to view records.</p>
+            {overview && rangeReady ? (
+              <HorizontalBarChart data={overview.procedureData} legend={overview.procedureLegend} minScale={5}
+                onSelect={(item) => setSelection({ kind: 'treatments', procedure: item.procedure })} />
             ) : (
               <ChartSkeleton bars={6} />
             )}
-            {overview?.hiddenProcedures > 0 && (
+            {rangeReady && overview?.hiddenProcedures > 0 && (
               <button
                 type="button"
                 onClick={() => setShowAllProcedures((v) => !v)}
@@ -396,8 +438,8 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <section className={CARD}>
             <h3 className="mb-1 text-base font-semibold text-slate-900">New patients and treatments</h3>
-            <p className="mb-4 text-sm text-slate-600">Last 6 months. Hover or tap a month for exact numbers.</p>
-            {data ? <MonthlyTrendChart data={data.monthlyTrend} /> : <SkeletonBlock className="h-48 w-full" />}
+            <p className="mb-4 text-sm text-slate-600">{allTime ? 'All recorded activity' : 'Selected dates'}, grouped by month. Hover, tap, or focus a month for exact numbers.</p>
+            {rangeReady ? <MonthlyTrendChart key={periodLabel} data={data.monthlyTrend} /> : <SkeletonBlock className="h-48 w-full" />}
           </section>
 
           <section className={CARD}>
@@ -455,6 +497,7 @@ export default function DashboardPage() {
           </section>
         </div>
       </section>
+      {selection && rangeReady && <DashboardRecordsModal selection={selection} range={range} onClose={() => setSelection(null)} />}
     </div>
   )
 }

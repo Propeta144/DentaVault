@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useState } from 'react'
 import { ChevronDown, ChevronLeft, ChevronRight, ScrollText, Search, X, Layers, SlidersHorizontal } from 'lucide-react'
 import { listAuditLogs, listAuditLogActions } from '../services/auditLogs'
 import StatusBadge from '../components/common/StatusBadge'
 import EmptyState from '../components/common/EmptyState'
 import { SkeletonRows } from '../components/common/Skeleton'
+import AuditEntityFilter from '../components/audit/AuditEntityFilter'
+import AuditEventDetails, { AuditDetailBody } from '../components/audit/AuditEventDetails'
 import {
   actionVariant,
   actionLabel,
@@ -64,7 +66,7 @@ function dayLabel(date) {
 function UserCell({ log, inline = false }) {
   if (!log.user_name) {
     // hal. lumang Mailgun inbound email (bago ang #32), o ang retention job: walang logged-in user
-    return <span className="italic text-slate-600">System</span>
+    return <span className="italic text-slate-600">{log.user_id ? 'Former account' : 'System / no account'}</span>
   }
   const role = log.user_role === 'patient' ? 'Patient' : null
   if (inline) {
@@ -83,6 +85,31 @@ function UserCell({ log, inline = false }) {
   )
 }
 
+function AuditTableRow({ group }) {
+  const [expanded, setExpanded] = useState(false)
+  const detailId = useId()
+  const patientName = auditPatientName(group)
+  const summary = formatAuditDetails(group.details)
+  return (
+    <>
+      <tr className="hover:bg-slate-50">
+        <td className="whitespace-nowrap px-4 py-3 align-top tabular-nums text-slate-600"><GroupTime group={group} /></td>
+        <td className="px-4 py-3 align-top font-semibold text-slate-900">{patientName || <span className="font-normal text-slate-500">—</span>}</td>
+        <td className="px-4 py-3 align-top"><ActionBadge group={group} /></td>
+        <td className="min-w-48 max-w-sm px-4 py-3 align-top text-slate-600">
+          {summary && <p className="line-clamp-2 break-words text-sm">{summary}</p>}
+          <button type="button" aria-expanded={expanded} aria-controls={detailId} onClick={() => setExpanded((value) => !value)} className="mt-1 flex min-h-11 items-center gap-1 rounded-md px-1 text-sm font-medium text-sky-700 hover:bg-sky-50">
+            <ChevronDown className={`h-4 w-4 shrink-0 ${expanded ? 'rotate-180' : ''}`} aria-hidden="true" />{expanded ? 'Hide details' : 'View details'}{group.count > 1 ? ` (${group.count} events)` : ''}
+          </button>
+        </td>
+        <td className="px-4 py-3 align-top"><UserCell log={group} /></td>
+        <td className="whitespace-nowrap px-4 py-3 align-top text-slate-600">{group.ip_address || '—'}</td>
+      </tr>
+      {expanded && <tr><td colSpan={6} className="bg-slate-50 p-4"><div id={detailId} role="region" aria-label={`Details: ${actionLabel(group.action)}`}><AuditDetailBody group={group} /></div></td></tr>}
+    </>
+  )
+}
+
 export default function AuditLogPage() {
   const [data, setData] = useState({ logs: [], page: 1, totalPages: 1, total: 0 })
   const [page, setPage] = useState(1)
@@ -94,12 +121,16 @@ export default function AuditLogPage() {
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [availableActions, setAvailableActions] = useState([])
+  const [selectedUser, setSelectedUser] = useState(null)
+  const [selectedPatient, setSelectedPatient] = useState(null)
+  const [attempt, setAttempt] = useState(0)
   // Default: mga ginawa sa records lang (critique 2026-10-25). Ang pagbukas
   // ng page at matagumpay na sign-in/out ay lumalabas kapag naka-check.
   const [showRoutine, setShowRoutine] = useState(false)
-  const hasFilters = Boolean(search || action || dateFrom || dateTo)
+  const hasFilters = Boolean(search || action || dateFrom || dateTo || selectedUser || selectedPatient || showRoutine)
   const [filtersOpen, setFiltersOpen] = useState(false)
-  const activeFilterCount = [action, dateFrom, dateTo, showRoutine].filter(Boolean).length
+  const activeFilterCount = [action, dateFrom, dateTo, showRoutine, selectedUser, selectedPatient].filter(Boolean).length
+  const dateError = dateFrom && dateTo && dateFrom > dateTo ? 'Start date must be on or before end date.' : ''
 
   useEffect(() => {
     listAuditLogActions()
@@ -107,19 +138,19 @@ export default function AuditLogPage() {
       .catch(() => {}) // non-critical lang naman 'to: babalik lang na walang laman yung dropdown
   }, [])
 
-  const reload = useCallback(() => {
+  useEffect(() => {
+    if (dateError) { setLoading(false); return }
+    let active = true
     setLoading(true)
     setError('')
-    listAuditLogs({ page, search, action, dateFrom, dateTo, showRoutine })
-      .then(setData)
-      .catch((err) => setError(err.response?.data?.error || 'Failed to load audit log'))
-      .finally(() => setLoading(false))
-  }, [page, search, action, dateFrom, dateTo, showRoutine])
-
-  useEffect(() => {
-    const timeout = setTimeout(reload, 300) // debounce, para hindi mag-fire ng request sa bawat letrang type sa Search
-    return () => clearTimeout(timeout)
-  }, [reload])
+    const timeout = setTimeout(() => {
+      listAuditLogs({ page, search, action, dateFrom, dateTo, showRoutine, userId: selectedUser?.value, patientCode: selectedPatient?.value })
+        .then((result) => { if (active) setData(result) })
+        .catch((err) => { if (active) setError(err.response?.data?.error || 'Failed to load audit log') })
+        .finally(() => { if (active) setLoading(false) })
+    }, 300)
+    return () => { active = false; clearTimeout(timeout) }
+  }, [page, search, action, dateFrom, dateTo, showRoutine, selectedUser, selectedPatient, dateError, attempt])
 
   // Display lang ang pagsasama (hal. 6 na VIEW_XRAY → isang row); buo pa
   // rin ang bawat entry sa database at sa bilang na "events total".
@@ -154,6 +185,7 @@ export default function AuditLogPage() {
     return (value) => {
       setter(value)
       setPage(1)
+      setLoading(true)
     }
   }
   const onSearchChange = updateFilter(setSearch)
@@ -167,7 +199,11 @@ export default function AuditLogPage() {
     setAction('')
     setDateFrom('')
     setDateTo('')
+    setSelectedUser(null)
+    setSelectedPatient(null)
+    setShowRoutine(false)
     setPage(1)
+    setLoading(true)
   }
 
   const inputClass =
@@ -192,8 +228,8 @@ export default function AuditLogPage() {
         )}
       </div>
 
-      <div className="mb-4 grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-2 lg:flex lg:flex-wrap lg:items-center">
-        <div className="relative sm:col-span-2 lg:min-w-[16rem] lg:flex-1">
+      <div className="mb-4 grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-2 lg:flex lg:flex-wrap lg:items-end">
+        <div className="relative sm:col-span-2 lg:basis-full">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
           <input
             type="search"
@@ -224,6 +260,8 @@ export default function AuditLogPage() {
         </button>
 
         <div className={`${filtersOpen ? 'grid' : 'hidden'} grid-cols-1 gap-3 sm:contents`}>
+        <AuditEntityFilter kind="users" selection={selectedUser} onChange={updateFilter(setSelectedUser)} />
+        <AuditEntityFilter kind="patients" selection={selectedPatient} onChange={updateFilter(setSelectedPatient)} />
         <select
           value={action}
           aria-label="Filter by action"
@@ -238,7 +276,8 @@ export default function AuditLogPage() {
           ))}
         </select>
 
-        <div className="flex items-center gap-2">
+        <div className="grid min-w-0 grid-cols-1 gap-3 sm:col-span-2 sm:grid-cols-2 lg:flex">
+        <div className="flex min-w-0 items-center gap-2">
           <label className="w-10 text-sm text-slate-500 lg:w-auto" htmlFor="audit-date-from">
             From
           </label>
@@ -247,10 +286,12 @@ export default function AuditLogPage() {
             type="date"
             value={dateFrom}
             onChange={(e) => onDateFromChange(e.target.value)}
-            className={`${inputClass} flex-1`}
+            className={`${inputClass} min-w-0 flex-1`}
+            aria-invalid={Boolean(dateError)}
+            aria-describedby={dateError ? 'audit-date-error' : undefined}
           />
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 items-center gap-2">
           <label className="w-10 text-sm text-slate-500 lg:w-auto" htmlFor="audit-date-to">
             To
           </label>
@@ -259,8 +300,12 @@ export default function AuditLogPage() {
             type="date"
             value={dateTo}
             onChange={(e) => onDateToChange(e.target.value)}
-            className={`${inputClass} flex-1`}
+            className={`${inputClass} min-w-0 flex-1`}
+            aria-invalid={Boolean(dateError)}
+            aria-describedby={dateError ? 'audit-date-error' : undefined}
           />
+        </div>
+
         </div>
 
         {/* Hindi applicable kapag may napiling Action (ipinapakita na iyon mismo) */}
@@ -299,12 +344,13 @@ export default function AuditLogPage() {
         </div>
       </div>
 
-      {error && (
-        <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-base text-red-700">{error}</div>
+      {dateError && <p id="audit-date-error" role="alert" className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-base text-red-700">{dateError}</p>}
+      {error && !dateError && (
+        <div role="alert" className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-base text-red-700">{error}<button type="button" onClick={() => { setLoading(true); setAttempt((value) => value + 1) }} className="ml-3 min-h-11 rounded-md border border-red-300 px-3 font-medium">Retry audit log</button></div>
       )}
       {loading && <SkeletonRows rows={8} label="Loading audit log..." />}
 
-      {!loading && !error && groups.length === 0 && (
+      {!loading && !error && !dateError && groups.length === 0 && (
         <EmptyState
           icon={ScrollText}
           title={hasFilters ? 'No activity matches these filters' : 'No activity recorded yet'}
@@ -312,7 +358,7 @@ export default function AuditLogPage() {
         />
       )}
 
-      {!loading && groups.length > 0 && (
+      {!loading && !error && !dateError && groups.length > 0 && (
         // Naka-grupo ayon sa ARAW (bolder, critique 2026-10-25): binabasa ang
         // audit trail na parang talaan ng clinic ("Today", "Yesterday", petsa),
         // at oras na lang sa bawat row. Pasyente ang nauuna, hindi ang user:
@@ -334,7 +380,6 @@ export default function AuditLogPage() {
               <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:hidden">
                 {day.groups.map((g) => {
                   const patientName = auditPatientName(g)
-                  const details = formatAuditDetails(g.details)
                   return (
                     <li key={g.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                       <div className="flex flex-wrap items-start justify-between gap-x-2 gap-y-1">
@@ -348,7 +393,7 @@ export default function AuditLogPage() {
                       <div className="mt-1.5">
                         <ActionBadge group={g} />
                       </div>
-                      {details && <p className="mt-1.5 text-sm text-slate-600">{details}</p>}
+                      <AuditEventDetails group={g} />
                       <p className="mt-2 text-sm text-slate-600">
                         By <UserCell log={g} inline /> · IP {g.ip_address || 'not recorded'}
                       </p>
@@ -371,30 +416,7 @@ export default function AuditLogPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {day.groups.map((g) => {
-                      const details = formatAuditDetails(g.details)
-                      const patientName = auditPatientName(g)
-                      return (
-                        <tr key={g.id} className="hover:bg-slate-50">
-                          <td className="whitespace-nowrap px-4 py-3 tabular-nums text-slate-600">
-                            <GroupTime group={g} />
-                          </td>
-                          <td className="px-4 py-3 font-semibold text-slate-900">
-                            {patientName || <span className="font-normal text-slate-500">—</span>}
-                          </td>
-                          <td className="px-4 py-3">
-                            <ActionBadge group={g} />
-                          </td>
-                          <td className="max-w-xs truncate px-4 py-3 text-slate-600" title={details || undefined}>
-                            {details || '—'}
-                          </td>
-                          <td className="px-4 py-3">
-                            <UserCell log={g} />
-                          </td>
-                          <td className="whitespace-nowrap px-4 py-3 text-slate-600">{g.ip_address || '—'}</td>
-                        </tr>
-                      )
-                    })}
+                    {day.groups.map((group) => <AuditTableRow key={group.id} group={group} />)}
                   </tbody>
                 </table>
               </div>
@@ -403,7 +425,7 @@ export default function AuditLogPage() {
         </div>
       )}
 
-      {data.total > 0 && !loading && (
+      {data.total > 0 && !loading && !error && !dateError && (
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
           <p>
             {data.total} event{data.total === 1 ? '' : 's'}
@@ -413,7 +435,7 @@ export default function AuditLogPage() {
           <div className="flex gap-2">
             <button
               type="button"
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              onClick={() => { setLoading(true); setPage((p) => Math.max(1, p - 1)) }}
               disabled={page <= 1}
               className="flex min-h-11 items-center gap-1 rounded-md border border-slate-300 bg-white px-4 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-40"
             >
@@ -422,7 +444,7 @@ export default function AuditLogPage() {
             </button>
             <button
               type="button"
-              onClick={() => setPage((p) => Math.min(data.totalPages, p + 1))}
+              onClick={() => { setLoading(true); setPage((p) => Math.min(data.totalPages, p + 1)) }}
               disabled={page >= data.totalPages}
               className="flex min-h-11 items-center gap-1 rounded-md border border-slate-300 bg-white px-4 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-40"
             >

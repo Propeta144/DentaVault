@@ -12,5 +12,6 @@ router.use(authenticate)
 // oversight endpoint.
 router.get('/audit-logs', requireRole('dentist'), auditLogController.list)
 router.get('/audit-logs/actions', requireRole('dentist'), auditLogController.listActions)
+router.get('/audit-logs/filter-options', requireRole('dentist'), auditLogController.filterOptions)
 
 export default router
