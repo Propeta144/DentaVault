@@ -2615,3 +2615,14 @@ History belongs to the current mounted X-ray viewer and never enters the API pay
 | `CLAUDE.md` | MODIFIED | Record the X-ray-only scope and validation. |
 
 Validation: all 58 automated tests passed, production build passed and lint passed with existing warnings and no errors. Nineteen headless Edge checks passed using fictional API fixtures: icon/text controls, saved/new pen and text Undo/Redo, saving after Undo/Redo, redo branching, annotation-only payloads, unsaved close confirmation, separate file state, read-only patient access, no dental-chart Undo/Redo, and toolbar fit at 390/1366px. The toolbar screenshot was visually inspected. No runtime exceptions or unmatched fixture endpoints. No production data writes, commit or push.
+
+## Default X-ray viewing tool: Pan (2026-11-17)
+
+X-ray viewers now start with Pan selected for both dentists and patients. Pen and Text remain explicitly selectable; annotation Undo/Redo, saving, comparison and dental charts retain their existing behavior.
+
+| File | Type | Purpose |
+|---|---|---|
+| `client/src/components/xray/XrayViewer.jsx` | MODIFIED | Initialize the active tool to Pan. |
+| `CLAUDE.md` | MODIFIED | Document the requested default and verification. |
+
+Validation: production build and lint passed (existing warnings, no errors). Four local browser checks verified Pan selected / Pen off on two separate X-rays and manual Pen selection on each, using fictional API fixtures. No backend or database change.
