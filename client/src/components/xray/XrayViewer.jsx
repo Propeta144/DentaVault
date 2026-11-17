@@ -1,9 +1,10 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState, useCallback } from 'react'
-import { PenLine, Type, Eraser, Save, ZoomIn, ZoomOut, X, Printer, Trash2, Hand, Eye, EyeOff, SlidersHorizontal, RotateCcw, Loader2, FileText } from 'lucide-react'
+import { useEffect, useId, useLayoutEffect, useReducer, useRef, useState, useCallback } from 'react'
+import { PenLine, Type, Undo2, Redo2, Save, ZoomIn, ZoomOut, X, Printer, Trash2, Hand, Eye, EyeOff, SlidersHorizontal, RotateCcw, Loader2, FileText } from 'lucide-react'
 import { fetchXrayObjectUrl, saveAnnotations } from '../../services/xrays'
 import { useToast } from '../../context/ToastContext'
 import { openPrintTab, PROFILE_PATH } from '../../utils/selectedPatient'
-import { drawShapes, cleanShapes, ANNOTATION_TEXT_MAX } from './drawAnnotations'
+import { drawShapes, ANNOTATION_TEXT_MAX } from './drawAnnotations'
+import { createAnnotationHistory, annotationHistoryReducer } from './annotationHistory'
 import DeleteXrayModal from './DeleteXrayModal'
 import Modal from '../common/Modal'
 import XrayReviewBadge from './XrayReviewBadge'
@@ -60,7 +61,8 @@ export default function XrayViewer({ xray, patientCode, canAnnotate, canDelete =
   // newShape]` sa susunod, tahimik lang na i-spread yung string papuntang
   // individual characters sa halip na mag-error.
   // cleanShapes: walang sirang entry na ipapakita o ipapadala ulit pag-save (#41)
-  const [shapes, setShapes] = useState(() => cleanShapes(xray.annotations))
+  const [annotationHistory, dispatchAnnotations] = useReducer(annotationHistoryReducer, xray.annotations, createAnnotationHistory)
+  const { shapes, undone } = annotationHistory
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [deleting, setDeleting] = useState(false)
@@ -264,23 +266,17 @@ export default function XrayViewer({ xray, patientCode, canAnnotate, canDelete =
       return
     }
     if (!drawingRef.current) return
-    // I-capture muna sa local bago i-clear yung ref: yung updater function
-    // ng setShapes, tumatakbo mamaya, hindi synchronous, kaya kung hindi
-    // ganito, mag-close over sa drawingRef.current PAGKATAPOS na ma-null
-    // out sa baba.
+    // Itabi ang completed stroke bago i-clear ang in-progress drawing ref.
     const points = drawingRef.current
     drawingRef.current = null
     if (!cancelled && points.length > 1) {
-      setShapes((prev) => [...prev, { type: 'line', points, color: '#ef4444' }])
+      dispatchAnnotations({ type: 'add', shape: { type: 'line', points, color: '#ef4444' } })
     } else redraw()
   }
 
   function commitTextInput() {
     if (textInput && textInput.value.trim()) {
-      setShapes((prev) => [
-        ...prev,
-        { type: 'text', x: textInput.xFrac, y: textInput.yFrac, text: textInput.value.trim(), color: '#ef4444' },
-      ])
+      dispatchAnnotations({ type: 'add', shape: { type: 'text', x: textInput.xFrac, y: textInput.yFrac, text: textInput.value.trim(), color: '#ef4444' } })
     }
     setTextInput(null)
   }
@@ -344,7 +340,12 @@ export default function XrayViewer({ xray, patientCode, canAnnotate, canDelete =
                 <Type className="h-4 w-4" />
                 Text
               </button>
-              <button type="button" title="Remove last annotation" onClick={() => setShapes((prev) => prev.slice(0, -1))} disabled={!shapes.length || saving} className="flex min-h-11 items-center gap-1.5 rounded bg-slate-800 px-3 text-sm font-medium hover:bg-slate-700 disabled:opacity-50"><Eraser className="h-4 w-4" />Remove last mark</button>
+              <button type="button" title="Undo last annotation" onClick={() => dispatchAnnotations({ type: 'undo' })} disabled={!shapes.length || saving} className="flex min-h-11 items-center gap-1.5 rounded bg-slate-800 px-3 text-sm font-medium transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50">
+                <Undo2 className="h-4 w-4" aria-hidden="true" />Undo
+              </button>
+              <button type="button" title="Redo annotation" onClick={() => dispatchAnnotations({ type: 'redo' })} disabled={!undone.length || saving} className="flex min-h-11 items-center gap-1.5 rounded bg-slate-800 px-3 text-sm font-medium transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50">
+                <Redo2 className="h-4 w-4" aria-hidden="true" />Redo
+              </button>
               <button
                 type="button"
                 title="Save Annotations"

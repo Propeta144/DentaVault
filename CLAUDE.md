@@ -2599,3 +2599,19 @@ An existing refresh bug was also fixed: when the initial profile tab was Dental 
 | `CLAUDE.md` | MODIFIED | Document final scope, root cause and verification. |
 
 Validation: all 56 automated tests and 23 browser checks passed. Browser checks use fictional API fixtures: 2D/3D/pen sync, first History transition refresh, enabled/disabled/linked defaults, chart-only findings, delete confirmation/cancel/retained treatment, removed Undo/Redo, retained tooth history and X-ray slider, and 320/768/1366px editor layout. No app exceptions or unexpected endpoints. Four new server model/contract tests use an isolated transactional fake database. Production build passed; lint has existing warnings and no errors. No production data writes, migration, commit or push.
+
+
+## X-ray-only annotation Undo/Redo (2026-11-17)
+
+The user requested replacing Remove last mark with Undo and Redo, each with a directional icon beside the text, only in the X-ray viewer. The toolbar now uses lucide Undo2/Redo2 icons and the existing button styles. Undo removes the most recent annotation, including a loaded saved annotation, preserving the correction behavior of the former button. Redo restores the exact removed pen/text annotation and its normalized coordinates in order. A newly committed pen or text mark clears the redo branch. Empty actions and actions while saving are disabled.
+
+History belongs to the current mounted X-ray viewer and never enters the API payload. Saving remains explicit; Undo/Redo also work after saving in the same viewer session. The existing unsaved-close guard compares the current annotations against the saved baseline. Opening another X-ray starts with that file's own saved annotations and no redo state. Patient viewers remain read-only. No 2D/3D dental chart, tooth-history, X-ray comparison or backend behavior was changed.
+
+| File | Type | Purpose |
+|---|---|---|
+| `client/src/components/xray/XrayViewer.jsx` | MODIFIED | Replace Remove last mark with icon-labeled Undo/Redo and dispatch committed pen/text annotations. |
+| `client/src/components/xray/annotationHistory.js` | NEW | X-ray-specific annotation reducer and per-viewer redo stack. |
+| `client/test/xrayAnnotations.test.js` | NEW | Verify saved/new pen/text order and coordinate preservation, empty actions, branching and fresh viewer state. |
+| `CLAUDE.md` | MODIFIED | Record the X-ray-only scope and validation. |
+
+Validation: all 58 automated tests passed, production build passed and lint passed with existing warnings and no errors. Nineteen headless Edge checks passed using fictional API fixtures: icon/text controls, saved/new pen and text Undo/Redo, saving after Undo/Redo, redo branching, annotation-only payloads, unsaved close confirmation, separate file state, read-only patient access, no dental-chart Undo/Redo, and toolbar fit at 390/1366px. The toolbar screenshot was visually inspected. No runtime exceptions or unmatched fixture endpoints. No production data writes, commit or push.
