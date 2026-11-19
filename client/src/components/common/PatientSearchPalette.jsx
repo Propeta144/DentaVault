@@ -31,9 +31,12 @@ export default function PatientSearchPalette({ onClose }) {
   useEffect(() => {
     let cancelled = false
     setLoading(true)
+    setResults([])
+    setError('')
+    setActive(0)
     const timeout = setTimeout(() => {
       const trimmed = query.trim()
-      listPatients(trimmed ? { search: trimmed, sort: 'name', limit: 8 } : { sort: 'last_visit', limit: 6 })
+      listPatients(trimmed ? { search: trimmed, searchMode: 'name_prefix', sort: 'name', limit: 8 } : { sort: 'last_visit', limit: 6 })
         .then((data) => {
           if (cancelled) return
           setResults(data.patients)
@@ -58,13 +61,13 @@ export default function PatientSearchPalette({ onClose }) {
     if (e.key === 'Escape') {
       e.preventDefault()
       onClose()
-    } else if (e.key === 'ArrowDown') {
+    } else if (e.key === 'ArrowDown' && !loading && results.length) {
       e.preventDefault()
       setActive((i) => Math.min(results.length - 1, i + 1))
-    } else if (e.key === 'ArrowUp') {
+    } else if (e.key === 'ArrowUp' && !loading && results.length) {
       e.preventDefault()
       setActive((i) => Math.max(0, i - 1))
-    } else if (e.key === 'Enter' && results[active]) {
+    } else if (e.key === 'Enter' && !loading && !error && results[active]) {
       e.preventDefault()
       open(results[active])
     }
@@ -89,12 +92,18 @@ export default function PatientSearchPalette({ onClose }) {
             ref={inputRef}
             type="text"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              setQuery(e.target.value)
+              setLoading(true)
+              setResults([])
+              setError('')
+              setActive(0)
+            }}
             onKeyDown={handleKeyDown}
             placeholder="Search patients by name..."
             aria-label="Search patients by name"
             aria-controls="patient-search-results"
-            aria-activedescendant={results[active] ? `patient-search-${results[active].patient_code}` : undefined}
+            aria-activedescendant={!loading && results[active] ? `patient-search-${results[active].patient_code}` : undefined}
             className="min-h-14 flex-1 bg-transparent text-base text-slate-900 placeholder:text-slate-500 focus:outline-none"
           />
           <kbd className="hidden rounded border border-slate-200 px-1.5 py-0.5 text-xs text-slate-600 sm:block">Esc</kbd>
@@ -102,14 +111,15 @@ export default function PatientSearchPalette({ onClose }) {
 
         <div className="max-h-[60vh] overflow-y-auto p-2">
           <p className="px-2 pb-1 pt-1 text-sm font-semibold text-slate-600">{heading}</p>
+          {loading && <p role="status" className="px-2 py-6 text-center text-sm text-slate-600">Searching patients...</p>}
           {error && <p className="px-2 py-4 text-sm text-red-600">{error}</p>}
           {!error && !loading && results.length === 0 && (
             <p className="px-2 py-6 text-center text-sm text-slate-600">
               {query.trim() ? `No patients match "${query.trim()}".` : 'No patients yet.'}
             </p>
           )}
-          <ul id="patient-search-results" role="listbox" aria-label={heading}>
-            {results.map((p, i) => (
+          <ul id="patient-search-results" role="listbox" aria-label={heading} aria-busy={loading}>
+            {!loading && !error && results.map((p, i) => (
               <li
                 key={p.patient_code}
                 id={`patient-search-${p.patient_code}`}

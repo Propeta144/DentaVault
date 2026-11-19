@@ -27,6 +27,7 @@ export const list = asyncHandler(async (req, res) => {
 
   const { rows, total } = await patientModel.listPatients({
     search: queryText(req.query.search),
+    searchMode: queryText(req.query.searchMode),
     sort: queryText(req.query.sort),
     limit,
     offset,

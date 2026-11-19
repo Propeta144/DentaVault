@@ -2,6 +2,7 @@ import pool from '../config/db.js'
 import { EXTRA_PATIENT_FIELDS, toDbValue } from '../utils/patientFields.js'
 import { limitOffset } from '../utils/sqlLimit.js'
 import { generatePatientCode, normalizePatientCode } from '../utils/patientCode.js'
+import { patientSearchFilter } from '../utils/patientSearch.js'
 
 // Whitelisted 'to, hindi galing sa user input — sarili nating sinulat na
 // ORDER BY clause lang naman palagi yung `sort`, kaya walang injection
@@ -17,21 +18,8 @@ const PATIENT_SORTS = {
   last_visit: '(lt.last_treatment_date IS NULL) ASC, lt.last_treatment_date DESC',
 }
 
-function buildPatientListQuery({ search }) {
-  const searchTerm = search ? `%${search}%` : null
-  const where = searchTerm
-    ? // Single quotes sa ' ', hindi " ": naka-ANSI_QUOTES ang Aiven, kaya
-      // column name ang tingin nito sa "..." (hindi text).
-      `WHERE p.deleted_at IS NULL AND (CONCAT(p.first_name, ' ', p.last_name) LIKE :search)`
-    : 'WHERE p.deleted_at IS NULL'
-  return {
-    where,
-    params: { search: searchTerm },
-  }
-}
-
-export async function listPatients({ search, sort, limit, offset }) {
-  const { where, params } = buildPatientListQuery({ search })
+export async function listPatients({ search, searchMode, sort, limit, offset }) {
+  const { where, params } = patientSearchFilter({ search, searchMode })
   // Object.hasOwn: para hindi tumama ang "__proto__"/"constructor" (500 dati)
   const orderBy = Object.hasOwn(PATIENT_SORTS, sort ?? '') ? PATIENT_SORTS[sort] : PATIENT_SORTS.name
 
@@ -63,7 +51,7 @@ export async function listPatients({ search, sort, limit, offset }) {
 // view, kaya kapag "Export CSV" pagkatapos mag-search, filtered results
 // lang ang lalabas, hindi lahat ng patient.
 export async function listPatientsForExport({ search }) {
-  const { where, params } = buildPatientListQuery({ search })
+  const { where, params } = patientSearchFilter({ search })
   const [rows] = await pool.execute(
     `SELECT p.* FROM patients p ${where} ORDER BY p.last_name, p.first_name`,
     params,

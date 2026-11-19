@@ -163,7 +163,7 @@ function InkLayer({ geometry, strokes = [], paintEnabled, penColor, penCondition
   }
 
   function handlePointerDown(e) {
-    if (!paintEnabled) return
+    if (!paintEnabled || e.button !== 0 || e.isPrimary === false) return
     e.stopPropagation()
     e.target.setPointerCapture?.(e.pointerId)
     onPaintStart()
@@ -424,9 +424,9 @@ export default function Tooth3D({
             </mesh>
           )}
           {toothGeometry && (
-            <mesh castShadow receiveShadow geometry={toothGeometry}
-              raycast={canSelect ? THREE.Mesh.prototype.raycast : () => null}
-              onClick={canSelect ? handleSurfaceClick : undefined}
+            <mesh castShadow receiveShadow geometry={toothGeometry} userData={{ toothCrown: true }}
+              raycast={THREE.Mesh.prototype.raycast}
+              onClick={handleSurfaceClick}
               onPointerMove={canSelect ? handleSurfaceHover : undefined}
               onPointerOut={() => setHoveredSurface(null)}
               onPointerDown={() => setHoveredSurface(null)}>

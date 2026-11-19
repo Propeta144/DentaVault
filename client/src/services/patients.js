@@ -1,8 +1,8 @@
 import api, { withBlobErrors } from './api'
 import { todayISO } from '../utils/formatDate'
 
-export function listPatients({ search = '', sort = 'name', page = 1, limit = 20 } = {}) {
-  return api.get('/patients', { params: { search, sort, page, limit } }).then((r) => r.data)
+export function listPatients({ search = '', searchMode, sort = 'name', page = 1, limit = 20 } = {}) {
+  return api.get('/patients', { params: { search, searchMode, sort, page, limit } }).then((r) => r.data)
 }
 
 // Parehong auth-required-blob pattern gaya ng downloadImportTemplate sa

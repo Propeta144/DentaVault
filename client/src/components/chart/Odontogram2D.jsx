@@ -215,7 +215,14 @@ export default function Odontogram2D({ patientId, canEdit, printMode = false, al
       {/* Walang sariling card (border/shadow): nasa loob na ito ng card ng
           tabs, kaya card-in-card dati (critique 2026-10-25). Sa print, pareho
           pa rin (walang border doon). */}
-      <div data-odontogram-scroll className="-mx-1 overflow-x-auto px-1 py-2 print:mx-0 print:overflow-visible print:p-0">
+      <div data-odontogram-scroll className="-mx-1 overflow-x-auto px-1 py-2 print:mx-0 print:overflow-visible print:p-0"
+        onClick={!printMode ? (event) => {
+          if (event.target.closest('[id^="tooth-"]')) return
+          onToothSelect?.(null)
+          setHighlightedTooth(null)
+          const focused = document.activeElement
+          if (event.currentTarget.contains(focused)) focused.blur()
+        } : undefined}>
         <svg
           data-dentition={dentition}
           viewBox={`0 0 ${layout.width} ${layout.height}`}
