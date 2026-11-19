@@ -8,8 +8,8 @@ export function listPatients({ search = '', searchMode, sort = 'name', page = 1,
 // Parehong auth-required-blob pattern gaya ng downloadImportTemplate sa
 // patientImport.js — hindi kasi makakapagpadala ng Bearer token yung plain
 // <a href>.
-export async function exportPatientsCsv({ search = '' } = {}) {
-  const response = await withBlobErrors(api.get('/patients/export', { params: { search }, responseType: 'blob' }))
+export async function exportPatientsCsv({ search = '', searchMode } = {}) {
+  const response = await withBlobErrors(api.get('/patients/export', { params: { search, searchMode }, responseType: 'blob' }))
   const url = URL.createObjectURL(response.data)
   const link = document.createElement('a')
   link.href = url

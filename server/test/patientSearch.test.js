@@ -2,9 +2,9 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { DatabaseSync } from 'node:sqlite'
 import { patientSearchFilter } from '../src/utils/patientSearch.js'
-import { listPatients } from '../src/models/patientModel.js'
+import { listPatients, listPatientsForExport } from '../src/models/patientModel.js'
 import pool from '../src/config/db.js'
-import { list } from '../src/controllers/patients.controller.js'
+import { list, exportCsv } from '../src/controllers/patients.controller.js'
 
 // Execute the generated, portable name predicate against a temporary in-memory
 // database. No credentials, external database, or patient records are used.
@@ -44,10 +44,14 @@ test('wildcards and punctuation cannot turn a sidebar search into all patients',
   assert.deepEqual(matches(''), [1, 2, 3, 4, 5, 7])
 })
 
-test('the patient list and CSV retain their existing substring search', () => {
+test('requests without prefix mode retain legacy substring search', () => {
   assert.deepEqual(matches('b', null), [1, 2, 3, 5])
   // Explicit default: the helper does not treat unknown modes as prefix mode.
   assert.deepEqual(matches('b', 'other'), [1, 2, 3, 5])
+})
+
+test('a D search matches the surname start in Dela Cruz, not an internal D in Abad', () => {
+  assert.deepEqual(matches('d'), [4])
 })
 
 test('patient rows and total use the same prefix filter before pagination', async (t) => {
@@ -76,4 +80,34 @@ test('the HTTP controller forwards prefix mode to the database query', async (t)
   assert.deepEqual(calls[0].params, { nameWord0: '% b%' })
   assert.equal(result.patients[0].id, 3)
   assert.equal(result.limit, 8)
+})
+
+test('CSV export applies the same prefix filter as the paginated list', async (t) => {
+  const calls = []
+  t.mock.method(pool, 'execute', async (sql, params) => {
+    calls.push({ sql, params })
+    return /COUNT\(\*\)/.test(sql) ? [[{ total: 0 }]] : [[]]
+  })
+  await listPatients({ search: 'd', searchMode: 'name_prefix', sort: 'name_desc', limit: 20, offset: 20 })
+  await listPatientsForExport({ search: 'd', searchMode: 'name_prefix' })
+  assert.deepEqual(calls[0].params, calls[2].params)
+  assert.equal(calls[0].sql.split('WHERE ')[1].split('ORDER BY')[0].trim(), calls[2].sql.split('WHERE ')[1].split('ORDER BY')[0].trim())
+  assert.match(calls[0].sql, /ORDER BY p.last_name DESC, p.first_name DESC/)
+  assert.match(calls[0].sql, /LIMIT 20 OFFSET 20/)
+  assert.doesNotMatch(calls[2].sql, /LIMIT/)
+})
+
+test('the CSV endpoint forwards prefix mode and records the export audit entry', async (t) => {
+  const calls = []
+  t.mock.method(pool, 'execute', async (sql, params) => { calls.push({ sql, params }); return [[]] })
+  const headers = {}
+  const result = await new Promise((resolve, reject) => {
+    exportCsv({ query: { search: 'd', searchMode: 'name_prefix' }, user: { userId: 1 }, ip: '127.0.0.1' },
+      { setHeader: (name, value) => { headers[name] = value }, send: resolve }, reject)
+  })
+  assert.deepEqual(calls[0].params, { nameWord0: '% d%' })
+  assert.match(calls[1].sql, /INSERT INTO audit_logs/)
+  assert.equal(calls[1].params.action, 'EXPORT_PATIENTS_CSV')
+  assert.equal(headers['Content-Type'], 'text/csv')
+  assert.match(result, /^Last Name,First Name/)
 })

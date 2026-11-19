@@ -50,8 +50,8 @@ export async function listPatients({ search, searchMode, sort, limit, offset }) 
 // (tignan route). Ginagamit ulit yung parehong search filter ng list
 // view, kaya kapag "Export CSV" pagkatapos mag-search, filtered results
 // lang ang lalabas, hindi lahat ng patient.
-export async function listPatientsForExport({ search }) {
-  const { where, params } = patientSearchFilter({ search })
+export async function listPatientsForExport({ search, searchMode }) {
+  const { where, params } = patientSearchFilter({ search, searchMode })
   const [rows] = await pool.execute(
     `SELECT p.* FROM patients p ${where} ORDER BY p.last_name, p.first_name`,
     params,

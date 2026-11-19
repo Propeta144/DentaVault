@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { PROFILE_PATH, profileState } from '../utils/selectedPatient'
 import {
@@ -77,19 +77,18 @@ export default function PatientsListPage() {
   const [exporting, setExporting] = useState(false)
   const isDentist = user.role === 'dentist'
 
-  const reload = useCallback(() => {
+  useEffect(() => {
+    let cancelled = false
     setLoading(true)
     setError('')
-    listPatients({ search, sort, page, limit: PAGE_SIZE })
-      .then(setData)
-      .catch((err) => setError(err.response?.data?.error || 'Failed to load patients'))
-      .finally(() => setLoading(false))
+    const timeout = setTimeout(() => {
+      listPatients({ search: search.trim(), searchMode: 'name_prefix', sort, page, limit: PAGE_SIZE })
+        .then((result) => { if (!cancelled) setData(result) })
+        .catch((err) => { if (!cancelled) setError(err.response?.data?.error || 'Failed to load patients') })
+        .finally(() => { if (!cancelled) setLoading(false) })
+    }, 300)
+    return () => { cancelled = true; clearTimeout(timeout) }
   }, [search, sort, page])
-
-  useEffect(() => {
-    const timeout = setTimeout(reload, 300) // debounce so we don't fire a search request on every keystroke
-    return () => clearTimeout(timeout)
-  }, [reload])
 
   function openProfile(patient) {
     navigate(PROFILE_PATH, { state: profileState(patient.patient_code) })
@@ -124,7 +123,7 @@ export default function PatientsListPage() {
   async function handleExport() {
     setExporting(true)
     try {
-      await exportPatientsCsv({ search })
+      await exportPatientsCsv({ search: search.trim(), searchMode: 'name_prefix' })
     } catch (err) {
       showToast(err.response?.data?.error || 'Failed to export patients.', { type: 'error' })
     } finally {
@@ -198,6 +197,8 @@ export default function PatientsListPage() {
             aria-label="Search patients by name"
             value={search}
             onChange={(e) => {
+              setLoading(true)
+              setError('')
               setSearch(e.target.value)
               setPage(1)
             }}
@@ -208,6 +209,8 @@ export default function PatientsListPage() {
           value={sort}
           aria-label="Sort patients"
           onChange={(e) => {
+            setLoading(true)
+            setError('')
             setSort(e.target.value)
             setPage(1)
           }}
@@ -251,7 +254,7 @@ export default function PatientsListPage() {
         />
       )}
 
-      {!loading && data.patients.length > 0 && (
+      {!loading && !error && data.patients.length > 0 && (
         <>
           {/* Card list: small screens only. Buong card ang pipindutin para
               buksan ang profile; nasa ⋯ menu ang Edit/Delete. */}
@@ -375,7 +378,7 @@ export default function PatientsListPage() {
         </>
       )}
 
-      {data.total > 0 && !loading && (
+      {data.total > 0 && !loading && !error && (
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm text-slate-500">
           <p>
             {data.total} patient{data.total === 1 ? '' : 's'}
@@ -386,7 +389,7 @@ export default function PatientsListPage() {
             <div className="flex gap-2">
               <button
                 type="button"
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                onClick={() => { setLoading(true); setError(''); setPage((p) => Math.max(1, p - 1)) }}
                 disabled={page <= 1}
                 className="flex min-h-11 items-center gap-1 rounded-md border border-slate-300 bg-white px-4 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-40"
               >
@@ -395,7 +398,7 @@ export default function PatientsListPage() {
               </button>
               <button
                 type="button"
-                onClick={() => setPage((p) => Math.min(data.totalPages, p + 1))}
+                onClick={() => { setLoading(true); setError(''); setPage((p) => Math.min(data.totalPages, p + 1)) }}
                 disabled={page >= data.totalPages}
                 className="flex min-h-11 items-center gap-1 rounded-md border border-slate-300 bg-white px-4 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-40"
               >

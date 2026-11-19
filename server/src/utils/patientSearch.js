@@ -1,5 +1,5 @@
-// Sidebar search matches the start of name words, including compound surnames.
-// Keep list/export substring search unchanged. All user text stays in parameters.
+// Patient search matches the start of name words, including compound surnames.
+// Callers select prefix mode explicitly; all user text stays in parameters.
 export function patientSearchFilter({ search, searchMode } = {}) {
   const base = 'WHERE p.deleted_at IS NULL'
   if (!search) return { where: base, params: {} }

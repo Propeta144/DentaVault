@@ -37,7 +37,9 @@ export const list = asyncHandler(async (req, res) => {
 })
 
 export const exportCsv = asyncHandler(async (req, res) => {
-  const patients = await patientModel.listPatientsForExport({ search: queryText(req.query.search) })
+  const patients = await patientModel.listPatientsForExport({
+    search: queryText(req.query.search), searchMode: queryText(req.query.searchMode),
+  })
 
   // Kasama ang buong Patient Information Record (migration 015). Yes/No na
   // sagot: "Yes" / "No" / blangko (hindi natanong).
