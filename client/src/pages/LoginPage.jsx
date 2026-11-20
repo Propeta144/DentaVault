@@ -160,12 +160,14 @@ export default function LoginPage() {
               - Nakalimutan: walang self-service email reset (walang
                 email-sending sa app), kaya ang clinic ang magbibigay ng temporary password — na papalitan
                 agad ng pasyente sa pag-login (tignan ChangePasswordPage).
+                Dentist: recovery sa authorized technical maintainer.
               - Alam pa pero gustong palitan: sa loob ng app mismo. */}
           <div className="mt-8 space-y-1 text-center text-sm text-slate-500">
             <p>
-              <span className="font-medium text-slate-600">Forgot your password?</span> Contact the clinic for a
-              temporary password. You&apos;ll set a new one right after you sign in.
+              <span className="font-medium text-slate-600">Forgot your password?</span>
             </p>
+            <p>Patients: Contact the clinic for a temporary password.</p>
+            <p>Dentist: Contact the authorized technical maintainer for account recovery.</p>
             <p className="text-slate-500">To change a password you know, sign in and open your account menu.</p>
           </div>
         </div>

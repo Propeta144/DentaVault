@@ -3,8 +3,8 @@ import BrandMark from './BrandMark'
 
 export const HIGHLIGHTS = [
   { icon: ClipboardList, text: 'Treatment history and dental charting in one record' },
-  { icon: ScanLine, text: 'X-rays stored, annotated, and compared side by side' },
-  { icon: ShieldCheck, text: 'Every access logged, as required by the Data Privacy Act' },
+  { icon: ScanLine, text: 'X-ray viewing, annotation, and comparison' },
+  { icon: ShieldCheck, text: 'Audit logs for record access and updates' },
 ]
 
 // Madilim na brand panel sa kaliwa ng Welcome at Login page (lg pataas lang).
@@ -28,9 +28,9 @@ export default function AuthBrandPanel() {
         <h2 className="text-3xl font-semibold leading-tight">
           Patient records,
           <br />
-          charts, and X-rays
+          dental charts, and X-rays
           <br />
-          <span className="text-sky-300">in one secure place.</span>
+          <span className="text-sky-300">in one organized place.</span>
         </h2>
         <ul className="mt-8 space-y-4">
           {HIGHLIGHTS.map(({ icon: Icon, text }) => (
@@ -44,7 +44,7 @@ export default function AuthBrandPanel() {
         </ul>
       </div>
 
-      <p className="relative text-sm text-slate-400">For clinic staff and registered patients only.</p>
+      <div aria-hidden="true" className="h-5 shrink-0" />
     </aside>
   )
 }
